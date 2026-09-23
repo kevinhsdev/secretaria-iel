@@ -1,0 +1,40 @@
+SECRETARIA IEL - Sistema de gestão da secretaria do Instituto Educacional Luterano
+=================================================================================
+
+COMO ABRIR
+  Dê dois cliques em "Iniciar Secretaria.bat".
+  Uma janela preta vai abrir. Ela é o "motor" do sistema; deixe-a aberta (pode minimizar).
+  O navegador abre sozinho em http://localhost:3000
+
+PRIMEIRO ACESSO
+  Usuários: samara (administração), kevin (administração), duda (aprendiz)
+  Senha inicial: luterano   -> o sistema obriga cada pessoa a criar a própria senha.
+
+DADOS DE TESTE x DADOS REAIS (LGPD)
+  Configurações > Importar dados > "Carregar demonstração" cria alunos FICTÍCIOS.
+  Só importe os alunos reais do ACADESC depois da aprovação da Samara/Diretoria.
+  Para usar dados reais: apague a demonstração e importe a exportação de alunos do ACADESC (.xlsx).
+
+ONDE FICAM OS DADOS
+  SecretariaIEL\dados\secretaria.db  (é um arquivo só; faça cópia de segurança dele toda semana,
+  por exemplo copiando para o pen drive ou para o HD da escola, com o sistema fechado).
+
+CONTRATO 2027
+  O modelo usado fica em SecretariaIEL\app\modelos\contrato-2027.xlsx.
+  Se a planilha de contrato mudar, substitua esse arquivo (mesmo nome) pela nova versão.
+  O modelo precisa continuar buscando a matrícula na célula BF2 e os dados na aba "Planilha1".
+
+CONTRATO DE ATIVIDADE EXTRA
+  Modelo: SecretariaIEL\app\modelos\contrato-atividade-extra.xlsx (cópia do "Contrato Atividade Extra 2026").
+  Para trocar, substitua o arquivo mantendo as abas Planilha1, Planilha2 e Planilha3.
+
+FOTOS DAS CARTEIRINHAS
+  O app procura <matrícula>.jpg nas pastas definidas em Configurações > Geral (ex.: fotos alunos\2ºA\2083.jpg).
+
+USAR NOS 3 PCs DA SECRETARIA (depois)
+  1. No PC que ficará como "servidor", edite "Iniciar Secretaria.bat" e, logo ANTES da linha
+       "%~dp0node\node.exe" --no-warnings server.js
+     acrescente uma linha com:
+       set "IEL_REDE=1"
+  2. Libere a porta 3000 no Firewall do Windows (o Windows pergunta na primeira vez; clique "Permitir" em rede privada).
+  3. Nos outros PCs, abra no navegador: http://IP-DO-SERVIDOR:3000  (o IP aparece em "ipconfig").

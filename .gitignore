@@ -1,0 +1,17 @@
+# Node portátil (baixado pelo "Iniciar Secretaria.bat" / ferramentas\instalar-node.ps1)
+node/
+
+# Banco de dados com dados reais de alunos — NUNCA versionar (LGPD)
+dados/
+*.db
+*.db-wal
+*.db-shm
+
+# Planilhas/arquivos com dados reais que alguém copie para dentro do projeto
+*.csv
+entrada/
+
+# Sistema
+Thumbs.db
+desktop.ini
+~$*
