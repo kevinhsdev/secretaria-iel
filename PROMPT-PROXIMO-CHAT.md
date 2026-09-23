@@ -6,7 +6,7 @@ Copie **tudo o que está entre as linhas** e cole como primeira mensagem no Clau
 
 Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Ontem, em outro computador, você construiu comigo as **Etapas 1 e 2** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro. Hoje quero que você **execute a Etapa 3**, sem refazer perguntas que já foram respondidas.
 
-**Repositório (privado):** {{URL_DO_REPOSITORIO}}
+**Repositório (privado):** https://github.com/kevinhsdev/secretaria-iel
 
 Faça nesta ordem:
 

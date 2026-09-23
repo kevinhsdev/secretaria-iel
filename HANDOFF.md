@@ -134,7 +134,7 @@ SecretariaIEL/
 
 ## 6. Como rodar e testar
 
-1. `git clone` do repositório e duplo clique em **`Iniciar Secretaria.bat`**. Na 1ª vez ele baixa o Node sozinho.
+1. `git clone https://github.com/kevinhsdev/secretaria-iel.git` (repositório **privado** da conta `kevinhsdev`; o clone exige login no GitHub) e duplo clique em **`Iniciar Secretaria.bat`**. Na 1ª vez ele baixa o Node sozinho.
 2. Entrar como `kevin` com a senha `luterano`. É obrigatório criar uma senha nova no primeiro acesso.
 3. **Configurações › Importar dados › Carregar demonstração** (alunos, atividades, ingressos e bolsas fictícios).
 4. Em Configurações › Geral, **ajustar as pastas** (prontuários e fotos) para os caminhos do PC atual.
