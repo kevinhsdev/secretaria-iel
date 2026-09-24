@@ -327,3 +327,10 @@ label.chk input { width: 16px; height: 16px; accent-color: var(--azul); }
   .conteudo { padding: 16px; }
 }
 .resultados a.ver-todos { font-size: 12.5px; font-weight: 600; color: var(--azul-2); }
+
+/* Servidor fora do ar e rascunho de janela não salva */
+.sem-conexao { position: fixed; top: 0; left: 0; right: 0; z-index: 90; background: var(--vermelho); color: #fff; padding: 10px 20px;
+  font-size: 14px; text-align: center; box-shadow: var(--sombra); }
+.faixa-rascunho { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--amarelo-claro); border: 1px solid var(--amarelo);
+  color: var(--aviso-txt); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; font-size: 13px; }
+.faixa-rascunho span { flex: 1 1 220px; }

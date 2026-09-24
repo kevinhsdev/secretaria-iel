@@ -22,13 +22,40 @@ const HOST = process.env.IEL_REDE === '1' ? '0.0.0.0' : '127.0.0.1';
 const PUBLICO = path.join(__dirname, 'public');
 
 // ───────────────────────── sessões ─────────────────────────
-const sessoes = new Map(); // token -> { usuario, expira }
+// As sessões ficam na memória e também no banco (só o hash do token, nunca o token): se o servidor cair ou
+// reiniciar (atualização, restauração), ninguém é jogado para a tela de entrada e perde o que estava digitando.
 const DOZE_HORAS = 12 * 3600 * 1000;
+const sessoes = {
+  mem: new Map(),
+  hash: (tok) => crypto.createHash('sha256').update(String(tok)).digest('hex'),
+  get(tok) {
+    let s = this.mem.get(tok);
+    if (!s) {
+      const r = db.prepare('SELECT uid, expira, bloqueada FROM sessoes WHERE hash = ?').get(this.hash(tok));
+      if (r) { s = { uid: r.uid, expira: r.expira, bloqueada: !!r.bloqueada, gravado: r.expira }; this.mem.set(tok, s); }
+    }
+    return s;
+  },
+  set(tok, s) {
+    this.mem.set(tok, { ...s, gravado: s.expira });
+    db.prepare('INSERT OR REPLACE INTO sessoes (hash, uid, expira, bloqueada) VALUES (?, ?, ?, ?)').run(this.hash(tok), s.uid, s.expira, s.bloqueada ? 1 : 0);
+  },
+  // Grava no banco o que mudou (prazo ou bloqueio de tela)
+  gravar(tok) {
+    const s = this.mem.get(tok);
+    if (!s) return;
+    db.prepare('UPDATE sessoes SET expira = ?, bloqueada = ? WHERE hash = ?').run(s.expira, s.bloqueada ? 1 : 0, this.hash(tok));
+    s.gravado = s.expira;
+  },
+  delete(tok) { this.mem.delete(tok); db.prepare('DELETE FROM sessoes WHERE hash = ?').run(this.hash(tok)); },
+};
+db.prepare('DELETE FROM sessoes WHERE expira < ?').run(Date.now());
 function sessaoDe(req) {
   const tok = (req.headers.cookie || '').split(/;\s*/).find((c) => c.startsWith('iel='))?.slice(4);
   const s = tok && sessoes.get(tok);
   if (!s || s.expira < Date.now()) { if (tok) sessoes.delete(tok); return null; }
   s.expira = Date.now() + DOZE_HORAS;
+  if (s.expira - s.gravado > 10 * 60 * 1000) sessoes.gravar(tok); // não escreve no banco a cada clique
   const u = db.prepare('SELECT id, login, nome, perfil, trocar_senha, ativo FROM usuarios WHERE id = ?').get(s.uid);
   return u && u.ativo ? { token: tok, usuario: u, bloqueada: !!s.bloqueada } : null;
 }
@@ -279,12 +306,14 @@ rota('POST', '/api/logout', async (req, res, { sessao }) => {
   json(res, 200, { ok: true }, { 'Set-Cookie': 'iel=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
 });
 
+// Pública e sem dado nenhum: a tela usa para saber se o servidor voltou depois de cair
+rota('GET', '/api/versao', async (req, res) => json(res, 200, { versao: VERSAO }), true);
 rota('GET', '/api/eu', async (req, res, { u, sessao }) => json(res, 200, { ...u, versao: VERSAO, bloqueada: !!sessao.bloqueada, config: cfgPublica() }));
 
 // ── Bloqueio de tela (balcão sem ninguém por perto) ──
 rota('POST', '/api/bloquear', async (req, res, { u, sessao }) => {
   const s = sessoes.get(sessao.token);
-  if (s) s.bloqueada = true;
+  if (s) { s.bloqueada = true; sessoes.gravar(sessao.token); }
   registrar(u.login, 'bloqueou a tela', '');
   json(res, 200, { ok: true });
 });
@@ -296,7 +325,7 @@ rota('POST', '/api/desbloquear', async (req, res, { u, sessao }) => {
     falha(403, 'Senha incorreta'); // 403 e não 401: a sessão continua válida, só a tela está bloqueada
   }
   const s = sessoes.get(sessao.token);
-  if (s) s.bloqueada = false;
+  if (s) { s.bloqueada = false; sessoes.gravar(sessao.token); }
   json(res, 200, { ok: true });
 });
 
@@ -638,7 +667,12 @@ rota('PUT', '/api/admin/usuarios/:id', async (req, res, { u, p }) => {
   const b = await corpoJson(req);
   const alvo = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(+p.id) || falha(404, 'Usuário não encontrado');
   if (alvo.id === u.id && (b.ativo === false || b.perfil === 'aprendiz')) falha(400, 'Você não pode desativar ou rebaixar a si mesmo');
-  if (b.resetar_senha) db.prepare('UPDATE usuarios SET senha_hash = ?, trocar_senha = 1 WHERE id = ?').run(hashSenha('luterano'), alvo.id);
+  if (b.resetar_senha) {
+    db.prepare('UPDATE usuarios SET senha_hash = ?, trocar_senha = 1 WHERE id = ?').run(hashSenha('luterano'), alvo.id);
+    // Senha redefinida: quem estava logado com a senha antiga sai
+    db.prepare('DELETE FROM sessoes WHERE uid = ?').run(alvo.id);
+    for (const [tok, s] of sessoes.mem) if (s.uid === alvo.id) sessoes.mem.delete(tok);
+  }
   if (b.perfil) db.prepare('UPDATE usuarios SET perfil = ? WHERE id = ?').run(b.perfil === 'admin' ? 'admin' : 'aprendiz', alvo.id);
   if (b.ativo != null) db.prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(b.ativo ? 1 : 0, alvo.id);
   if (b.nome) db.prepare('UPDATE usuarios SET nome = ? WHERE id = ?').run(b.nome, alvo.id);

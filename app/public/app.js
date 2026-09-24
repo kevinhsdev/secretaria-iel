@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.4.0';
+const VERSAO = '4.5.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -24,7 +24,13 @@ async function api(metodo, url, corpo, bruto) {
   const op = { method: metodo, headers: { 'X-IEL': '1' } };
   if (bruto) op.body = bruto;
   else if (corpo !== undefined) { op.headers['Content-Type'] = 'application/json'; op.body = JSON.stringify(corpo); }
-  const r = await fetch(url, op);
+  let r;
+  try { r = await fetch(url, op); } catch {
+    // O servidor (a janela preta) não respondeu: a janela aberta continua com tudo o que foi digitado
+    semConexao();
+    throw new Error('O computador da secretaria não respondeu. O que você digitou continua aqui: espere a faixa vermelha sumir e tente de novo.');
+  }
+  conexaoVoltou();
   const dados = await r.json().catch(() => ({}));
   if (r.status === 401 && url !== '/api/login') { EU = null; telaLogin(); throw new Error(dados.erro || 'Sessão expirada'); }
   if (r.status === 428) { telaTrocarSenha(true); throw new Error(dados.erro); }
@@ -35,6 +41,97 @@ async function api(metodo, url, corpo, bruto) {
   if (!r.ok) throw new Error(dados.erro || 'Erro ' + r.status);
   if (metodo === 'DELETE' && dados.lixeira_id) avisarLixeira(dados.lixeira_id);
   return dados;
+}
+
+// ───────────── quando o servidor cai ─────────────
+// Faixa vermelha fixa no topo e uma nova tentativa a cada 4 segundos; quando volta, avisa e some sozinha.
+let vigiaConexao = null;
+function semConexao() {
+  if (!$('#semConexao')) {
+    const f = document.createElement('div');
+    f.id = 'semConexao';
+    f.className = 'sem-conexao';
+    f.setAttribute('role', 'alert');
+    f.innerHTML = '<b>Sem conexão com o computador da secretaria.</b> Confira se a janela preta do "Iniciar Secretaria" está aberta. Nada do que você digitou foi perdido — tentando de novo…';
+    document.body.appendChild(f);
+  }
+  if (!vigiaConexao) vigiaConexao = setInterval(async () => {
+    try { const r = await fetch('/api/versao', { cache: 'no-store' }); if (r.status < 500) conexaoVoltou(true); } catch { /* ainda fora */ }
+  }, 4000);
+}
+function conexaoVoltou(avisar) {
+  const f = $('#semConexao');
+  if (vigiaConexao) { clearInterval(vigiaConexao); vigiaConexao = null; }
+  if (f) { f.remove(); if (avisar) toast('A conexão voltou. Pode salvar de novo.'); }
+}
+
+// ───────────── rascunho das janelas ─────────────
+// Tudo o que é digitado numa janela com formulário fica guardado nesta aba do navegador (sessionStorage, some ao
+// fechar o navegador). Se a janela fecha normalmente (salvou ou cancelou), o rascunho é apagado. Se o sistema cai,
+// a página recarrega ou pede para entrar de novo, na próxima vez que a mesma janela abrir aparece "Recuperar".
+const RASCUNHO = 'iel-rascunho:';
+const RASCUNHO_HORAS = 12;
+const camposDaJanela = (el) => $$('input[id], select[id], textarea[id]', el).filter((i) => !['password', 'file', 'hidden'].includes(i.type));
+function guardarRascunho(tituloTxt, el) {
+  const campos = {};
+  let algo = false;
+  for (const i of camposDaJanela(el)) {
+    campos[i.id] = i.type === 'checkbox' || i.type === 'radio' ? i.checked : i.value;
+    if (i.type !== 'checkbox' && i.type !== 'radio' && i.value && i.value !== i.defaultValue) algo = true;
+  }
+  try {
+    if (algo) sessionStorage.setItem(RASCUNHO + tituloTxt, JSON.stringify({ quando: Date.now(), tela: location.hash, campos }));
+    else sessionStorage.removeItem(RASCUNHO + tituloTxt);
+  } catch { /* navegador sem armazenamento */ }
+}
+function lerRascunho(tituloTxt) {
+  try {
+    const r = JSON.parse(sessionStorage.getItem(RASCUNHO + tituloTxt) || 'null');
+    if (r && Date.now() - r.quando < RASCUNHO_HORAS * 3600000) return r;
+    sessionStorage.removeItem(RASCUNHO + tituloTxt);
+  } catch { /* ignora */ }
+  return null;
+}
+const apagarRascunho = (tituloTxt) => { try { sessionStorage.removeItem(RASCUNHO + tituloTxt); } catch { /* ignora */ } };
+function rascunhosPendentes() {
+  try { return Object.keys(sessionStorage).filter((k) => k.startsWith(RASCUNHO)).map((k) => k.slice(RASCUNHO.length)).filter(lerRascunho); } catch { return []; }
+}
+// Faixa no topo de qualquer tela: "ficou uma janela sem salvar", com o caminho de volta
+function mostrarRascunhos() {
+  const caixa = $('#rascunhos');
+  if (!caixa) return;
+  const lista = rascunhosPendentes().filter((t) => !$$('.modal h2 span').some((s) => s.textContent === t));
+  caixa.innerHTML = lista.length ? `<div class="aviso-fixo">📝 <b>Ficou sem salvar:</b> ${lista.map((t) => {
+    const r = lerRascunho(t);
+    return `“${esc(t)}” <a class="btn peq" href="${esc(r.tela || '#/')}">Voltar para aquela tela</a>`;
+  }).join(' · ')} <span>Abra a mesma janela de novo e clique em <b>Recuperar</b>.</span>
+    <button class="btn peq" id="rascOk" title="Descartar o que ficou sem salvar">Descartar</button></div>` : '';
+  if ($('#rascOk')) $('#rascOk').onclick = () => { lista.forEach(apagarRascunho); mostrarRascunhos(); };
+}
+function ligarRascunho(tituloTxt, el) {
+  if (!camposDaJanela(el).length) return;
+  const r = lerRascunho(tituloTxt);
+  if (r) {
+    const faixa = document.createElement('div');
+    faixa.className = 'faixa-rascunho';
+    faixa.innerHTML = `<span>Você começou a preencher esta janela ${new Date(r.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} e ela não foi salva.</span>
+      <button type="button" class="btn peq pri" data-rec>Recuperar o que foi digitado</button><button type="button" class="btn peq" data-desc>Descartar</button>`;
+    const alvo = $('h2', el);
+    alvo.after(faixa);
+    $('[data-rec]', faixa).onclick = () => {
+      for (const i of camposDaJanela(el)) {
+        if (!(i.id in r.campos)) continue;
+        if (i.type === 'checkbox' || i.type === 'radio') i.checked = !!r.campos[i.id]; else i.value = r.campos[i.id];
+        i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      faixa.remove(); toast('Recuperado. Confira e salve.');
+    };
+    $('[data-desc]', faixa).onclick = () => { apagarRascunho(tituloTxt); faixa.remove(); };
+  }
+  let t;
+  const salvar = () => { clearTimeout(t); t = setTimeout(() => guardarRascunho(tituloTxt, el), 300); };
+  el.addEventListener('input', salvar);
+  el.addEventListener('change', salvar);
 }
 
 let toastTimer;
@@ -73,12 +170,14 @@ function modal(tituloTxt, corpoHtml, { onAbrir } = {}) {
   const f = document.createElement('div');
   f.className = 'fundo-modal';
   f.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h2><span>${esc(tituloTxt)}</span><button class="x" aria-label="Fechar">×</button></h2>${corpoHtml}</div>`;
-  const fechar = () => { f.remove(); document.removeEventListener('keydown', tecla); };
+  // Fechou a janela (salvou, cancelou ou apertou Esc): o rascunho não serve mais
+  const fechar = () => { f.remove(); document.removeEventListener('keydown', tecla); apagarRascunho(tituloTxt); mostrarRascunhos(); };
   const tecla = (e) => { if (e.key === 'Escape') fechar(); };
   f.addEventListener('click', (e) => { if (e.target === f || e.target.closest('.x') || e.target.closest('[data-fechar]')) fechar(); });
   document.addEventListener('keydown', tecla);
   document.body.appendChild(f);
   onAbrir && onAbrir(f, fechar);
+  if (tituloTxt !== 'Confirmar') ligarRascunho(tituloTxt, f);
   return { el: f, fechar };
 }
 
@@ -308,7 +407,7 @@ async function iniciar() {
         <span class="saudacao" id="saudacao"></span>
         <div class="busca"><input id="busca" placeholder="Buscar em tudo: aluno, responsável, CPF, atendimento, aviso…" autocomplete="off" aria-label="Buscar em todo o sistema" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
       </header>
-      <div id="avisos"></div>
+      <div id="avisos"></div><div id="rascunhos"></div>
       <main class="conteudo" id="conteudo"></main>
     </div>
   </div>`;
@@ -379,6 +478,7 @@ async function rotear() {
     if (qTela && fq) { fq.value = qTela; fq.dispatchEvent(new Event('input')); }
   } catch (e) { c.innerHTML = `<div class="cartao"><h2>Ops!</h2><p>${esc(e.message)}</p></div>`; }
   atualizarBadge();
+  mostrarRascunhos();
   window.scrollTo(0, 0);
 }
 

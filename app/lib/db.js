@@ -158,6 +158,8 @@ CREATE TABLE IF NOT EXISTS lixeira (
   id INTEGER PRIMARY KEY, tipo TEXT NOT NULL, rotulo TEXT, aluno_id INTEGER, dados TEXT NOT NULL,
   usuario TEXT, excluido_em TEXT NOT NULL, demo INTEGER NOT NULL DEFAULT 0
 );
+-- Sessões abertas (só o hash do token): sobrevivem a um reinício do servidor
+CREATE TABLE IF NOT EXISTS sessoes (hash TEXT PRIMARY KEY, uid INTEGER NOT NULL, expira INTEGER NOT NULL, bloqueada INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS ix_alunos_nome ON alunos(nome);
 CREATE INDEX IF NOT EXISTS ix_atend_data ON atendimentos(data);
 CREATE INDEX IF NOT EXISTS ix_avisos_data ON saida_avisos(data);
