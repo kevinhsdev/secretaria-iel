@@ -191,6 +191,12 @@ SecretariaIEL/
   seletor, as cores escuras venceriam por especificidade e a impressão sairia com fundo escuro.
 - O botão fica na barra lateral (`#tema`, classe `.tema-btn`) e a tecla `/` leva o foco para a busca.
 
+**Versão (armadilha que já mordeu):** o navegador lê `public/*.js` do disco a cada carregamento, mas o servidor é o
+processo aberto na janela preta. Depois de um `git pull`, as telas ficam novas e o servidor velho — e as rotas novas
+respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a constante `VERSAO`, repetida em
+`public/app.js`: quando as duas diferem, o app mostra uma faixa vermelha mandando reabrir o "Iniciar Secretaria".
+**Ao mudar uma, mude a outra** — o teste de versão compara as duas.
+
 **Convenções do código:**
 - Tudo em português (nomes de funções, variáveis e mensagens).
 - `rota(metodo, padrao, fn)`: rotas novas entram como módulo em `rotas/*.js` recebendo `ctx`.

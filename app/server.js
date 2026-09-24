@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { db, inicializar, cfg, cfgPublica, registrar, registrarAcesso, transacao, hashSenha, conferirSenha, PASTA_DADOS, restauracao } = require('./lib/db');
 const copias = require('./lib/backup');
+const { VERSAO } = require('./lib/versao');
 const { lerPlanilha, serialParaIso } = require('./lib/planilha');
 const S = require('./lib/series');
 const { gerarContrato } = require('./lib/contrato');
@@ -277,7 +278,7 @@ rota('POST', '/api/logout', async (req, res, { sessao }) => {
   json(res, 200, { ok: true }, { 'Set-Cookie': 'iel=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
 });
 
-rota('GET', '/api/eu', async (req, res, { u, sessao }) => json(res, 200, { ...u, bloqueada: !!sessao.bloqueada, config: cfgPublica() }));
+rota('GET', '/api/eu', async (req, res, { u, sessao }) => json(res, 200, { ...u, versao: VERSAO, bloqueada: !!sessao.bloqueada, config: cfgPublica() }));
 
 // ── Bloqueio de tela (balcão sem ninguém por perto) ──
 rota('POST', '/api/bloquear', async (req, res, { u, sessao }) => {

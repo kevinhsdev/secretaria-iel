@@ -1,6 +1,10 @@
 // Secretaria IEL — interface (sem bibliotecas externas: funciona sem internet)
 'use strict';
 
+// Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
+// enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
+const VERSAO = '4.0.0';
+
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -25,6 +29,9 @@ async function api(metodo, url, corpo, bruto) {
   if (r.status === 401 && url !== '/api/login') { EU = null; telaLogin(); throw new Error(dados.erro || 'Sessão expirada'); }
   if (r.status === 428) { telaTrocarSenha(true); throw new Error(dados.erro); }
   if (r.status === 423 && url !== '/api/desbloquear') { if (window.mostrarBloqueio) window.mostrarBloqueio(); throw new Error(dados.erro || 'Tela bloqueada'); }
+  if (r.status === 404 && /rota não encontrada/i.test(dados.erro || '')) {
+    throw new Error('Esta tela é mais nova que o sistema que está aberto. Feche a janela preta do "Iniciar Secretaria" e abra de novo.');
+  }
   if (!r.ok) throw new Error(dados.erro || 'Erro ' + r.status);
   return dados;
 }
@@ -122,6 +129,22 @@ function aplicarDensidade(d, escolhido) {
   const compacta = d === 'compacta';
   document.documentElement.dataset.densidade = compacta ? 'compacta' : 'normal';
   if (escolhido) { try { localStorage.setItem('iel-compacto', compacta ? '1' : '0'); } catch { /* sem armazenamento */ } }
+}
+
+// O navegador lê as telas do disco na hora, mas o servidor é o processo que está aberto na janela preta.
+// Depois de uma atualização (git pull), os dois ficam diferentes até reabrir o "Iniciar Secretaria".
+function avisarVersaoAntiga() {
+  if (EU.versao === VERSAO) return;
+  const caixa = $('#avisos');
+  if (!caixa) return;
+  caixa.insertAdjacentHTML('afterbegin', `<div class="aviso-fixo perigo">🔄 <b>O sistema foi atualizado neste computador</b>
+    (telas ${esc(VERSAO)}, servidor ${esc(EU.versao || 'anterior à 4.0.0')}). Feche a <b>janela preta</b> do "Iniciar Secretaria" e abra de novo —
+    algumas telas não vão funcionar até lá. <button class="btn peq" id="avVersao">Tentar reiniciar sozinho</button></div>`);
+  $('#avVersao').onclick = tentar(async () => {
+    try { await api('POST', '/api/admin/reiniciar'); } catch { /* servidor antigo pode não ter essa rota */ }
+    toast('Se o sistema não voltar em alguns segundos, feche e abra a janela preta.');
+    setTimeout(() => location.reload(), 5000);
+  });
 }
 
 // Atalhos e escuta do tema do Windows — ligados uma vez só
@@ -273,6 +296,7 @@ async function iniciar() {
   aplicarDensidade(densidadeAtual());
   ligarAtalhos();
   if (window.ligarBloqueio) window.ligarBloqueio();
+  avisarVersaoAntiga();
   if (EU.bloqueada && window.mostrarBloqueio) window.mostrarBloqueio();
   configurarBusca();
   window.onhashchange = rotear;

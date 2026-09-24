@@ -6,6 +6,11 @@ COMO ABRIR
   Uma janela preta vai abrir. Ela é o "motor" do sistema; deixe-a aberta (pode minimizar).
   O navegador abre sozinho em http://localhost:3000
 
+DEPOIS DE ATUALIZAR O SISTEMA (git pull / versao nova)
+  FECHE A JANELA PRETA E ABRA O "Iniciar Secretaria.bat" DE NOVO.
+  O navegador pega as telas novas na hora, mas a janela preta continua rodando a versao antiga
+  ate ser reaberta — e ai algumas telas reclamam. O proprio app avisa em vermelho quando isso acontece.
+
 PRIMEIRO ACESSO
   Usuários: samara (administração), kevin (administração), duda (aprendiz)
   Senha inicial: luterano   -> o sistema obriga cada pessoa a criar a própria senha.
