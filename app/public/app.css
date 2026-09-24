@@ -334,3 +334,11 @@ label.chk input { width: 16px; height: 16px; accent-color: var(--azul); }
 .faixa-rascunho { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--amarelo-claro); border: 1px solid var(--amarelo);
   color: var(--aviso-txt); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; font-size: 13px; }
 .faixa-rascunho span { flex: 1 1 220px; }
+
+/* Ajuda dentro da tela */
+.ajuda-btn { border-radius: 16px; color: var(--azul-2); font-weight: 600; }
+.ajuda .ajuda-serve { font-size: 15px; background: var(--azul-fundo); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }
+.ajuda h3 { margin: 14px 0 6px; }
+.ajuda ol, .ajuda ul { margin: 0; padding-left: 22px; }
+.ajuda li { margin: 5px 0; line-height: 1.45; }
+@media print { .ajuda-btn { display: none; } }

@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.6.0';
+const VERSAO = '4.7.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -199,7 +199,7 @@ function modal(tituloTxt, corpoHtml, { onAbrir } = {}) {
   document.addEventListener('keydown', tecla);
   document.body.appendChild(f);
   onAbrir && onAbrir(f, fechar);
-  if (tituloTxt !== 'Confirmar') ligarRascunho(tituloTxt, f);
+  if (tituloTxt !== 'Confirmar' && !tituloTxt.startsWith('Ajuda · ')) ligarRascunho(tituloTxt, f);
   return { el: f, fechar };
 }
 
@@ -427,6 +427,7 @@ async function iniciar() {
     <div class="principal">
       <header class="topo">
         <span class="saudacao" id="saudacao"></span>
+        <button class="btn peq ajuda-btn" id="ajuda" title="Como usar esta tela (tecla ?)" aria-label="Ajuda desta tela">? Ajuda</button>
         <div class="busca"><input id="busca" placeholder="Buscar em tudo: aluno, responsável, CPF, atendimento, aviso…" autocomplete="off" aria-label="Buscar em todo o sistema" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
       </header>
       <div id="avisos"></div><div id="rascunhos"></div>
@@ -444,6 +445,7 @@ async function iniciar() {
   avisarVersaoAntiga();
   if (EU.bloqueada && window.mostrarBloqueio) window.mostrarBloqueio();
   configurarBusca();
+  if (window.ligarAjuda) window.ligarAjuda();
   window.onhashchange = rotear;
   rotear();
 }
