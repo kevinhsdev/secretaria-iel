@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **24/09/2026**, versão **4.1.0** (fim da **Etapa 4**). O que vem a seguir está em §7.
+> Última atualização: **24/09/2026**, versão **4.2.0** (Etapa 4 + página inicial reorganizada). O que vem a seguir está em §7.
 
 ---
 
@@ -139,6 +139,15 @@
   esqueleto cinza no carregamento, telas vazias que explicam o próximo passo, **modo compacto** (mais linhas na tela),
   layout de celular para o portão e atalho `/` para a busca.
 
+### Página inicial reorganizada (versão 4.2.0, 24/09/2026)
+- A tela **Início** (`TELAS['']` em `app.js`) agora tem três blocos, na ordem em que a secretaria pensa:
+  1. **Para hoje:** 4 cartões que são links — minhas tarefas (→ Meu dia), portão/quem busca hoje (→ Portão), atendimentos de hoje (→ Atendimentos) e lembretes do mês (→ Calendário). Verde quando está tudo em dia, vermelho quando tem algo esperando.
+  2. **Atalhos:** registrar atendimento (abre a janela direto), consultar o portão, emitir documento, achar um aluno (foca a busca, tecla /) e cadastrar aluno novo.
+  3. **Matrícula e rematrícula:** os mesmos números de antes, agora clicáveis; documentos vencidos limitados a **5** (com "faltam N documentos" em vez da lista inteira; a lista completa aparece ao passar o mouse); a **próxima data** da campanha fica destacada.
+- A antiga faixa do dia (`window.painelEtapa3` em `etapa3.js`) **saiu**: o Início busca `/api/hoje` sozinho e, se falhar, mostra o resto da página.
+- `/api/hoje` ganhou `lembretes_atrasados`. No celular os cartões ficam 2 por linha (`.grade.g4.kpis`).
+- Teste novo `t-inicio` (navegador): confere os blocos, os 8 links, os atalhos abrindo as janelas certas e todas as telas do menu, como admin (35 ok) e como aprendiz (32 ok).
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -251,7 +260,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
   **impressão no modo escuro** (5, conferindo as cores calculadas); **versão** (6, inclusive fingindo servidor velho);
   **atualização** (16, montando um "GitHub" local com `git init --bare` para não depender da internet) e
   **atualização de ponta a ponta** (12, subindo o app com `IEL_RAIZ` apontado para o repositório de teste);
-  **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
+  **página inicial** (`t-inicio`, 35 ok como admin e 32 como aprendiz); **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
   que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
 - Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
 - Para copiar o banco a fim de testar, copie **também** `secretaria.db-wal` e `-shm`: no modo WAL boa parte dos dados ainda não está no arquivo principal.

@@ -656,21 +656,6 @@ window.fichaEtapa3 = async (el, a) => {
   $('#s_at', el).onclick = () => formAtendimento(at, null, a);
 };
 
-// ───────────── Faixa do dia no painel inicial ─────────────
-window.painelEtapa3 = async (el) => {
-  const h = await api('GET', '/api/hoje');
-  const pend = h.tarefas.minhas - h.tarefas.minhas_feitas;
-  el.innerHTML = `<div class="cartao" style="border-left:4px solid var(--amarelo);margin-bottom:16px">
-    <div class="acoes" style="justify-content:space-between">
-      <div><b>${esc(h.dia_nome)}, ${dataBR(h.data)}</b> ·
-        ${pend ? `você tem <b>${pend}</b> tarefa(s) para hoje` : 'suas tarefas de hoje estão em dia 🎉'}
-        ${h.saida.pendentes ? ` · <b>${h.saida.pendentes}</b> aviso(s) de saída aguardando no portão` : ''}
-        ${h.atendimentos.em_aberto ? ` · <b>${h.atendimentos.em_aberto}</b> atendimento(s) em aberto` : ''}
-        ${h.lembretes_total ? ` · <b>${h.lembretes_total}</b> lembrete(s) do mês` : ''}</div>
-      <div class="acoes"><a class="btn peq" href="#/hoje">Meu dia</a><a class="btn peq" href="#/portao">Portão</a></div>
-    </div></div>`;
-};
-
 // Contadores do menu lateral
 window.badgesEtapa3 = async () => {
   try {

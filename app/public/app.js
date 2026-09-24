@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.1.0';
+const VERSAO = '4.2.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -359,46 +359,88 @@ async function atualizarBadge() {
 const faixaDemo = (p) => (p.demo ? '<div class="faixa-demo">⚠️ <b>Modo demonstração:</b> os alunos exibidos são fictícios. Para usar dados reais, apague a demonstração e importe o ACADESC em Configurações.</div>' : '');
 
 // ───────────── Início ─────────────
+// Três blocos, na ordem em que a secretaria pensa: o que é para hoje, o que fazer rápido e como vai a rematrícula.
+// Todo número é um link para a tela onde se resolve aquilo.
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 TELAS[''] = async (c) => {
-  const p = await api('GET', '/api/painel');
+  // /api/hoje é da Etapa 3: se por algum motivo falhar, o resto da página continua aparecendo
+  const [p, h] = await Promise.all([api('GET', '/api/painel'), api('GET', '/api/hoje').catch(() => null)]);
   const cfg = EU.config;
   const s = p.porStatus, v = p.veteranos || 1;
   const pct = (n) => (100 * n / v).toFixed(1) + '%';
+  const [aa, mm, dd] = hojeIso().split('-');
+  const diasAte = (iso) => Math.round((Date.parse(iso) - Date.parse(hojeIso())) / 86400000);
   const datas = [
     ['Início das matrículas', cfg.data_inicio], ['Fim do desconto (plantão de sábado)', cfg.data_desconto],
     ['Fim da garantia de vaga', cfg.data_garantia_vaga], ['Encerramento das matrículas', cfg.data_fim],
-  ];
-  const diasAte = (iso) => Math.round((Date.parse(iso) - Date.parse(hojeIso())) / 86400000);
-  c.innerHTML = `${faixaDemo(p)}<div id="painelEtapa3"></div>
-  <h1>Painel da secretaria</h1><p class="sub">Matrícula e rematrícula ${p.ano} · ${p.total_alunos} alunos ativos cadastrados</p>
-  <div class="grade g4">
-    <div class="cartao kpi destaque"><div class="rot">Rematrículas concluídas</div><div class="val">${s.concluida}<small style="font-size:14px;color:var(--texto-2)"> / ${p.veteranos}</small></div><div class="det">${pct(s.concluida)} dos veteranos (sem 3ª série EM)</div></div>
-    <div class="cartao kpi"><div class="rot">Em andamento</div><div class="val">${s.reservada}</div><div class="det">pagaram matrícula, falta concluir</div></div>
-    <div class="cartao kpi"><div class="rot">Ainda não iniciaram</div><div class="val">${s.pendente}</div><div class="det">famílias para contatar</div></div>
-    <div class="cartao kpi ${p.pendencias.vencidas ? 'alerta' : ''}"><div class="rot">Pendências de documentos</div><div class="val">${p.pendencias.total}</div><div class="det">${p.pendencias.vencidas} vencidas · ${p.pendencias.vencendo} vencendo em 7 dias</div></div>
+  ].filter(([, d]) => d);
+  const proxima = datas.findIndex(([, d]) => diasAte(d) >= 0);
+
+  // Cartão que é um link: rótulo, número grande e uma linha explicando
+  const bloco = (href, rot, val, det, classe = '') => `<a class="cartao kpi link ${classe}" href="${href}">
+    <div class="rot">${esc(rot)}</div><div class="val">${val}</div><div class="det">${det}</div></a>`;
+  let hoje = '';
+  if (h) {
+    const falta = h.tarefas.minhas - h.tarefas.minhas_feitas;
+    const atras = h.lembretes_atrasados || 0;
+    hoje = `<div class="grade g4 kpis">
+      ${bloco('#/hoje', 'Minhas tarefas', falta ? `${falta} <small>a fazer</small>` : 'Em dia', `${h.tarefas.minhas_feitas} de ${h.tarefas.minhas} feitas hoje`, falta ? 'destaque' : 'ok')}
+      ${bloco('#/portao', 'Portão · quem busca hoje', h.saida.pendentes ? `${h.saida.pendentes} <small>aguardando</small>` : h.saida.total ? 'Conferidos' : 'Nenhum aviso',
+        h.saida.total ? `${plural(h.saida.total, 'aviso', 'avisos')} de saída hoje` : 'as famílias não avisaram nada', h.saida.pendentes ? 'alerta' : 'ok')}
+      ${bloco('#/atendimentos', 'Atendimentos de hoje', h.atendimentos.em_aberto ? `${h.atendimentos.em_aberto} <small>em aberto</small>` : String(h.atendimentos.hoje),
+        h.atendimentos.em_aberto ? `de ${plural(h.atendimentos.hoje, 'registrado', 'registrados')} hoje` : h.atendimentos.hoje ? 'todos resolvidos' : 'nenhum registrado ainda', h.atendimentos.hoje && !h.atendimentos.em_aberto ? 'ok' : '')}
+      ${bloco('#/calendario', 'Lembretes de ' + MESES[+mm - 1], String(h.lembretes_total), atras ? `<span class="aviso-num">${plural(atras, 'atrasado', 'atrasados')}</span>` : 'nada atrasado', atras ? 'alerta' : '')}
+    </div>`;
+  }
+
+  c.innerHTML = `${faixaDemo(p)}
+  <h1>${esc(h ? h.dia_nome : '')}${h ? ', ' : ''}${+dd} de ${MESES[+mm - 1]} de ${aa}</h1>
+  <p class="sub">${p.total_alunos} alunos ativos cadastrados · clique em qualquer número para abrir a tela correspondente</p>
+
+  <h2 class="titulo-secao" style="margin-top:4px">Para hoje</h2>
+  ${hoje}
+  <div class="atalhos">
+    <button class="btn" id="atAtend">${icone('atendimentos')}Registrar atendimento</button>
+    <a class="btn" href="#/portao">${icone('portao')}Consultar o portão</a>
+    <a class="btn" href="#/documentos">${icone('documentos')}Emitir documento</a>
+    <button class="btn" id="atBusca">${icone('alunos')}Achar um aluno <kbd>/</kbd></button>
+    <button class="btn" id="atNovo">${icone('interessados')}Cadastrar aluno novo</button>
+  </div>
+
+  <div class="acoes titulo-secao" style="justify-content:space-between"><span>Matrícula e rematrícula ${p.ano}</span><a href="#/rematricula">Ver por série →</a></div>
+  <div class="grade g4 kpis">
+    ${bloco('#/rematricula', 'Rematrículas concluídas', `${s.concluida}<small> / ${p.veteranos}</small>`, `${pct(s.concluida)} dos veteranos (sem 3ª série EM)`, 'destaque')}
+    ${bloco('#/rematricula', 'Em andamento', String(s.reservada), 'pagaram matrícula, falta concluir')}
+    ${bloco('#/rematricula', 'Ainda não iniciaram', String(s.pendente), 'famílias para contatar')}
+    ${bloco('#/pendencias', 'Pendências de documentos', String(p.pendencias.total), `${p.pendencias.vencidas} vencidas · ${p.pendencias.vencendo} vencendo em 7 dias`, p.pendencias.vencidas ? 'alerta' : '')}
   </div>
   <div class="cartao" style="margin-top:14px">
-    <h3>Andamento da rematrícula ${p.ano}</h3>
-    <div class="barra" role="img" aria-label="Concluídas ${s.concluida}, em andamento ${s.reservada}, não vão renovar ${s.nao_renova + s.transferido}">
+    <div class="barra" role="img" aria-label="Concluídas ${s.concluida}, em andamento ${s.reservada}, não vão renovar ${s.nao_renova + s.transferido}, não iniciadas ${s.pendente}">
       <i class="b-concl" style="width:${pct(s.concluida)}"></i><i class="b-and" style="width:${pct(s.reservada)}"></i><i class="b-nao" style="width:${pct(s.nao_renova + s.transferido)}"></i></div>
     <div class="legenda"><span><i class="b-concl"></i>Concluídas ${s.concluida}</span><span><i class="b-and"></i>Em andamento ${s.reservada}</span><span><i class="b-nao"></i>Não renovam ${s.nao_renova + s.transferido}</span><span><i style="background:var(--cinza-claro)"></i>Não iniciadas ${s.pendente}</span>
       <span>· Alunos novos matriculados: <b>${p.novos}</b></span><span>· Concluintes (3ª EM): <b>${p.concluintes}</b></span></div>
   </div>
   <div class="grade g2" style="margin-top:14px">
-    <div class="cartao"><h3>⚠️ Documentos vencidos ou vencendo</h3>
-      ${p.urgentes.length ? `<table><tbody>${p.urgentes.map((u) => `<tr class="clic" data-id="${u.aluno_id}"><td><b>${esc(titulo(u.nome))}</b><br><small class="dado">${esc(u.turma)} · falta: ${esc(u.faltam.join(', '))}</small></td>
+    <div class="cartao"><div class="acoes" style="justify-content:space-between"><h3 style="margin:0">Documentos vencidos ou vencendo</h3>
+        ${p.urgentes.length ? `<span class="dado">${plural(p.pendencias.vencidas + p.pendencias.vencendo, 'aluno', 'alunos')}</span>` : ''}</div>
+      ${p.urgentes.length ? `<table style="margin-top:6px"><tbody>${p.urgentes.slice(0, 5).map((u) => `<tr class="clic" data-id="${u.aluno_id}" title="Falta: ${esc(u.faltam.join(', '))}"><td><b>${esc(titulo(u.nome))}</b><br><small class="dado">${esc(u.turma)} · ${u.faltam.length === 1 ? 'falta: ' + esc(u.faltam[0]) : `faltam ${u.faltam.length} documentos`}</small></td>
         <td class="num-col"><span class="tag t-${u.situacao}">${u.dias == null ? 'sem data' : u.dias < 0 ? `venceu há ${-u.dias}d` : u.dias === 0 ? 'vence hoje' : `em ${u.dias}d`}</span></td></tr>`).join('')}</tbody></table>
-        <p style="margin:10px 0 0"><a href="#/pendencias">Ver todas as pendências →</a></p>` : '<p class="vazio">Nenhuma pendência urgente 🎉</p>'}
+        <p style="margin:10px 0 0"><a href="#/pendencias">Ver todas as pendências por turma →</a></p>` : '<p class="vazio">Nenhum documento vencido ou vencendo 🎉</p>'}
     </div>
-    <div class="cartao"><h3>📅 Datas da campanha ${p.ano}</h3><div class="datas">
-      ${datas.map(([rot, d]) => { const n = diasAte(d); return `<div class="data-item ${n < 0 ? 'passou' : ''}"><span>${esc(rot)}</span><span><b>${dataBR(d)}</b> ${n > 0 ? `· ${n === 1 ? 'falta' : 'faltam'} ${plural(n, 'dia', 'dias')}` : n === 0 ? '· hoje' : ''}</span></div>`; }).join('')}
+    <div class="cartao"><h3>Datas da campanha ${p.ano}</h3><div class="datas">
+      ${datas.map(([rot, d], i) => { const n = diasAte(d); return `<div class="data-item ${n < 0 ? 'passou' : ''} ${i === proxima ? 'proxima' : ''}"><span>${esc(rot)}${i === proxima ? ` <span class="tag t-reservada">${n === 0 ? 'é hoje' : 'próxima'}</span>` : ''}</span><span><b>${dataBR(d)}</b> ${n > 0 ? `· ${n === 1 ? 'falta' : 'faltam'} ${plural(n, 'dia', 'dias')}` : n < 0 ? '· passou' : ''}</span></div>`; }).join('')}
       </div>
-      <h3 style="margin-top:16px">🤝 Interessados (SIG)</h3>
-      <div class="kanban-mini">${Object.entries(STATUS_INT).map(([k, r]) => `<span class="tag t-${k === 'matriculado' ? 'concluida' : k === 'desistiu' ? 'nao_renova' : 'novo'}">${r}: ${p.interessados[k] || 0}</span>`).join('')}</div>
+      <div class="acoes" style="justify-content:space-between;margin-top:16px"><h3 style="margin:0">Interessados (SIG)</h3><a href="#/interessados">Abrir o funil →</a></div>
+      <div class="kanban-mini" style="margin-top:8px">${Object.entries(STATUS_INT).map(([k, r]) => `<span class="tag t-${k === 'matriculado' ? 'concluida' : k === 'desistiu' ? 'sem_prazo' : 'novo'}">${r}: ${p.interessados[k] || 0}</span>`).join('')}</div>
     </div>
   </div>`;
   $$('tr[data-id]', c).forEach((tr) => (tr.onclick = () => (location.hash = '#/aluno/' + tr.dataset.id)));
-  if (window.painelEtapa3) window.painelEtapa3($('#painelEtapa3')).catch(() => {});
+  $('#atAtend').onclick = tentar(async () => {
+    if (typeof formAtendimento !== 'function') { location.hash = '#/atendimentos'; return; }
+    formAtendimento(await api('GET', '/api/atendimentos'));
+  });
+  $('#atBusca').onclick = () => $('#busca').focus();
+  $('#atNovo').onclick = () => formAluno();
 };
 
 // ───────────── Alunos ─────────────

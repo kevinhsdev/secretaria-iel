@@ -238,7 +238,7 @@ module.exports = function rotina(ctx) {
         feitas: [...fixas, ...avulsas].filter((t) => t.feito).length, lista: minhas },
       saida: { total: avisos.length, pendentes: avisos.filter((v) => !v.conferido_em).length,
         avisos: avisos.map((v) => ({ ...v, turma_rotulo: turmaRotulo(v) })) },
-      lembretes: lembretes.slice(0, 8), lembretes_total: lembretes.length,
+      lembretes: lembretes.slice(0, 8), lembretes_total: lembretes.length, lembretes_atrasados: lembretes.filter((i) => i.atrasado).length,
       atendimentos: { hoje: at.length, em_aberto: at.filter((a) => !a.resolvido).length },
       boletos: { pendentes: db.prepare(`SELECT COUNT(*) n FROM alunos a JOIN rematriculas r ON r.aluno_id = a.id AND r.ano = ?
         WHERE a.ativo = 1 AND r.status IN ('reservada','concluida')

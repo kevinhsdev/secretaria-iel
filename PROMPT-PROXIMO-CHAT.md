@@ -4,7 +4,7 @@ Copie **tudo o que está entre as linhas** e cole como primeira mensagem no Clau
 
 ---
 
-Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Em chats anteriores você construiu comigo as **Etapas 1 a 4** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro, hoje na **versão 4.1.0**.
+Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Em chats anteriores você construiu comigo as **Etapas 1 a 4** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro, hoje na **versão 4.2.0**.
 
 **Repositório (privado):** https://github.com/kevinhsdev/secretaria-iel
 
