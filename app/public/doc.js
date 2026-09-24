@@ -395,6 +395,139 @@ const DOCS = {
     },
     emissao: (v) => ({ tipo: 'Lista de saída (portão)', alunos: [null], descricao: v.turma || 'todas as turmas' }),
   },
+  dados_aluno: {
+    nome: 'Dados guardados sobre o aluno (LGPD)',
+    carregar: async () => api('GET', `/api/alunos/${encodeURIComponent(P.get('aluno') || '')}/dados-pessoais`),
+    campos: ({ cadastro }) => [
+      { id: 'titulo', rot: 'Título', valor: 'RELATÓRIO DE DADOS PESSOAIS' },
+      { id: 'solicitante', rot: 'Quem pediu', valor: '', dica: 'Nome de quem solicitou (responsável legal)' },
+      { id: 'data', rot: 'Data', tipo: 'date', valor: hojeIso() },
+      { id: 'tudo', rot: 'Incluir também o histórico de alterações e consultas', tipo: 'checkbox', valor: true },
+    ],
+    aviso: 'Entregue este relatório quando a família pedir os dados do aluno (art. 18 da LGPD). Confira antes de imprimir.',
+    render: (v, d) => {
+      const a = d.cadastro;
+      const tab = (titulo2, colunas, linhas) => !linhas.length ? '' : `<h3 class="sec">${esc(titulo2)} <span style="font-weight:400">(${linhas.length})</span></h3>
+        <table class="doc" style="font-size:9pt"><thead><tr>${colunas.map((c) => `<th>${esc(c[0])}</th>`).join('')}</tr></thead>
+        <tbody>${linhas.map((l) => `<tr>${colunas.map((c) => `<td>${esc(c[1](l) ?? '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      const dado = (rot, valor) => (valor == null || valor === '' ? '' : `<div><b>${esc(rot)}:</b> ${esc(valor)}</div>`);
+      const sim = (x) => (x ? 'sim' : 'não');
+      return folha(`${TIMBRE}<p class="local-data">Ferraz de Vasconcelos, ${dataExtenso(v.data)}.</p>
+        <h2 class="titulo-doc" style="font-size:13pt">${esc(v.titulo)}</h2>
+        <div class="corpo"><p class="sem-recuo">Em atendimento ao art. 18 da Lei nº 13.709/2018 (LGPD), o Instituto Educacional Luterano
+          informa abaixo <b>todos os dados</b> que mantém em seu sistema de secretaria sobre o(a) aluno(a)
+          <b>${esc(titulo(a.nome))}</b>${a.mat ? `, matrícula ${esc(a.mat)}` : ''}${v.solicitante ? `, a pedido de <b>${esc(v.solicitante)}</b>` : ''}.</p></div>
+        <h3 class="sec">Cadastro</h3>
+        <div class="grade-dados">
+          ${dado('Nome', titulo(a.nome))}${dado('Nome social', a.nome_social)}${dado('Matrícula', a.mat)}${dado('Nascimento', dataBR(a.dt_nasc))}
+          ${dado('CPF', a.cpf)}${dado('RG', a.rg)}${dado('R.A.', a.ra)}${dado('NIS', a.nis)}
+          ${dado('Série', [a.descricao, a.serie, a.turma].filter(Boolean).join(' '))}${dado('Turno', a.turno)}${dado('Ano letivo', a.ano_letivo)}
+          ${dado('Mãe', titulo(a.nome_mae))}${dado('Pai', titulo(a.nome_pai))}${dado('Responsável', titulo(a.nome_resp))}
+          ${dado('Telefones', [a.telefone, a.tel_mae, a.cel_mae, a.tel_pai, a.cel_pai, a.tel_resp].filter(Boolean).join(' · '))}
+          ${dado('E-mails', [a.email, a.email_mae, a.email_pai].filter(Boolean).join(' · '))}
+          ${dado('Endereço', [a.endereco, a.bairro, a.cidade, a.uf, a.cep].filter(Boolean).join(', '))}
+          ${dado('CPF do responsável', a.cpf_resp)}${dado('RG do responsável', a.rg_resp)}
+          ${dado('Filho(a) de funcionário', sim(a.filho_funcionario))}${dado('Observações', a.obs)}
+        </div>
+        ${tab('Matrículas', [['Ano', (l) => l.ano], ['Situação', (l) => l.status], ['Série destino', (l) => l.serie_destino],
+          ['Data da matrícula', (l) => dataBR(l.data_matricula)], ['Observação', (l) => l.obs]], d.matriculas)}
+        ${tab('Documentos entregues', [['Ano', (l) => l.ano], ['Documento', (l) => l.documento], ['Entregue', (l) => sim(l.entregue)],
+          ['Data', (l) => dataBR(l.data_entrega)]], d.documentos_entregues.filter((l) => l.entregue))}
+        ${tab('Atividades extras', [['Ano', (l) => l.ano], ['Atividade', (l) => l.atividade], ['Inscrição', (l) => dataBR(l.data_inscricao)],
+          ['Parcelas', (l) => `${l.parcelas || '?'}x ${l.valor_parcela != null ? 'R$ ' + moeda(l.valor_parcela) : ''}`], ['Situação', (l) => l.status]], d.atividades_extras)}
+        ${tab('Bolsa de estudos', [['Ano', (l) => l.ano], ['Tipo', (l) => l.tipo], ['Etapa', (l) => l.status], ['Ofertado', (l) => (l.ofertado != null ? l.ofertado + '%' : '')],
+          ['Aprovado', (l) => (l.aprovado != null ? l.aprovado + '%' : '')], ['Renda per capita', (l) => (l.per_capita != null ? 'R$ ' + moeda(l.per_capita) : '')]], d.bolsas)}
+        ${tab('Quem pode buscar', [['Nome', (l) => titulo(l.nome)], ['Parentesco', (l) => l.parentesco], ['Documento', (l) => l.documento], ['Telefone', (l) => l.telefone]], d.quem_pode_buscar)}
+        ${tab('Avisos de saída', [['Data', (l) => dataBR(l.data)], ['Quem buscou', (l) => titulo(l.quem)], ['Parentesco', (l) => l.parentesco], ['Como avisaram', (l) => l.canal]], d.avisos_de_saida)}
+        ${tab('Atendimentos', [['Data', (l) => dataBR(l.data)], ['Canal', (l) => l.canal], ['Quem procurou', (l) => titulo(l.pessoa)],
+          ['Assunto', (l) => l.assunto], ['Resolvido', (l) => sim(l.resolvido)]], d.atendimentos)}
+        ${tab('Documentos emitidos', [['Quando', (l) => dataBR(l.quando)], ['Documento', (l) => l.tipo], ['Emitido por', (l) => l.usuario]], d.documentos_emitidos)}
+        ${tab('Boletos entregues', [['Remessa', (l) => l.remessa], ['Entregue em', (l) => dataBR(l.entregue_em)], ['Recebido por', (l) => titulo(l.recebido_por)]], d.boletos_entregues)}
+        ${d.foto ? `<h3 class="sec">Foto</h3><div class="grade-dados">${dado('Foto tirada', sim(d.foto.tirada))}${dado('Data', dataBR(d.foto.data_foto))}
+          ${dado('Inserida no ACADESC', sim(d.foto.acadesc))}${dado('Inserida na SED', sim(d.foto.sed))}${dado('Inserida no Lanche Card', sim(d.foto.lanche))}</div>` : ''}
+        ${v.tudo ? tab('Quem consultou esta ficha', [['Data', (l) => dataBR(l.data)], ['Pessoa', (l) => l.usuario], ['Vezes', (l) => l.vezes]], d.quem_consultou) : ''}
+        ${v.tudo ? tab('Alterações registradas', [['Quando', (l) => new Date(l.quando).toLocaleString('pt-BR')], ['Pessoa', (l) => l.usuario], ['O que foi feito', (l) => l.acao]], d.alteracoes) : ''}
+        <p class="nota">Relatório gerado pelo sistema da secretaria em ${new Date(d.gerado_em).toLocaleString('pt-BR')} por ${esc(d.gerado_por)}.
+          Os dados são tratados para a execução do contrato educacional e para o cumprimento de obrigações legais da escola.
+          Para corrigir, atualizar ou solicitar a eliminação de algum dado, procure a secretaria.</p>
+        <div class="assinatura">Secretaria Escolar</div>`);
+    },
+    emissao: (v, d) => ({ tipo: 'Relatório de dados pessoais (LGPD)', alunos: [d.cadastro.id], descricao: v.solicitante || '' }),
+  },
+  fechamento: {
+    nome: 'Relatório de fechamento',
+    carregar: async () => api('GET', '/api/relatorios?ano=' + encodeURIComponent(P.get('ano') || '')),
+    campos: ({ ano }) => [
+      { id: 'titulo', rot: 'Título', valor: `RELATÓRIO DA SECRETARIA — ${ano}` },
+      { id: 'para', rot: 'Destinatário', valor: 'À Direção e à mantenedora (OASE)' },
+      { id: 'assinante', rot: 'Assina', valor: 'Secretaria Escolar' },
+      { id: 'data', rot: 'Data', tipo: 'date', valor: hojeIso() },
+      { id: 'obs', rot: 'Observações finais', tipo: 'textarea', valor: '' },
+    ],
+    aviso: 'Este é o retrato do ano em uma folha. Confira os números e leve impresso à reunião.',
+    render: (v, d) => {
+      const r = d.rematricula, a = d.alunos, at = d.atendimentos;
+      const linha = (rot, valor, det = '') => `<tr><td>${esc(rot)}</td><td class="n"><b>${esc(valor)}</b></td><td style="font-size:8.5pt">${esc(det)}</td></tr>`;
+      const bloco = (titulo2, linhas) => `<h3 class="sec">${esc(titulo2)}</h3><table class="doc" style="font-size:9.5pt"><tbody>${linhas.join('')}</tbody></table>`;
+      const canais = { balcao: 'Balcão', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail' };
+      const pc = (n, t) => (t ? Math.round((100 * n) / t) + '%' : '—');
+      return folha(`${TIMBRE}<p class="local-data">Ferraz de Vasconcelos, ${dataExtenso(v.data)}.</p>
+        <p class="inep">Código no INEP ${esc(d.escola.inep)}<br>${esc(v.para)}</p>
+        <h2 class="titulo-doc" style="font-size:14pt">${esc(v.titulo)}</h2>
+        <div class="duas-colunas">
+          ${bloco('Alunos', [
+            linha('Alunos ativos', a.ativos),
+            ...Object.entries(a.por_segmento).map(([s, n]) => linha('• ' + s, n, pc(n, a.ativos) + ' do total')),
+            linha('Alunos novos em ' + d.ano, a.novos),
+            linha('Concluintes (3ª série EM)', a.concluintes),
+            linha('Filhos de funcionários', a.filhos_funcionarios, 'isentos de mensalidade'),
+          ])}
+          ${bloco('Matrícula ' + d.ano, [
+            linha('Veteranos a rematricular', r.veteranos),
+            linha('Rematrículas concluídas', r.concluidas, r.percentual + '% dos veteranos'),
+            linha('Em andamento', r.reservada || 0),
+            linha('Não iniciadas', r.pendente || 0),
+            linha('Não renovam / transferidos', (r.nao_renova || 0) + (r.transferido || 0)),
+            linha('Interessados no SIG', d.interessados.total, d.interessados.matriculados + ' matriculados'),
+          ])}
+          ${bloco('Atendimento às famílias (' + at.ano + ')', [
+            linha('Atendimentos registrados', at.total),
+            ...at.por_canal.map(([k, n]) => linha('• ' + (canais[k] || k), n, pc(n, at.total))),
+            linha('Resolvidos na hora', at.resolvidos, pc(at.resolvidos, at.total)),
+            linha('Mês mais movimentado', at.pico.mes, at.pico.n + ' atendimentos'),
+            linha('Documentos emitidos', d.documentos.emitidos, 'declarações, termos e listas'),
+          ])}
+          ${bloco('Financeiro', [
+            linha('Alunos com boleto em ' + d.boletos.ano, d.boletos.matriculados),
+            linha('Descontos conferidos', d.boletos.conferidos, pc(d.boletos.conferidos, d.boletos.matriculados)),
+            linha('Já lançados no ACADESC', d.boletos.lancados),
+            linha('Inscrições em atividades extras', d.extras.inscricoes_ativas, 'R$ ' + moeda(d.extras.receita_mensal) + '/mês'),
+            linha('Inscrições canceladas', d.extras.canceladas),
+          ])}
+          ${bloco('Bolsas de estudo (CEBAS ' + d.bolsas.ano + ')', [
+            linha('Processos abertos', d.bolsas.total),
+            linha('Bolsas concedidas', d.bolsas.concedidas),
+            linha('• de 100%', d.bolsas.cem_por_cento),
+            linha('• de 50%', d.bolsas.cinquenta),
+            linha('Contratos assinados', d.bolsas.contratos),
+            linha('Prestação de contas', dataBR(d.bolsas.prestacao_contas)),
+          ])}
+          ${bloco('Organização e cuidado com os dados', [
+            linha('Fotos nos 3 sistemas', d.fotos.completos, d.fotos.faltando + ' pendentes'),
+            linha('Alunos com autorização de saída', d.saida.alunos_com_autorizado, d.saida.autorizados + ' pessoas autorizadas'),
+            linha('Avisos de saída no ano', d.saida.avisos_ano),
+            linha('Lembretes do calendário cumpridos', `${d.equipe.lembretes_concluidos}/${d.equipe.lembretes_total}`),
+            linha('Tarefas do dia concluídas', d.equipe.tarefas_concluidas),
+            linha('Fichas de ex-alunos anonimizadas', a.anonimizados, 'descarte previsto na LGPD'),
+          ])}
+        </div>
+        ${v.obs ? `<h3 class="sec">Observações</h3><p style="font-size:10pt;text-align:justify">${esc(v.obs)}</p>` : ''}
+        <p class="nota">Números extraídos do sistema da secretaria em ${dataBR(d.gerado_em)}. Os dados de alunos e famílias
+          ficam restritos à secretaria e são tratados conforme a LGPD.</p>
+        <div class="assinatura">${esc(v.assinante)}</div>`);
+    },
+    emissao: () => ({ tipo: 'Relatório de fechamento', alunos: [null] }),
+  },
 };
 
 // Turmas disponíveis numa lista de alunos, na ordem em que o servidor mandou
@@ -491,9 +624,11 @@ async function iniciar() {
   if (!DEF) { $('#painel').innerHTML = '<p>Documento desconhecido.</p>'; return; }
   document.title = DEF.nome + ' — Secretaria IEL';
   try { DADOS = await DEF.carregar(); } catch (e) { $('#painel').innerHTML = `<h1>${esc(DEF.nome)}</h1><p class="aviso">${esc(e.message)}</p>`; return; }
-  if (DADOS.alunos && !DADOS.alunos.length) { $('#painel').innerHTML = `<h1>${esc(DEF.nome)}</h1><p class="aviso">Nenhum aluno encontrado.</p>`; return; }
+  // Atenção: em alguns documentos (relatórios) "alunos" é um resumo, não uma lista
+  const lista = Array.isArray(DADOS.alunos) ? DADOS.alunos : null;
+  if (lista && !lista.length) { $('#painel').innerHTML = `<h1>${esc(DEF.nome)}</h1><p class="aviso">Nenhum aluno encontrado.</p>`; return; }
   CAMPOS = DEF.campos(DADOS);
-  const a = DADOS.alunos && DADOS.alunos.length === 1 ? DADOS.alunos[0] : null;
+  const a = lista && lista.length === 1 ? lista[0] : null;
   $('#painel').innerHTML = `<h1>${esc(DEF.nome)}</h1><p class="sub">${a ? esc(titulo(a.nome)) + ' · ' + esc(a.turma_rotulo) : 'Confira os campos e imprima.'}</p>
     ${CAMPOS.map(campoHtml).join('')}${DEF.aviso ? `<p class="aviso">${esc(DEF.aviso)}</p>` : ''}
     <div class="botoes"><button class="btn" id="fechar">Fechar</button><button class="btn pri" id="imprimir">🖨️ Imprimir</button></div>`;

@@ -15,3 +15,8 @@ entrada/
 Thumbs.db
 desktop.ini
 ~$*
+
+# Cópias de segurança do banco (contêm os mesmos dados reais) e restaurações em andamento
+backups/
+RESTAURAR.*
+antes-da-restauracao-*

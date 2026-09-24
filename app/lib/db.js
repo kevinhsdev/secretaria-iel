@@ -7,6 +7,11 @@ const { DatabaseSync } = require('node:sqlite');
 
 const PASTA_DADOS = process.env.IEL_DADOS || path.join(__dirname, '..', '..', 'dados');
 fs.mkdirSync(PASTA_DADOS, { recursive: true });
+
+// Se alguém pediu para restaurar um backup, a troca do arquivo acontece agora, antes de abrir o banco.
+const backup = require('./backup');
+const restauracao = backup.aplicarPendente(PASTA_DADOS);
+
 const db = new DatabaseSync(path.join(PASTA_DADOS, 'secretaria.db'));
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
@@ -141,9 +146,16 @@ CREATE TABLE IF NOT EXISTS atendimentos (
   categoria TEXT, detalhe TEXT, resolvido INTEGER NOT NULL DEFAULT 1, encaminhado TEXT, retorno_em TEXT,
   criado_em TEXT, usuario TEXT, demo INTEGER NOT NULL DEFAULT 0
 );
+-- ── Etapa 4 ──
+-- LGPD: quem abriu a ficha de quem (uma linha por pessoa/aluno/dia, com a contagem)
+CREATE TABLE IF NOT EXISTS acessos (
+  usuario TEXT NOT NULL, aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+  data TEXT NOT NULL, vezes INTEGER NOT NULL DEFAULT 1, ultima TEXT, PRIMARY KEY (usuario, aluno_id, data)
+);
 CREATE INDEX IF NOT EXISTS ix_alunos_nome ON alunos(nome);
 CREATE INDEX IF NOT EXISTS ix_atend_data ON atendimentos(data);
 CREATE INDEX IF NOT EXISTS ix_avisos_data ON saida_avisos(data);
+CREATE INDEX IF NOT EXISTS ix_acessos_data ON acessos(data);
 CREATE INDEX IF NOT EXISTS ix_log_quando ON log(quando);
 `);
 
@@ -152,6 +164,8 @@ const colunasAluno = new Set(db.prepare('PRAGMA table_info(alunos)').all().map((
 for (const c of ['ra', 'rg', 'endereco', 'bairro', 'cidade', 'uf', 'cep', 'cpf_resp', 'rg_resp', 'tel_resp']) {
   if (!colunasAluno.has(c)) db.exec(`ALTER TABLE alunos ADD COLUMN ${c} TEXT`);
 }
+// Etapa 4: marca de aluno cujos dados pessoais já foram descartados (LGPD)
+if (!colunasAluno.has('anonimizado')) db.exec('ALTER TABLE alunos ADD COLUMN anonimizado TEXT');
 
 function hashSenha(senha) {
   const sal = crypto.randomBytes(16).toString('hex');
@@ -194,7 +208,18 @@ const cfgPadrao = {
   boletos_mes_massa: '11',          // mês em que a massa de boletos do ano seguinte é gerada
   fotos_sistemas: 'ACADESC;SED;Lanche Card',
   saida_aviso_telefone: '0',        // 0 = não aceitar aviso só por telefone (regra do termo de saída)
+  // Etapa 4 — cópias de segurança
+  backup_pasta: '',                 // vazio = <dados>\backups. Aponte para o pen drive ou o HD da escola.
+  backup_horas: '6',                // de quantas em quantas horas o sistema copia sozinho
+  backup_manter: '30',              // quantas cópias guardar (as mais velhas são apagadas)
+  backup_avisar_dias: '2',          // avisa na tela se o último backup for mais velho que isso
+  backup_senha: '',                 // se preenchida, o arquivo do backup sai cifrado (AES-256)
+  bloqueio_minutos: '20',           // bloqueia a tela após este tempo parado (0 = não bloquear)
+  lgpd_anos_descarte: '5',          // depois de quantos anos um ex-aluno pode ser anonimizado
 };
+
+// Nunca sai do servidor para a tela (nem para o admin): só se diz se está definida ou não.
+const CHAVES_SECRETAS = ['backup_senha'];
 
 function inicializar() {
   if (!db.prepare('SELECT 1 FROM usuarios LIMIT 1').get()) {
@@ -328,9 +353,25 @@ function cfg() {
   return o;
 }
 
+// Versão para mandar ao navegador: troca os segredos por "está definido?"
+function cfgPublica() {
+  const o = cfg();
+  for (const k of CHAVES_SECRETAS) { o[k + '_definida'] = !!String(o[k] || '').trim(); delete o[k]; }
+  return o;
+}
+
 function registrar(usuario, acao, detalhe) {
   db.prepare('INSERT INTO log (quando, usuario, acao, detalhe) VALUES (?, ?, ?, ?)')
     .run(new Date().toISOString(), usuario, acao, typeof detalhe === 'string' ? detalhe : JSON.stringify(detalhe));
+}
+
+// LGPD: guarda que alguém abriu a ficha de um aluno. Uma linha por pessoa/aluno/dia.
+function registrarAcesso(usuario, alunoId) {
+  if (!usuario || !alunoId) return;
+  const hoje = new Date().toLocaleDateString('sv-SE');
+  db.prepare(`INSERT INTO acessos (usuario, aluno_id, data, vezes, ultima) VALUES (?,?,?,1,?)
+    ON CONFLICT(usuario, aluno_id, data) DO UPDATE SET vezes = vezes + 1, ultima = excluded.ultima`)
+    .run(usuario, alunoId, hoje, new Date().toISOString());
 }
 
 function transacao(fn) {
@@ -338,4 +379,4 @@ function transacao(fn) {
   try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
-module.exports = { db, inicializar, cfg, registrar, transacao, hashSenha, conferirSenha, PASTA_DADOS };
+module.exports = { db, inicializar, cfg, cfgPublica, registrar, registrarAcesso, transacao, hashSenha, conferirSenha, PASTA_DADOS, restauracao, CHAVES_SECRETAS };

@@ -24,6 +24,7 @@ async function api(metodo, url, corpo, bruto) {
   const dados = await r.json().catch(() => ({}));
   if (r.status === 401 && url !== '/api/login') { EU = null; telaLogin(); throw new Error(dados.erro || 'Sessão expirada'); }
   if (r.status === 428) { telaTrocarSenha(true); throw new Error(dados.erro); }
+  if (r.status === 423 && url !== '/api/desbloquear') { if (window.mostrarBloqueio) window.mostrarBloqueio(); throw new Error(dados.erro || 'Tela bloqueada'); }
   if (!r.ok) throw new Error(dados.erro || 'Erro ' + r.status);
   return dados;
 }
@@ -106,8 +107,25 @@ function aplicarTema(tema, escolhido) {
   if (escolhido) { try { localStorage.setItem('iel-tema', tema); } catch { /* navegador sem armazenamento */ } }
   const b = $('#tema');
   if (b) {
-    b.textContent = tema === 'escuro' ? '☀' : '☾';
+    b.innerHTML = icone(tema === 'escuro' ? 'sol' : 'lua');
+    b.dataset.icone = tema === 'escuro' ? 'sol' : 'lua';
     b.title = tema === 'escuro' ? 'Voltar ao modo claro' : 'Modo escuro (bom para a tarde/noite)';
+    b.setAttribute('aria-label', b.title);
+  }
+}
+
+// Modo compacto: menos espaço entre as linhas, para caber mais aluno na tela
+function densidadeAtual() {
+  try { return localStorage.getItem('iel-compacto') === '1' ? 'compacta' : 'normal'; } catch { return 'normal'; }
+}
+function aplicarDensidade(d, escolhido) {
+  const compacta = d === 'compacta';
+  document.documentElement.dataset.densidade = compacta ? 'compacta' : 'normal';
+  if (escolhido) { try { localStorage.setItem('iel-compacto', compacta ? '1' : '0'); } catch { /* sem armazenamento */ } }
+  const b = $('#densidade');
+  if (b) {
+    b.innerHTML = icone(compacta ? 'largo' : 'compacto');
+    b.title = compacta ? 'Voltar ao tamanho normal' : 'Modo compacto: cabe mais linha na tela';
     b.setAttribute('aria-label', b.title);
   }
 }
@@ -131,6 +149,40 @@ function ligarAtalhos() {
       if (!localStorage.getItem('iel-tema')) aplicarTema(e.matches ? 'escuro' : 'claro');
     });
   } catch { /* navegador antigo */ }
+}
+
+// ───────────── ícones ─────────────
+// Desenhados aqui mesmo (traço de 1.8, grade de 24) para ficarem iguais em qualquer Windows,
+// ao contrário dos emojis, que cada computador desenha de um jeito.
+const ICONES = {
+  casa: '<path d="M4 10.6 12 4.2l8 6.4V19a1.6 1.6 0 0 1-1.6 1.6h-3.6v-5.6H9.2v5.6H5.6A1.6 1.6 0 0 1 4 19z"/>',
+  dia: '<path d="M9 4.6H6.6A1.6 1.6 0 0 0 5 6.2v13.2A1.6 1.6 0 0 0 6.6 21h10.8a1.6 1.6 0 0 0 1.6-1.6V6.2a1.6 1.6 0 0 0-1.6-1.6H15"/><path d="M9.4 3h5.2a.8.8 0 0 1 .8.8v1.6a.8.8 0 0 1-.8.8H9.4a.8.8 0 0 1-.8-.8V3.8a.8.8 0 0 1 .8-.8z"/><path d="m8.8 13.4 2.2 2.2 4.4-4.4"/>',
+  alunos: '<path d="M15.5 20.5v-1.7a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.8v1.7"/><path d="M9.2 12a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4z"/><path d="M21 20.5v-1.7a3.4 3.4 0 0 0-2.6-3.3"/><path d="M15.8 4.8a3.4 3.4 0 0 1 0 6.6"/>',
+  rematricula: '<path d="M12 20.5h8.5"/><path d="M16.6 4.6a2.1 2.1 0 0 1 3 3L8.2 19 4 20l1-4.2z"/>',
+  pendencias: '<path d="M14 3.2H7.4a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.2a2 2 0 0 0 2-2V8z"/><path d="M14 3.2V8h4.6"/><path d="M12 11.4v3.4"/><path d="M12 18.1h.01"/>',
+  interessados: '<path d="M14.5 20.5v-1.7a3.4 3.4 0 0 0-3.4-3.4H5.9a3.4 3.4 0 0 0-3.4 3.4v1.7"/><path d="M8.7 12a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4z"/><path d="M18.5 8.2v5.6"/><path d="M21.3 11h-5.6"/>',
+  documentos: '<path d="M7 8.2V3.6h10v4.6"/><path d="M7 17.4H5.6A1.6 1.6 0 0 1 4 15.8v-5.2a1.6 1.6 0 0 1 1.6-1.6h12.8a1.6 1.6 0 0 1 1.6 1.6v5.2a1.6 1.6 0 0 1-1.6 1.6H17"/><path d="M7 14.4h10v6H7z"/>',
+  extras: '<path d="m12 3.8 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5 2.7.9-5.6-4-3.9 5.6-.8z"/>',
+  bolsas: '<path d="m12 3.8 9.2 4.4L12 12.6 2.8 8.2z"/><path d="M6.6 10.4v5.2c0 1.5 2.4 2.8 5.4 2.8s5.4-1.3 5.4-2.8v-5.2"/><path d="M20.4 9v5.4"/>',
+  boletos: '<path d="M3.6 6.4h16.8A1.6 1.6 0 0 1 22 8v8a1.6 1.6 0 0 1-1.6 1.6H3.6A1.6 1.6 0 0 1 2 16V8a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M2 10.4h20"/><path d="M6 14h3.4"/>',
+  fotos: '<path d="M4 8.6h3l1.5-2.2h7l1.5 2.2h3A1.6 1.6 0 0 1 21.6 10v8a1.6 1.6 0 0 1-1.6 1.6H4A1.6 1.6 0 0 1 2.4 18v-8A1.6 1.6 0 0 1 4 8.6z"/><path d="M12 16.8a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6z"/>',
+  portao: '<path d="M5.4 20.8V4.8a1.6 1.6 0 0 1 1.6-1.6h10a1.6 1.6 0 0 1 1.6 1.6v16"/><path d="M3 20.8h18"/><path d="M14.6 12.4h.01"/>',
+  atendimentos: '<path d="M21 16.6V19a1.6 1.6 0 0 1-1.8 1.6 15.9 15.9 0 0 1-6.9-2.5 15.6 15.6 0 0 1-4.8-4.8A15.9 15.9 0 0 1 5 6.4 1.6 1.6 0 0 1 6.6 4.6H9a1.6 1.6 0 0 1 1.6 1.4c.1.9.3 1.7.6 2.5a1.6 1.6 0 0 1-.4 1.7l-1 1a12.8 12.8 0 0 0 4.8 4.8l1-1a1.6 1.6 0 0 1 1.7-.4c.8.3 1.6.5 2.5.6A1.6 1.6 0 0 1 21 16.6z"/>',
+  calendario: '<path d="M6.6 5.4h10.8A1.6 1.6 0 0 1 19 7v11.4a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 18.4V7a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M15.8 3.6v3.2"/><path d="M8.2 3.6v3.2"/><path d="M5 10.4h14"/>',
+  mensagens: '<path d="M20.6 12.2a7.6 7.6 0 0 1-8.2 7.6 8.6 8.6 0 0 1-3.3-.7L4 20.6l1.5-4.6a8.1 8.1 0 0 1-.8-3.5 7.6 7.6 0 0 1 7.6-8.2h.5a7.6 7.6 0 0 1 7.8 7.9z"/>',
+  config: '<path d="M4 20.6v-6.2M4 10.4V3.4M12 20.6v-8.2M12 8.4v-5M20 20.6v-4.2M20 12.4v-9"/><path d="M1.6 14.4h4.8M9.6 8.4h4.8M17.6 16.4h4.8"/>',
+  sair: '<path d="M9.4 20.6H6a1.8 1.8 0 0 1-1.8-1.8V5.2A1.8 1.8 0 0 1 6 3.4h3.4"/><path d="m16 16.6 4.6-4.6L16 7.4"/><path d="M20.6 12H9.4"/>',
+  relatorios: '<path d="M14 3.2H7.4a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.2a2 2 0 0 0 2-2V8z"/><path d="M14 3.2V8h4.6"/><path d="M9 17v-3.4"/><path d="M12 17v-6"/><path d="M15 17v-2"/>',
+  lua: '<path d="M20.4 14.2A8.6 8.6 0 1 1 9.8 3.6a6.7 6.7 0 0 0 10.6 10.6z"/>',
+  sol: '<path d="M12 17.2a5.2 5.2 0 1 0 0-10.4 5.2 5.2 0 0 0 0 10.4z"/><path d="M12 1.8v2.4M12 19.8v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/>',
+  compacto: '<path d="M4 6.4h16M4 12h16M4 17.6h16"/>',
+  largo: '<path d="M4 5h16M4 12h16M4 19h16"/><path d="m8 8.6 4-3.6 4 3.6"/>',
+};
+const icone = (nome, classe = 'ic') => `<svg class="${classe}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome] || ''}</svg>`;
+
+// Bloco para quando não há nada para mostrar: explica e oferece o próximo passo
+function vazio(nomeIcone, titulo2, texto, acaoHtml = '') {
+  return `<div class="nada">${icone(nomeIcone, 'ic-grande')}<h3>${esc(titulo2)}</h3><p>${esc(texto)}</p>${acaoHtml}</div>`;
 }
 
 // ───────────── login ─────────────
@@ -173,26 +225,27 @@ function telaTrocarSenha(obrigatoria) {
 
 // ───────────── estrutura ─────────────
 const MENU = [
-  { rota: '', ic: '🏠', nome: 'Início' },
-  { rota: 'hoje', ic: '📌', nome: 'Meu dia', badge: 'tarefas' },
-  { rota: 'alunos', ic: '👩‍🎓', nome: 'Alunos' },
+  { rota: '', ic: 'casa', nome: 'Início' },
+  { rota: 'hoje', ic: 'dia', nome: 'Meu dia', badge: 'tarefas' },
+  { rota: 'alunos', ic: 'alunos', nome: 'Alunos' },
   { sep: 'Matrícula ' },
-  { rota: 'rematricula', ic: '📝', nome: 'Rematrícula' },
-  { rota: 'pendencias', ic: '📄', nome: 'Pendências', badge: 'pend' },
-  { rota: 'interessados', ic: '🤝', nome: 'Interessados (SIG)' },
+  { rota: 'rematricula', ic: 'rematricula', nome: 'Rematrícula' },
+  { rota: 'pendencias', ic: 'pendencias', nome: 'Pendências', badge: 'pend' },
+  { rota: 'interessados', ic: 'interessados', nome: 'Interessados (SIG)' },
   { sep: 'Secretaria' },
-  { rota: 'documentos', ic: '🖨️', nome: 'Documentos' },
-  { rota: 'extras', ic: '🩰', nome: 'Atividades extras' },
-  { rota: 'bolsas', ic: '🎓', nome: 'Bolsas (CEBAS)', admin: true },
-  { rota: 'boletos', ic: '💳', nome: 'Boletos' },
-  { rota: 'fotos', ic: '📷', nome: 'Mutirão de fotos' },
+  { rota: 'documentos', ic: 'documentos', nome: 'Documentos' },
+  { rota: 'extras', ic: 'extras', nome: 'Atividades extras' },
+  { rota: 'bolsas', ic: 'bolsas', nome: 'Bolsas (CEBAS)', admin: true },
+  { rota: 'boletos', ic: 'boletos', nome: 'Boletos' },
+  { rota: 'fotos', ic: 'fotos', nome: 'Mutirão de fotos' },
   { sep: 'Dia a dia' },
-  { rota: 'portao', ic: '🚪', nome: 'Portão · Saída', badge: 'saida' },
-  { rota: 'atendimentos', ic: '☎️', nome: 'Atendimentos' },
-  { rota: 'calendario', ic: '📅', nome: 'Calendário' },
+  { rota: 'portao', ic: 'portao', nome: 'Portão · Saída', badge: 'saida' },
+  { rota: 'atendimentos', ic: 'atendimentos', nome: 'Atendimentos' },
+  { rota: 'calendario', ic: 'calendario', nome: 'Calendário' },
   { sep: 'Ferramentas' },
-  { rota: 'mensagens', ic: '💬', nome: 'Modelos de mensagem' },
-  { rota: 'config', ic: '⚙️', nome: 'Configurações', admin: true },
+  { rota: 'relatorios', ic: 'relatorios', nome: 'Relatórios', admin: true },
+  { rota: 'mensagens', ic: 'mensagens', nome: 'Mensagens' },
+  { rota: 'config', ic: 'config', nome: 'Configurações', admin: true },
 ];
 
 async function iniciar() {
@@ -205,15 +258,16 @@ async function iniciar() {
     <nav class="lateral" aria-label="Menu principal">
       <div class="marca"><img src="icone.png" alt=""><div><b>Secretaria IEL</b><small>Instituto Educacional Luterano</small></div></div>
       <ul class="menu">${MENU.filter((m) => !m.admin || EU.perfil === 'admin').map((m) => m.sep ? `<li class="sep">${esc(m.sep)}</li>`
-        : `<li><a href="#/${m.rota}" data-rota="${m.rota}"><span class="ic">${m.ic}</span>${esc(m.nome)}${m.badge ? `<span class="num" id="badge-${m.badge}" hidden></span>` : ''}</a></li>`).join('')}</ul>
+        : `<li><a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.ic)}${esc(m.nome)}${m.badge ? `<span class="num" id="badge-${m.badge}" hidden></span>` : ''}</a></li>`).join('')}</ul>
       <div class="usuario"><span class="av">${esc(EU.nome[0])}</span><span>${esc(EU.nome)}<br><small style="color:var(--azul-claro)">${EU.perfil === 'admin' ? 'Administração' : 'Aprendiz'}</small></span>
-        <button id="tema" class="tema-btn"></button><button id="sair" title="Sair">Sair</button></div>
+        <button id="densidade" class="tema-btn"></button><button id="tema" class="tema-btn"></button><button id="sair" title="Sair">Sair</button></div>
     </nav>
     <div class="principal">
       <header class="topo">
         <span class="saudacao" id="saudacao"></span>
         <div class="busca"><input id="busca" placeholder="Buscar aluno, responsável, matrícula ou CPF…" autocomplete="off" aria-label="Buscar aluno" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
       </header>
+      <div id="avisos"></div>
       <main class="conteudo" id="conteudo"></main>
     </div>
   </div>`;
@@ -222,7 +276,11 @@ async function iniciar() {
   $('#sair').onclick = tentar(async () => { await api('POST', '/api/logout'); EU = null; telaLogin(); });
   aplicarTema(temaAtual());
   $('#tema').onclick = () => aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro', true);
+  aplicarDensidade(densidadeAtual());
+  $('#densidade').onclick = () => aplicarDensidade(densidadeAtual() === 'compacta' ? 'normal' : 'compacta', true);
   ligarAtalhos();
+  if (window.ligarBloqueio) window.ligarBloqueio();
+  if (EU.bloqueada && window.mostrarBloqueio) window.mostrarBloqueio();
   configurarBusca();
   window.onhashchange = rotear;
   rotear();
@@ -261,7 +319,10 @@ async function rotear() {
   const [rota, arg] = location.hash.replace(/^#\/?/, '').split('/');
   $$('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === (rota === 'aluno' ? 'alunos' : rota)));
   const c = $('#conteudo');
-  c.innerHTML = '<p class="sub">Carregando…</p>';
+  // Esqueleto cinza no lugar de "Carregando…": a tela não "pula" quando o conteúdo chega
+  c.innerHTML = `<div class="carregando"><div class="bloco" style="width:220px;height:26px"></div><div class="bloco" style="width:340px;height:14px;margin-top:8px"></div>
+    <div class="grade g4" style="margin-top:20px">${'<div class="bloco" style="height:92px"></div>'.repeat(4)}</div>
+    <div class="bloco" style="height:260px;margin-top:14px"></div></div>`;
   try { await (TELAS[rota] || TELAS[''])(c, arg); }
   catch (e) { c.innerHTML = `<div class="cartao"><h2>Ops!</h2><p>${esc(e.message)}</p></div>`; }
   atualizarBadge();
@@ -274,6 +335,7 @@ async function atualizarBadge() {
     const b = $('#badge-pend');
     if (b) { const n = p.pendencias.vencidas + p.pendencias.vencendo; b.hidden = !n; b.textContent = n; b.title = 'Vencidas ou vencendo em 7 dias'; }
     if (window.badgesEtapa3) window.badgesEtapa3();
+    if (window.avisosEtapa4) window.avisosEtapa4();
   } catch { /* silencioso */ }
 }
 
@@ -326,6 +388,14 @@ TELAS[''] = async (c) => {
 TELAS.alunos = async (c) => {
   invalidar();
   const lista = await alunosBusca();
+  // Primeiro dia de uso: ainda não há ninguém cadastrado
+  if (!lista.length) {
+    c.innerHTML = `<h1>Alunos</h1><div class="cartao">${vazio('alunos', 'Nenhum aluno cadastrado ainda',
+      'Importe a exportação de alunos do ACADESC (.xlsx) para trazer a escola inteira de uma vez, ou carregue a demonstração para conhecer o sistema sem usar dados reais.',
+      EU.perfil === 'admin' ? '<div class="acoes" style="justify-content:center"><a class="btn pri" href="#/config/importar">Importar do ACADESC</a><a class="btn" href="#/config/importar">Carregar demonstração</a></div>'
+        : '<p class="dado">Peça à administração para importar os alunos.</p>')}</div>`;
+    return;
+  }
   const turmas = [...new Map(lista.map((a) => [a.turma_rotulo, a.ordem])).entries()].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).map((t) => t[0]);
   c.innerHTML = `
   <div class="acoes" style="justify-content:space-between"><div><h1>Alunos</h1><p class="sub">${lista.length} alunos ativos</p></div>
@@ -667,7 +737,8 @@ TELAS.mensagens = async (c) => {
 TELAS.config = async (c, aba = 'geral') => {
   if (EU.perfil !== 'admin') { c.innerHTML = '<div class="cartao">Somente a administração acessa as configurações.</div>'; return; }
   const d = await api('GET', '/api/admin');
-  const ABAS = { geral: 'Geral', importar: 'Importar dados', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários', log: 'Auditoria' };
+  const ABAS = { geral: 'Geral', importar: 'Importar dados', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários',
+    backup: 'Cópias de segurança', lgpd: 'LGPD e acessos', log: 'Auditoria' };
   c.innerHTML = `<h1>Configurações</h1><p class="sub">Só a administração vê esta área.</p>
     <div class="abas">${Object.entries(ABAS).map(([k, v]) => `<button data-aba="${k}" class="${aba === k ? 'on' : ''}">${v}</button>`).join('')}</div><div id="aba"></div>`;
   $$('[data-aba]').forEach((b) => (b.onclick = () => (location.hash = '#/config/' + b.dataset.aba)));
@@ -780,6 +851,9 @@ TELAS.config = async (c, aba = 'geral') => {
     });
     $('#fu').onsubmit = tentar(async (ev) => { ev.preventDefault(); await api('POST', '/api/admin/usuarios', { nome: $('#un').value, login: $('#ul').value, perfil: $('#up').value }); toast('Usuário criado. Senha inicial: luterano'); rotear(); });
   }
+
+  if (aba === 'backup' && window.abaBackup) await window.abaBackup(el);
+  if (aba === 'lgpd' && window.abaLgpd) await window.abaLgpd(el);
 
   if (aba === 'log') {
     const log = await api('GET', '/api/admin/log');

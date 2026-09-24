@@ -83,3 +83,15 @@ table.doc tr.fds td { background: #f0f0f0; color: #555; }
   .folha:last-child { page-break-after: auto; }
 }
 @media (max-width: 900px) { .tela { grid-template-columns: 1fr; } .painel { position: static; height: auto; } }
+
+/* Relatório de dados pessoais (LGPD) */
+.sec { font-size: 11pt; margin: 16px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #999; text-transform: uppercase; letter-spacing: .04em; }
+.grade-dados { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; font-size: 10pt; }
+.grade-dados > div { padding: 1px 0; }
+
+/* Relatório de fechamento: duas colunas na folha */
+.duas-colunas { column-count: 2; column-gap: 8mm; }
+.duas-colunas > * { break-inside: avoid; }
+.duas-colunas table.doc { margin-top: 2px; }
+.duas-colunas table.doc td { border: none; border-bottom: 1px solid #ddd; padding: 2px 3px; }
+.duas-colunas .sec { margin-top: 10px; }

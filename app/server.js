@@ -5,7 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
-const { db, inicializar, cfg, registrar, transacao, hashSenha, conferirSenha } = require('./lib/db');
+const { db, inicializar, cfg, cfgPublica, registrar, registrarAcesso, transacao, hashSenha, conferirSenha, PASTA_DADOS, restauracao } = require('./lib/db');
+const copias = require('./lib/backup');
 const { lerPlanilha, serialParaIso } = require('./lib/planilha');
 const S = require('./lib/series');
 const { gerarContrato } = require('./lib/contrato');
@@ -28,7 +29,7 @@ function sessaoDe(req) {
   if (!s || s.expira < Date.now()) { if (tok) sessoes.delete(tok); return null; }
   s.expira = Date.now() + DOZE_HORAS;
   const u = db.prepare('SELECT id, login, nome, perfil, trocar_senha, ativo FROM usuarios WHERE id = ?').get(s.uid);
-  return u && u.ativo ? { token: tok, usuario: u } : null;
+  return u && u.ativo ? { token: tok, usuario: u, bloqueada: !!s.bloqueada } : null;
 }
 
 // ───────────────────────── utilitários HTTP ─────────────────────────
@@ -276,13 +277,35 @@ rota('POST', '/api/logout', async (req, res, { sessao }) => {
   json(res, 200, { ok: true }, { 'Set-Cookie': 'iel=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
 });
 
-rota('GET', '/api/eu', async (req, res, { u }) => json(res, 200, { ...u, config: cfg() }));
+rota('GET', '/api/eu', async (req, res, { u, sessao }) => json(res, 200, { ...u, bloqueada: !!sessao.bloqueada, config: cfgPublica() }));
+
+// ── Bloqueio de tela (balcão sem ninguém por perto) ──
+rota('POST', '/api/bloquear', async (req, res, { u, sessao }) => {
+  const s = sessoes.get(sessao.token);
+  if (s) s.bloqueada = true;
+  registrar(u.login, 'bloqueou a tela', '');
+  json(res, 200, { ok: true });
+});
+rota('POST', '/api/desbloquear', async (req, res, { u, sessao }) => {
+  const { senha } = await corpoJson(req);
+  const reg = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(u.id);
+  if (!conferirSenha(String(senha || ''), reg.senha_hash)) {
+    registrar(u.login, 'errou a senha ao desbloquear a tela', '');
+    falha(403, 'Senha incorreta'); // 403 e não 401: a sessão continua válida, só a tela está bloqueada
+  }
+  const s = sessoes.get(sessao.token);
+  if (s) s.bloqueada = false;
+  json(res, 200, { ok: true });
+});
 
 rota('POST', '/api/trocar-senha', async (req, res, { u }) => {
   const { atual, nova } = await corpoJson(req);
   const reg = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(u.id);
   if (!conferirSenha(String(atual || ''), reg.senha_hash)) falha(400, 'Senha atual incorreta');
-  if (String(nova || '').length < 6) falha(400, 'A nova senha precisa ter pelo menos 6 caracteres');
+  const nv = String(nova || '');
+  if (nv.length < 8) falha(400, 'A nova senha precisa ter pelo menos 8 caracteres');
+  const fracas = ['luterano', '12345678', '123456789', 'secretaria', 'senha123', 'iel12345', 'password'];
+  if (fracas.includes(nv.toLowerCase()) || nv.toLowerCase() === u.login) falha(400, 'Essa senha é fácil demais de adivinhar. Escolha outra.');
   db.prepare('UPDATE usuarios SET senha_hash = ?, trocar_senha = 0 WHERE id = ?').run(hashSenha(nova), u.id);
   registrar(u.login, 'trocou a própria senha', '');
   json(res, 200, { ok: true });
@@ -325,9 +348,10 @@ rota('GET', '/api/alunos', async (req, res, { url }) => {
 });
 
 // Ficha completa do aluno
-rota('GET', '/api/alunos/:id', async (req, res, { p }) => {
+rota('GET', '/api/alunos/:id', async (req, res, { p, u }) => {
   const c = cfg(); const ano = +c.ano_matricula;
   const a = db.prepare('SELECT * FROM alunos WHERE id = ?').get(+p.id) || falha(404, 'Aluno não encontrado');
+  registrarAcesso(u.login, a.id); // LGPD: fica registrado quem abriu a ficha de quem
   const r = db.prepare('SELECT * FROM rematriculas WHERE aluno_id = ? AND ano = ?').get(a.id, ano) || { status: 'pendente' };
   const pastas = prontuario.doAluno(c.pasta_prontuario, a.nome);
   const ent = Object.fromEntries(db.prepare('SELECT * FROM entregas WHERE aluno_id = ? AND ano = ?').all(a.id, ano).map((e) => [e.doc_id, e]));
@@ -544,7 +568,7 @@ rota('GET', '/api/admin', async (req, res, { u }) => {
   const ano = +cfg().ano_matricula;
   const vagas = Object.fromEntries(db.prepare('SELECT serie_chave, capacidade FROM vagas WHERE ano = ?').all(ano).map((v) => [v.serie_chave, v.capacidade]));
   json(res, 200, {
-    config: cfg(),
+    config: cfgPublica(),
     usuarios: db.prepare('SELECT id, login, nome, perfil, trocar_senha, ativo FROM usuarios ORDER BY nome').all(),
     documentos: db.prepare('SELECT * FROM doc_tipos ORDER BY ordem, id').all(),
     vagas: S.SERIES.map((s) => ({ chave: s.chave, rotulo: s.rotulo, capacidade: vagas[s.chave] ?? null })),
@@ -556,7 +580,8 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
   const permitidas = ['ano_matricula', 'prazo_dias', 'data_inicio', 'data_desconto', 'data_garantia_vaga', 'data_fim', 'pasta_prontuario', 'pastas_fotos', 'inep',
     'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
     'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
-    'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone'];
+    'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone',
+    'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte'];
   for (const k of permitidas) if (b[k] !== undefined) db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(k, String(b[k]));
   prontuario.limparCache();
   registrar(u.login, 'alterou configurações', b);
@@ -653,7 +678,7 @@ rota('GET', '/api/admin/log', async (req, res, { u }) => {
 });
 
 // ── Etapa 2: documentos, atividades extras e bolsas ──
-const ctx = { rota, db, cfg, registrar, transacao, falha, json, corpoJson, lerCorpo, exigirAdmin, hoje, somarDias, agoraIso, S, turmaRotulo, foneWhats, destinoDe, lerPlanilha, serialParaIso };
+const ctx = { rota, db, cfg, cfgPublica, registrar, transacao, falha, json, corpoJson, lerCorpo, exigirAdmin, hoje, somarDias, agoraIso, S, turmaRotulo, foneWhats, destinoDe, lerPlanilha, serialParaIso, PASTA_DADOS, sessoes };
 require('./rotas/documentos')(ctx);
 require('./rotas/extras')(ctx);
 require('./rotas/cebas')(ctx);
@@ -661,6 +686,9 @@ require('./rotas/boletos')(ctx);
 require('./rotas/fotos')(ctx);
 require('./rotas/saida')(ctx);
 require('./rotas/rotina')(ctx);
+require('./rotas/backup')(ctx);
+require('./rotas/lgpd')(ctx);
+require('./rotas/relatorios')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {
@@ -680,6 +708,9 @@ const servidor = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  // O app não carrega nada de fora: trancar isso evita que um script estranho consiga rodar aqui dentro
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+    "script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
   if (!url.pathname.startsWith('/api/')) return servirEstatico(req, res, url);
   try {
     // Pedidos que alteram dados precisam vir do próprio app (cabeçalho customizado bloqueia CSRF)
@@ -694,6 +725,8 @@ const servidor = http.createServer(async (req, res) => {
       if (!sessao) falha(401, 'Faça login novamente');
       const u = sessao.usuario;
       if (u.trocar_senha && !['/api/trocar-senha', '/api/eu', '/api/logout'].includes(url.pathname)) falha(428, 'Troque sua senha antes de continuar');
+      // Tela bloqueada: nada passa até digitar a senha de novo
+      if (sessao.bloqueada && !['/api/desbloquear', '/api/eu', '/api/logout'].includes(url.pathname)) falha(423, 'Tela bloqueada');
       return await r.fn(req, res, { url, p, u, sessao });
     }
     falha(404, 'Rota não encontrada');
@@ -703,6 +736,24 @@ const servidor = http.createServer(async (req, res) => {
     if (!res.headersSent) json(res, status, { erro: status === 500 ? 'Erro interno: ' + e.message : e.message });
   }
 });
+
+// ───────────────────────── cópias de segurança automáticas ─────────────────────────
+function copiaAutomatica(motivo) {
+  try {
+    const r = copias.fazerBackup(db, cfg(), PASTA_DADOS, motivo);
+    console.log(`  Cópia de segurança gravada: ${r.arquivo}${r.cifrado ? ' (cifrada)' : ''}`);
+    registrar('sistema', 'cópia de segurança automática', { arquivo: r.arquivo, cifrado: r.cifrado });
+  } catch (e) {
+    console.error('  ATENÇÃO: não consegui gravar a cópia de segurança —', e.message);
+    registrar('sistema', 'FALHA na cópia de segurança', e.message);
+  }
+}
+if (restauracao) {
+  if (restauracao.erro) { console.error('  A restauração do backup falhou:', restauracao.erro); registrar('sistema', 'FALHA ao restaurar backup', restauracao); }
+  else { console.log('  Backup restaurado:', restauracao.restaurado); registrar('sistema', 'backup restaurado', restauracao.restaurado); }
+}
+if (copias.naHora(cfg(), PASTA_DADOS)) copiaAutomatica('inicio');
+setInterval(() => { if (copias.naHora(cfg(), PASTA_DADOS)) copiaAutomatica('automatico'); }, 30 * 60 * 1000);
 
 servidor.listen(PORTA, HOST, () => {
   console.log('');

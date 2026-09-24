@@ -13,7 +13,18 @@ if not exist "%~dp0node\node.exe" (
 )
 cd /d "%~dp0app"
 start "" "http://localhost:3000"
+
+:inicio
 "%~dp0node\node.exe" --no-warnings server.js
+
+rem Codigo 90 = o sistema pediu para reiniciar (ex.: depois de restaurar um backup)
+if errorlevel 90 if not errorlevel 91 (
+  echo.
+  echo Reiniciando o sistema...
+  timeout /t 2 /nobreak >nul
+  goto inicio
+)
+
 echo.
 echo O sistema foi encerrado. Pressione uma tecla para fechar.
 pause >nul

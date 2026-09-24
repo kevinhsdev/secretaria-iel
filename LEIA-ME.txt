@@ -16,8 +16,28 @@ DADOS DE TESTE x DADOS REAIS (LGPD)
   Para usar dados reais: apague a demonstração e importe a exportação de alunos do ACADESC (.xlsx).
 
 ONDE FICAM OS DADOS
-  SecretariaIEL\dados\secretaria.db  (é um arquivo só; faça cópia de segurança dele toda semana,
-  por exemplo copiando para o pen drive ou para o HD da escola, com o sistema fechado).
+  SecretariaIEL\dados\secretaria.db  (é um arquivo só).
+
+CÓPIAS DE SEGURANÇA (Configurações > Cópias de segurança)
+  O sistema copia sozinho ao abrir e a cada 6 horas, e avisa em vermelho se a última cópia passar de 2 dias.
+  FAÇA ISTO NO PRIMEIRO DIA:
+    1. Aponte a "Pasta das cópias" para um pen drive ou para uma pasta do OneDrive.
+       Cópia guardada no mesmo computador nao salva ninguem de um HD queimado.
+    2. Clique em "Proteger com senha" e ANOTE A SENHA num lugar seguro (sem ela nem voce restaura).
+    3. Teste uma restauracao antes de confiar: backup que nunca foi restaurado nao e backup.
+  Para restaurar: escolha a copia na lista e confirme. O sistema guarda o banco atual, troca e reinicia sozinho.
+
+BLOQUEIO DE TELA
+  Depois de 20 minutos sem ninguem mexer, a tela bloqueia e pede a senha de novo (ajustavel em Configuracoes > Geral).
+  Util no balcao: ninguem le dados de aluno se voce se afastar.
+
+LGPD (Configurações > LGPD e acessos)
+  - Mostra quem abriu a ficha de quem nos ultimos 30 dias.
+  - Gera, em 1 clique, o relatorio com tudo o que a escola guarda sobre um aluno (a familia tem direito de pedir).
+  - Apaga os dados pessoais de ex-alunos, mantendo so os numeros para estatistica.
+
+RELATORIOS (menu Relatorios)
+  Os numeros do ano em uma tela, e uma folha timbrada pronta para levar a Samara e a Diretoria.
 
 CONTRATO 2027
   O modelo usado fica em SecretariaIEL\app\modelos\contrato-2027.xlsx.

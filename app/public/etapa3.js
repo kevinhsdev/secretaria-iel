@@ -366,7 +366,9 @@ TELAS.portao = async (c) => {
         <td>${v.conferido_em ? `<span class="tag t-concluida">liberado</span><br><small class="dado">${esc(nomePessoa(v.conferido_por))}</small>` : '<span class="tag t-vencendo">aguardando</span>'}</td>
         <td class="acoes">${v.conferido_em ? `<button class="btn peq" data-reabrir="${v.id}">Desfazer</button>` : `<button class="btn peq pri" data-liberar="${v.id}">Liberar saída</button>`}
           <button class="btn peq perigo" data-delv="${v.id}">Excluir</button></td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="vazio">Nenhum aviso registrado para hoje.</p>'}
+      </tbody></table></div>` : vazio('portao', 'Nenhum aviso para hoje',
+        'Quando a família avisar que hoje quem busca é outra pessoa, registre aqui: na saída, o portão confere em segundos.',
+        '<div class="acoes" style="justify-content:center"><button class="btn pri" id="vazioAviso">Registrar aviso de hoje</button></div>')}
     <p class="dica">Autorização <b>só por telefone não vale</b> (regra do termo de saída): peça por WhatsApp, bilhete na agenda ou presencialmente.</p>
   </div>`;
   let espera;
@@ -386,6 +388,7 @@ TELAS.portao = async (c) => {
     }), 300);
   };
   $('#novoAviso').onclick = () => formAviso();
+  if ($('#vazioAviso')) $('#vazioAviso').onclick = () => formAviso();
   $('#impSaida').onclick = () => abrirDoc({ tipo: 'saida_turma' });
   $$('[data-liberar]').forEach((b) => (b.onclick = tentar(async () => { await api('PUT', '/api/saida/avisos/' + b.dataset.liberar, { conferido: true }); toast('Saída liberada e registrada'); rotear(); })));
   $$('[data-reabrir]').forEach((b) => (b.onclick = tentar(async () => { await api('PUT', '/api/saida/avisos/' + b.dataset.reabrir, { conferido: false }); rotear(); })));
@@ -479,9 +482,12 @@ TELAS.atendimentos = async (c) => {
       <td>${a.resolvido ? '<span class="tag t-concluida">resolvido</span>' : `<span class="tag t-vencendo">em aberto</span>${a.encaminhado ? `<br><small class="dado">com ${esc(a.encaminhado)}</small>` : ''}`}</td>
       <td class="dado">${esc(nomePessoa(a.usuario))}</td>
       <td class="acoes">${a.resolvido ? '' : `<button class="btn peq" data-ok="${a.id}">Resolvido</button>`}<button class="btn peq" data-ed="${a.id}">Ver</button></td></tr>`).join('')
-      : '<tr><td colspan="7" class="vazio">Nenhum atendimento com esses filtros.</td></tr>';
+      : `<tr><td colspan="7">${vazio('atendimentos', 'Nenhum atendimento por aqui',
+        'Cada vez que alguém procurar a secretaria — no balcão, por telefone ou no WhatsApp — registre aqui. Em um mês isso vira o retrato do que mais consome o tempo de vocês.',
+        '<div class="acoes" style="justify-content:center"><button class="btn pri" id="vazioAt">Registrar o primeiro</button></div>')}</td></tr>`;
     $$('[data-ok]').forEach((b) => (b.onclick = tentar(async () => { await api('PUT', '/api/atendimentos/' + b.dataset.ok, { resolvido: true }); toast('Marcado como resolvido'); rotear(); })));
     $$('[data-ed]').forEach((b) => (b.onclick = () => formAtendimento(d, d.atendimentos.find((x) => x.id === +b.dataset.ed))));
+    if ($('#vazioAt')) $('#vazioAt').onclick = () => formAtendimento(d);
   };
   ['fc', 'fp', 'fd', 'fq'].forEach((id) => ($('#' + id).oninput = desenhar));
   $('#novo').onclick = () => formAtendimento(d);

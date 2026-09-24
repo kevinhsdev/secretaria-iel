@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **23/09/2026**, ao fim da **Etapa 3**. A próxima é a **Etapa 4**.
+> Última atualização: **24/09/2026**, ao fim da **Etapa 4**. A próxima é a **Etapa 5** (ver §7).
 
 ---
 
@@ -105,6 +105,32 @@
 - **Demonstração** (`lib/demo.js` → `gerarDemoEtapa3`): autorizações, avisos de hoje, fotos, conferência, uma remessa com entregas,
   34 atendimentos, tarefas do dia e lembretes concluídos.
 
+### Etapa 4 (pronta): backup, segurança, LGPD, relatórios e acabamento
+- **Cópias de segurança** (`lib/backup.js`, `rotas/backup.js`, Configurações › Cópias de segurança):
+  - cópia a quente com `VACUUM INTO` (funciona com o sistema aberto e já inclui o WAL);
+  - automática ao abrir e a cada N horas (`backup_horas`), guardando as N mais novas (`backup_manter`);
+  - **pasta configurável** (`backup_pasta`) — a orientação é apontar para pen drive/OneDrive;
+  - **senha opcional** (`backup_senha`): o arquivo sai cifrado em **AES-256-GCM** (marca `IELBK1` + sal + IV + tag);
+  - **faixa de aviso** em qualquer tela quando o último backup passa de `backup_avisar_dias`;
+  - **restauração** em duas etapas: o app decifra/valida, grava `RESTAURAR.db` + `RESTAURAR.pendente` e o
+    `lib/db.js` faz a troca **na abertura seguinte**, guardando antes `antes-da-restauracao-<data>.db`;
+  - `POST /api/admin/reiniciar` sai com **código 90** e o `.bat` sobe de novo sozinho (laço `:inicio`).
+- **Segurança:** bloqueio de tela por inatividade (`bloqueio_minutos`) com senha no servidor (HTTP 423 enquanto bloqueada),
+  política de senha (mínimo 8, recusa senhas óbvias e o próprio login), cabeçalho **CSP** (`script-src 'self'`; por isso o
+  tema saiu do HTML para `public/tema.js`) e segredos nunca enviados ao navegador (`cfgPublica()` + `CHAVES_SECRETAS`).
+- **LGPD** (`rotas/lgpd.js`, Configurações › LGPD e acessos):
+  - **registro de consultas**: abrir a ficha de um aluno grava em `acessos` (uma linha por pessoa/aluno/dia, com contagem);
+  - **direito de acesso**: `GET /api/alunos/:id/dados-pessoais` reúne tudo o que o sistema guarda, com versão
+    imprimível (documento `dados_aluno`) e download em JSON;
+  - **descarte**: lista candidatos (nunca quem está matriculado) e anonimiza, apagando os dados pessoais e
+    mantendo série/ano/situação para a estatística (`alunos.anonimizado`).
+- **Relatórios** (`rotas/relatorios.js`, menu Relatórios, admin): números do ano em cartões e barrinhas
+  (alunos, rematrícula, atendimentos, financeiro, bolsas, fotos, saída, equipe) e a **versão de uma folha com o
+  papel timbrado** (documento `fechamento`) para levar à Samara e à Diretoria.
+- **Acabamento:** ícones **SVG desenhados no próprio código** (`ICONES` em `app.js`) no lugar dos emojis do menu,
+  esqueleto cinza no carregamento, telas vazias que explicam o próximo passo, **modo compacto** (mais linhas na tela),
+  layout de celular para o portão e atalho `/` para a busca.
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -137,6 +163,10 @@ SecretariaIEL/
    ├─ rotas/fotos.js          → mutirão de fotos e checklist dos 3 sistemas (Etapa 3)
    ├─ rotas/saida.js          → autorização de saída, avisos do dia e consulta do portão (Etapa 3)
    ├─ rotas/rotina.js         → tarefas do dia, calendário, atendimentos e /api/hoje (Etapa 3)
+   ├─ rotas/backup.js         → cópias de segurança, restauração e reinício (Etapa 4)
+   ├─ rotas/lgpd.js           → registro de consultas, dados do aluno e descarte (Etapa 4)
+   ├─ rotas/relatorios.js     → números do ano para a Direção (Etapa 4)
+   ├─ lib/backup.js           → VACUUM INTO, cifra AES-256-GCM, retenção e restauração agendada (Etapa 4)
    ├─ lib/db.js               → schema SQLite + migrações (ALTER TABLE) + sementes (usuários, docs, atividades, feriados, funcionários, modelos)
    ├─ lib/zip.js, planilha.js → ler/escrever .xlsx e .csv sem bibliotecas
    ├─ lib/contrato.js         → contrato 2027 + utilitários de modelo (abrirModelo, definirCelula, linhaXml)
@@ -146,7 +176,8 @@ SecretariaIEL/
    ├─ lib/fotos.js            → acha <mat>.jpg / AcaDescMySql.exe00<mat>.jpeg
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
-   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, doc.html/doc.css/doc.js
+   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js,
+                                tema.js (claro/escuro antes de desenhar), doc.html/doc.css/doc.js
 ```
 
 **Claro e escuro (regra importante ao mexer no visual):**
@@ -187,6 +218,8 @@ SecretariaIEL/
 3. **Configurações › Importar dados › Carregar demonstração** (alunos, atividades, ingressos, bolsas, autorizações de saída,
    fotos, conferência e entrega de boletos, tarefas e atendimentos fictícios).
 4. Em Configurações › Geral, **ajustar as pastas** (prontuários e fotos) para os caminhos do PC atual.
+5. Em Configurações › Cópias de segurança, **apontar a pasta para um pen drive ou o OneDrive** e definir a senha do backup.
+   Antes de importar alunos reais, fazer uma restauração de teste — backup que nunca foi restaurado não é backup.
 
 **Como validar mudanças (método usado até aqui):**
 - `node --check arquivo.js` para a sintaxe.
@@ -194,10 +227,13 @@ SecretariaIEL/
 - Contratos: abrir o `.xlsx` gerado pelo **Excel via COM** (`New-Object -ComObject Excel.Application`) e ler as células, por exemplo `B21`, `C10`, `M10`.
 - Telas: Edge headless com `--remote-debugging-port` e o protocolo DevTools via `WebSocket` do Node 24 para tirar prints. Fazer o login preenchendo o formulário.
 - **Nunca** deixar cópias de dados reais em pastas temporárias. Apague ao terminar.
-- Na Etapa 3 foram usados 4 scripts de teste (numa pasta temporária, fora do Git): um **cliente** de API com login e contador de ok/falha,
-  um teste das **Etapas 1 e 2** (21 checagens), um da **Etapa 3** (70 checagens), um do **perfil aprendiz** (25 checagens, inclusive o que deve dar 403)
-  e um de **migração** (copia o banco, derruba as tabelas novas e confere que o app as recria e completa a demonstração sozinho).
-  Vale recriá-los no próximo chat: é o que pega os erros de verdade.
+- Os testes ficam numa pasta temporária, fora do Git, e são a rede de proteção do projeto. Ao fim da Etapa 4 eram:
+  um **cliente** de API com login e contador de ok/falha; **Etapas 1 e 2** (20); **Etapa 3** (70); **perfil aprendiz** (25,
+  inclusive o que precisa dar 403); **segurança e LGPD** (28); **backup** (34, com restauração de verdade e reinício do servidor);
+  **migração** (derruba as tabelas novas e confere que o app as recria sem perder dados); **tema e atalho** (15, no navegador);
+  **impressão no modo escuro** (5, conferindo as cores calculadas); e os scripts de **print das telas** no Edge headless,
+  que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
+- Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
 - Para copiar o banco a fim de testar, copie **também** `secretaria.db-wal` e `-shm`: no modo WAL boa parte dos dados ainda não está no arquivo principal.
 
 **Armadilhas do ambiente (Windows 10 + PowerShell 5.1):**
@@ -211,9 +247,49 @@ SecretariaIEL/
 - No Bash do Claude Code as **contrabarras somem** dentro de heredoc e de `-e`, e heredocs muito longos quebram:
   para criar ou alterar arquivos grandes (ou qualquer coisa com caminho do Windows), use a ferramenta de escrita de arquivo, não `cat <<EOF`.
 
-## 7. Decisões da Etapa 3 e o que vem depois
+## 7. Roteiro: o que falta para virar um sistema de verdade
 
-### Padrões escolhidos na Etapa 3 (todos configuráveis em Configurações › Geral)
+> Avaliação feita em 24/09/2026, a pedido do Kevin ("o que falta para ser um app premium").
+> A régua aqui não é "mais telas" — é o que faz uma escola poder **confiar** o dia a dia dela ao sistema.
+
+### 7.1 Já resolvido na Etapa 4
+| O que | Como ficou |
+|---|---|
+| **Perder tudo num HD queimado** | Backup automático, cifrado, com pasta externa, aviso de atraso e restauração testada |
+| **Dado sensível sem controle** | Registro de quem consultou cada ficha, exportação dos dados ao titular e descarte de ex-alunos |
+| **Balcão sem ninguém por perto** | Bloqueio de tela com senha, validado no servidor |
+| **Senha fraca / script estranho na página** | Mínimo de 8 caracteres, recusa de senhas óbvias, cabeçalho CSP |
+| **"Quantos alunos temos?" para a Diretoria** | Tela de Relatórios + uma folha timbrada de fechamento |
+| **Cara de protótipo** | Ícones SVG, esqueleto de carregamento, telas vazias que ensinam, modo compacto, claro/escuro |
+
+### 7.2 Próximos passos, na ordem que eu faria
+1. **Piloto de verdade, com dado real, de um módulo só** — sugestão: *Atendimentos* ou *Portão*, por duas semanas.
+   Risco baixo, valor visível no primeiro dia, e é o que ganha a Samara. **Sem isso, o resto é só código.**
+2. **Histórico escolar** — maior buraco funcional. Depende de conseguir as notas (SED ou ACADESC): é a pergunta
+   que mais vale a pena responder na escola.
+3. **Atualizar sem depender do Kevin** — hoje é `git pull` no terminal. Um botão "Verificar atualizações" que faz
+   backup, baixa e reinicia. Enquanto não existir, **o sistema depende de uma pessoa só**, que um dia sai da escola.
+4. **Busca global** — um campo que ache aluno, atendimento, bolsa, documento emitido e aviso, agrupado por tipo.
+   É o recurso que mais dá sensação de "sistema profissional" pelo esforço que custa.
+5. **Conflito entre duas pessoas** — hoje, se o Kevin e a Duda editarem a mesma ficha, a última gravação vence em
+   silêncio. Avisar "a Duda alterou esta ficha há 2 minutos" antes de salvar.
+6. **Quando o PC servidor cai** — os outros não podem perder o que já foi digitado; hoje some. Guardar o formulário
+   e avisar em português, em vez de mostrar erro técnico.
+7. **Lixeira de 30 dias e desfazer** — excluir hoje é para sempre.
+8. **Uso real nos 3 PCs** — `IEL_REDE=1`, firewall e atalho nas outras máquinas, testado no local.
+9. **Ajuda dentro da tela** — um "?" por tela explicando o POP correspondente. Importa porque a secretaria tem
+   rotatividade de aprendizes: o próximo precisa conseguir usar sozinho.
+10. **Desempenho com 535 alunos reais** — a conferência de boletos e o mutirão viram páginas longas; paginar ou
+    virtualizar quando incomodar (com a demonstração de 160 ainda está tranquilo).
+
+### 7.3 O que eu recomendo **não** fazer
+- **Reescrever em React/Vue:** perderia meses e ganharia dependências e build. Rodar com um duplo clique, sem npm
+  e sem internet, é uma **qualidade** do projeto.
+- **Colocar na nuvem:** dado de menor na internet multiplica exigência de LGPD, custo e responsabilidade.
+- **WhatsApp automático em massa:** a API oficial é paga e burocrática; a não oficial derruba o número da escola.
+- **Novos módulos antes do piloto:** já são 4 etapas prontas e nenhuma rodando com dado real.
+
+### 7.4 Padrões escolhidos na Etapa 3 (todos configuráveis em Configurações › Geral)
 | Tema | Padrão adotado | Chave |
 |---|---|---|
 | Isenção de filho de funcionário | **100%** | `desconto_funcionario` |
@@ -228,26 +304,27 @@ SecretariaIEL/
 | Dias da semana no cronograma | 1 = segunda … 5 = sexta (sábado e domingo não têm tarefa fixa) | — |
 | Calendário | A marcação de "feito" vale **por ano**; item sem dia vale "durante o mês" | — |
 
-**Fora do escopo por decisão do Kevin:** Lanche Card (estoque), SPTRANS e NFS.
+### 7.5 Padrões escolhidos na Etapa 4
+| Tema | Padrão adotado | Chave |
+|---|---|---|
+| Backup automático | ao abrir e a cada **6 horas**, guardando as **30** últimas | `backup_horas`, `backup_manter` |
+| Aviso de backup atrasado | depois de **2 dias** sem cópia | `backup_avisar_dias` |
+| Pasta das cópias | `<dados>\backups` até alguém apontar para o pen drive | `backup_pasta` |
+| Senha do backup | opcional; fica guardada no banco para as cópias automáticas saírem cifradas — protege o **arquivo que sai do PC**, não o banco | `backup_senha` |
+| Bloqueio de tela | **20 minutos** parado (0 desliga) | `bloqueio_minutos` |
+| Descarte de ex-alunos | sugerido a partir de **5 anos** sem matrícula; nunca automático, sempre escolhido na tela | `lgpd_anos_descarte` |
 
-### Etapa 4 (sugestão, a combinar com o Kevin)
-1. **Histórico escolar** — é o maior buraco que sobrou. Depende de conseguir as notas (ver pendências).
-2. **Carta de concessão da bolsa** e demais documentos do CEBAS que faltam, quando os modelos chegarem.
-3. **Relatórios e fechamento**: números do ano (matrículas, bolsas, atendimentos, entregas) numa página imprimível para a Samara e a Diretoria.
-4. **Backup automático** do `dados/secretaria.db` (cópia diária numa pasta escolhida, com aviso na tela quando estiver velho demais).
-5. **Uso nos 3 PCs**: testar de verdade em rede (`IEL_REDE=1`), firewall e um atalho para as outras máquinas.
-6. **Educacenso / SED**: conferir o que dá para exportar do app no formato que a SED aceita.
-
-### Pendências abertas e perguntas para o Kevin
-- Histórico escolar: depende das notas da SED ou do ACADESC. Em qual formato dá para exportar?
+### 7.6 Pendências e perguntas para o Kevin
+- Histórico escolar: em qual formato dá para exportar as notas (SED ou ACADESC)?
 - Modelo da **carta de concessão** da bolsa: ainda não foi enviado.
-- Valor da **Recreação** (está vazio) e as **atividades e valores de 2027**. A conferência de boletos avisa quando a atividade está sem valor.
+- Valor da **Recreação** (está vazio) e as **atividades e valores de 2027**.
 - Regra da **categoria** da carteirinha olímpica (A, B, C).
 - **Feriados municipais** de Ferraz de Vasconcelos.
-- Lista oficial de documentos obrigatórios da matrícula: a escola ainda vai decidir.
-- Capacidade das turmas 2027: está numa **planilha do Google** que não foi achada no Drive conectado (provavelmente outra conta). Hoje é digitada em Configurações › Vagas.
-- Descobrir com a TI ou o fornecedor se há acesso de leitura ao MySQL do ACADESC.
-- **Confirmar com a Samara** os padrões da tabela acima, principalmente a isenção de 100% do filho de funcionário e a regra de "não somam".
+- Lista oficial de documentos obrigatórios da matrícula.
+- Capacidade das turmas 2027 (planilha do Google que não foi achada).
+- Acesso de leitura ao MySQL do ACADESC: perguntar à TI ou ao fornecedor.
+- **Confirmar com a Samara** os padrões de §7.4 e §7.5 — principalmente a isenção de 100% e a regra de "não somam".
+- **Ligar o BitLocker** no PC da secretaria: é o que protege o banco em si (o app protege as cópias).
 ## 8. Regras de ouro para quem continuar
 1. Responder em **pt-BR**, com linguagem simples: o usuário é aprendiz, não programador.
 2. **LGPD:** nunca commitar `dados/`, planilhas reais ou modelos sem passar por `ferramentas/sanitizar-modelos.js`. Testar com a demonstração.
