@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.3.0';
+const VERSAO = '4.4.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -306,7 +306,7 @@ async function iniciar() {
     <div class="principal">
       <header class="topo">
         <span class="saudacao" id="saudacao"></span>
-        <div class="busca"><input id="busca" placeholder="Buscar aluno, responsável, matrícula ou CPF…" autocomplete="off" aria-label="Buscar aluno" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
+        <div class="busca"><input id="busca" placeholder="Buscar em tudo: aluno, responsável, CPF, atendimento, aviso…" autocomplete="off" aria-label="Buscar em todo o sistema" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
       </header>
       <div id="avisos"></div>
       <main class="conteudo" id="conteudo"></main>
@@ -333,17 +333,23 @@ const invalidar = () => { cacheAlunos = null; };
 
 function configurarBusca() {
   const inp = $('#busca'), res = $('#res');
-  let sel = -1;
+  let sel = -1, espera, pedido = 0;
+  // Busca global: procura em tudo (alunos, atendimentos, avisos, quem busca, SIG, documentos, bolsas) e agrupa por tipo
+  const ICONE_GRUPO = { aluno: 'alunos', autorizado: 'portao', aviso: 'portao', atendimento: 'atendimentos', interessado: 'interessados', documento: 'documentos', bolsa: 'bolsas' };
   const mostrar = async () => {
-    const q = norm(inp.value.trim());
-    if (q.length < 2) { res.hidden = true; return; }
-    const lista = (await alunosBusca()).filter((a) => [a.nome, a.mat, a.nome_mae, a.nome_pai, a.nome_resp, a.cpf].some((v) => norm(v).includes(q))).slice(0, 12);
+    const texto = inp.value.trim();
+    if (norm(texto).length < 2) { res.hidden = true; return; }
+    const meu = ++pedido;
+    const r = await api('GET', '/api/busca?q=' + encodeURIComponent(texto));
+    if (meu !== pedido) return; // chegou a resposta de uma busca mais velha: ignora
     sel = -1;
-    res.innerHTML = lista.length ? lista.map((a) => `<a href="#/aluno/${a.id}"><b>${esc(titulo(a.nome))}</b><br><small>${esc(a.turma_rotulo)} · Mat. ${esc(a.mat || '—')} · Mãe: ${esc(titulo(a.nome_mae) || '—')}</small></a>`).join('')
-      : '<div class="vazio">Nenhum aluno encontrado</div>';
+    res.innerHTML = r.grupos.length ? r.grupos.map((g) => `<div class="grupo-busca">${icone(ICONE_GRUPO[g.tipo] || 'alunos')}${esc(g.nome)}
+        <span>${g.total > g.itens.length ? `${g.itens.length} de ${g.total}` : g.total}</span></div>
+      ${g.itens.map((i) => `<a href="${esc(i.link)}"><b>${esc(titulo(i.titulo))}</b><br><small>${esc(i.detalhe)}</small></a>`).join('')}${g.todos && g.total > g.itens.length ? `<a class="ver-todos" href="${esc(g.todos)}">Ver todos os ${g.total} →</a>` : ''}`).join('')
+      : `<div class="vazio">Nada encontrado para “${esc(texto)}”</div>`;
     res.hidden = false;
   };
-  inp.oninput = tentar(mostrar);
+  inp.oninput = () => { clearTimeout(espera); espera = setTimeout(tentar(mostrar), 180); };
   inp.onkeydown = (e) => {
     const itens = $$('a', res);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(0, Math.min(itens.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1))); itens.forEach((a, i) => a.classList.toggle('sel', i === sel)); }
@@ -357,15 +363,21 @@ function configurarBusca() {
 
 const TELAS = {};
 async function rotear() {
-  const [rota, arg] = location.hash.replace(/^#\/?/, '').split('/');
+  // "#/atendimentos?q=joao": o que vem depois do ? preenche o campo de busca da tela (#fq), usado pela busca global
+  const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
+  const [rota, arg] = caminho.split('/');
+  const qTela = new URLSearchParams(consulta || '').get('q');
   $$('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === (rota === 'aluno' ? 'alunos' : rota)));
   const c = $('#conteudo');
   // Esqueleto cinza no lugar de "Carregando…": a tela não "pula" quando o conteúdo chega
   c.innerHTML = `<div class="carregando"><div class="bloco" style="width:220px;height:26px"></div><div class="bloco" style="width:340px;height:14px;margin-top:8px"></div>
     <div class="grade g4" style="margin-top:20px">${'<div class="bloco" style="height:92px"></div>'.repeat(4)}</div>
     <div class="bloco" style="height:260px;margin-top:14px"></div></div>`;
-  try { await (TELAS[rota] || TELAS[''])(c, arg); }
-  catch (e) { c.innerHTML = `<div class="cartao"><h2>Ops!</h2><p>${esc(e.message)}</p></div>`; }
+  try {
+    await (TELAS[rota] || TELAS[''])(c, arg);
+    const fq = $('#fq', c) || $('#q', c);
+    if (qTela && fq) { fq.value = qTela; fq.dispatchEvent(new Event('input')); }
+  } catch (e) { c.innerHTML = `<div class="cartao"><h2>Ops!</h2><p>${esc(e.message)}</p></div>`; }
   atualizarBadge();
   window.scrollTo(0, 0);
 }
@@ -427,7 +439,7 @@ TELAS[''] = async (c) => {
     <button class="btn" id="atAtend">${icone('atendimentos')}Registrar atendimento</button>
     <a class="btn" href="#/portao">${icone('portao')}Consultar o portão</a>
     <a class="btn" href="#/documentos">${icone('documentos')}Emitir documento</a>
-    <button class="btn" id="atBusca">${icone('alunos')}Achar um aluno <kbd>/</kbd></button>
+    <button class="btn" id="atBusca">${icone('alunos')}Buscar em tudo <kbd>/</kbd></button>
     <button class="btn" id="atNovo">${icone('interessados')}Cadastrar aluno novo</button>
   </div>
 

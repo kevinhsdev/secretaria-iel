@@ -696,6 +696,7 @@ require('./rotas/lgpd')(ctx);
 require('./rotas/relatorios')(ctx);
 require('./rotas/atualizacao')(ctx);
 require('./rotas/lixeira')(ctx);
+require('./rotas/busca')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {
