@@ -451,7 +451,7 @@ let DEF, DADOS, CAMPOS;
 function campoHtml(c) {
   const id = 'c_' + c.id;
   const rot = `<label for="${id}">${esc(c.rot)}</label>`;
-  const dica = c.dica ? `<small style="color:#8a6d00">${esc(c.dica)}</small>` : '';
+  const dica = c.dica ? `<small style="color:var(--aviso-txt)">${esc(c.dica)}</small>` : '';
   switch (c.tipo) {
     case 'select': {
       const ops = c.opcoes.map(([val, txt]) => `<option value="${esc(val)}" ${String(val) === String(c.valor) ? 'selected' : ''}>${esc(txt)}</option>`).join('');
@@ -516,7 +516,7 @@ async function iniciar() {
       DADOS.pagamentos = r.linhas;
       box.innerHTML = r.linhas.length ? r.linhas.map((p, i) => `<label><input type="checkbox" value="${i}" ${p.pagto ? 'checked' : ''}> ${esc(p.descricao)} · ${p.pagto ? 'pago ' + dataBR(p.pagto) : 'em aberto'} · R$ ${moeda(p.valor)}</label>`).join('')
         : '<small>Nenhuma parcela desta matrícula no arquivo.</small>';
-    } catch (err) { box.innerHTML = `<small style="color:#c0392b">${esc(err.message)}</small>`; }
+    } catch (err) { box.innerHTML = `<small style="color:var(--erro)">${esc(err.message)}</small>`; }
     atualizar();
   };
   atualizar();

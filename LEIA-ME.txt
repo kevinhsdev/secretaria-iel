@@ -31,6 +31,15 @@ CONTRATO DE ATIVIDADE EXTRA
 FOTOS DAS CARTEIRINHAS
   O app procura <matrícula>.jpg nas pastas definidas em Configurações > Geral (ex.: fotos alunos\2ºA\2083.jpg).
 
+MODO CLARO E MODO ESCURO
+  Na barra lateral, embaixo, ao lado do botão "Sair", tem um botãozinho com uma lua (ou um sol).
+  Ele troca entre o modo claro e o escuro. A escolha fica guardada naquele computador/navegador.
+  Sem escolher nada, o sistema acompanha o tema do Windows.
+  Os documentos e as listas SEMPRE imprimem em branco com letra preta, mesmo com o modo escuro ligado.
+
+ATALHO ÚTIL
+  Aperte a tecla "/" em qualquer tela para o cursor ir direto para a busca de alunos.
+
 BOLETOS (menu "Boletos")
   "Conferência de descontos": o app cruza sozinho filhos de funcionários (isentos), bolsas CEBAS e
   atividades extras, e mostra o desconto esperado de cada aluno ANTES de gerar a massa de boletos.

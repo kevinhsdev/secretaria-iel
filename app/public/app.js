@@ -91,6 +91,48 @@ async function janelaWhats(dados, modeloPreferido = 0) {
   } });
 }
 
+// ───────────── claro / escuro ─────────────
+// A escolha fica guardada só neste navegador. Sem escolha, o app segue o tema do Windows.
+function temaAtual() {
+  try {
+    const t = localStorage.getItem('iel-tema');
+    if (t === 'claro' || t === 'escuro') return t;
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+  } catch { return 'claro'; }
+}
+// "escolhido" só é verdadeiro quando a pessoa clica no botão: quem nunca escolheu continua seguindo o Windows.
+function aplicarTema(tema, escolhido) {
+  document.documentElement.dataset.tema = tema;
+  if (escolhido) { try { localStorage.setItem('iel-tema', tema); } catch { /* navegador sem armazenamento */ } }
+  const b = $('#tema');
+  if (b) {
+    b.textContent = tema === 'escuro' ? '☀' : '☾';
+    b.title = tema === 'escuro' ? 'Voltar ao modo claro' : 'Modo escuro (bom para a tarde/noite)';
+    b.setAttribute('aria-label', b.title);
+  }
+}
+
+// Atalhos e escuta do tema do Windows — ligados uma vez só
+let atalhosLigados = false;
+function ligarAtalhos() {
+  if (atalhosLigados) return;
+  atalhosLigados = true;
+  // Barra "/" leva o cursor para a busca de alunos (só quando não se está digitando em outro campo)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== '/' || e.ctrlKey || e.altKey || e.metaKey) return;
+    const alvo = e.target;
+    if (alvo.isContentEditable || (alvo.matches && alvo.matches('input, textarea, select'))) return;
+    const busca = $('#busca');
+    if (busca) { e.preventDefault(); busca.focus(); }
+  });
+  // Quem nunca escolheu um tema acompanha o Windows na hora em que ele mudar
+  try {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('iel-tema')) aplicarTema(e.matches ? 'escuro' : 'claro');
+    });
+  } catch { /* navegador antigo */ }
+}
+
 // ───────────── login ─────────────
 function telaLogin() {
   document.title = 'Entrar — Secretaria IEL';
@@ -165,12 +207,12 @@ async function iniciar() {
       <ul class="menu">${MENU.filter((m) => !m.admin || EU.perfil === 'admin').map((m) => m.sep ? `<li class="sep">${esc(m.sep)}</li>`
         : `<li><a href="#/${m.rota}" data-rota="${m.rota}"><span class="ic">${m.ic}</span>${esc(m.nome)}${m.badge ? `<span class="num" id="badge-${m.badge}" hidden></span>` : ''}</a></li>`).join('')}</ul>
       <div class="usuario"><span class="av">${esc(EU.nome[0])}</span><span>${esc(EU.nome)}<br><small style="color:var(--azul-claro)">${EU.perfil === 'admin' ? 'Administração' : 'Aprendiz'}</small></span>
-        <button id="sair" title="Sair">Sair</button></div>
+        <button id="tema" class="tema-btn"></button><button id="sair" title="Sair">Sair</button></div>
     </nav>
     <div class="principal">
       <header class="topo">
         <span class="saudacao" id="saudacao"></span>
-        <div class="busca"><input id="busca" placeholder="Buscar aluno, responsável, matrícula ou CPF…" autocomplete="off" aria-label="Buscar aluno"><div class="resultados" id="res" hidden></div></div>
+        <div class="busca"><input id="busca" placeholder="Buscar aluno, responsável, matrícula ou CPF…" autocomplete="off" aria-label="Buscar aluno" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
       </header>
       <main class="conteudo" id="conteudo"></main>
     </div>
@@ -178,6 +220,9 @@ async function iniciar() {
   const h = new Date().getHours();
   $('#saudacao').textContent = `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}, ${EU.nome.split(' ')[0]}`;
   $('#sair').onclick = tentar(async () => { await api('POST', '/api/logout'); EU = null; telaLogin(); });
+  aplicarTema(temaAtual());
+  $('#tema').onclick = () => aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro', true);
+  ligarAtalhos();
   configurarBusca();
   window.onhashchange = rotear;
   rotear();

@@ -6,6 +6,14 @@
 <title>Documento — Secretaria IEL</title>
 <link rel="icon" href="icone.png">
 <link rel="stylesheet" href="doc.css">
+<script>
+// Segue o mesmo tema do sistema (a folha do documento continua branca, para imprimir)
+try {
+  var t = localStorage.getItem('iel-tema');
+  if (t !== 'claro' && t !== 'escuro') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+  document.documentElement.dataset.tema = t;
+} catch (e) { document.documentElement.dataset.tema = 'claro'; }
+</script>
 </head>
 <body>
 <div class="tela">

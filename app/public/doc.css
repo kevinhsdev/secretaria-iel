@@ -1,33 +1,44 @@
 /* Página de impressão de documentos (A4) */
-:root { --azul: #0e3d7a; --amarelo: #f5c21b; --borda: #d9e2ec; --texto: #1c2733; --cinza: #5b6878; font-family: "Segoe UI", system-ui, Arial, sans-serif; color: var(--texto); }
+/* As variáveis valem só para o painel da esquerda. A folha (.folha) é sempre branca: ela é o papel. */
+:root {
+  color-scheme: light;
+  --azul: #0e3d7a; --amarelo: #f5c21b; --borda: #d9e2ec; --texto: #1c2733; --cinza: #5b6878;
+  --painel: #fff; --mesa: #e9edf2; --aviso-bg: #fff6d6; --aviso-txt: #8a6d00; --erro: #c0392b;
+  font-family: "Segoe UI", system-ui, Arial, sans-serif; color: var(--texto);
+}
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+  --azul: #7db8ea; --borda: #2a3745; --texto: #e6edf5; --cinza: #9aabbe;
+  --painel: #16202b; --mesa: #0f1620; --aviso-bg: #3b300d; --aviso-txt: #f0d78a; --erro: #ff8f80;
+}
 * { box-sizing: border-box; }
-body { margin: 0; background: #e9edf2; font-size: 14px; }
+body { margin: 0; background: var(--mesa); font-size: 14px; }
 .tela { display: grid; grid-template-columns: 330px 1fr; min-height: 100vh; }
-.painel { background: #fff; border-right: 1px solid var(--borda); padding: 18px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.painel { background: var(--painel); border-right: 1px solid var(--borda); padding: 18px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 .painel h1 { font-size: 17px; color: var(--azul); margin: 0 0 4px; }
 .painel p.sub { color: var(--cinza); margin: 0 0 14px; font-size: 13px; }
 .painel label { display: block; font-size: 12px; font-weight: 600; color: var(--cinza); margin: 10px 0 4px; }
-.painel input, .painel select, .painel textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 7px; font: inherit; }
+.painel input, .painel select, .painel textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 7px; font: inherit; background: var(--painel); color: var(--texto); }
 .painel textarea { min-height: 70px; resize: vertical; }
 .painel .linha { display: flex; gap: 8px; }
 .painel .linha > * { flex: 1; }
 .painel .chk { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--texto); }
 .painel .chk input { width: auto; }
-.botoes { display: flex; gap: 8px; margin-top: 16px; position: sticky; bottom: 0; background: #fff; padding-top: 10px; }
-.btn { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--borda); background: #fff; cursor: pointer; font: inherit; font-weight: 600; }
-.btn.pri { background: var(--azul); color: #fff; border-color: var(--azul); flex: 1; }
-.aviso { background: #fff6d6; border: 1px solid var(--amarelo); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-top: 10px; }
+.botoes { display: flex; gap: 8px; margin-top: 16px; position: sticky; bottom: 0; background: var(--painel); padding-top: 10px; }
+.btn { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--borda); background: var(--painel); color: var(--texto); cursor: pointer; font: inherit; font-weight: 600; }
+.btn.pri { background: #155299; color: #fff; border-color: #155299; flex: 1; }
+.aviso { background: var(--aviso-bg); border: 1px solid var(--amarelo); color: var(--texto); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-top: 10px; }
 .lista-sel { max-height: 260px; overflow: auto; border: 1px solid var(--borda); border-radius: 7px; padding: 6px; }
 .lista-sel label { display: flex; gap: 6px; align-items: center; font-weight: 400; color: var(--texto); margin: 2px 0; }
 .lista-sel input[type=checkbox] { width: auto; }
 .lista-sel input[type=text] { width: 44px; padding: 2px 4px; }
 
 .previa { padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 24px; overflow-x: auto; }
-.folha { width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,.12); padding: 16mm 20mm 18mm; position: relative; font-family: Arial, Helvetica, sans-serif; font-size: 12pt; line-height: 1.5; }
+.folha { width: 210mm; min-height: 297mm; background: #fff; color: #1c2733; box-shadow: 0 4px 24px rgba(0,0,0,.25); padding: 16mm 20mm 18mm; position: relative; font-family: Arial, Helvetica, sans-serif; font-size: 12pt; line-height: 1.5; }
 .folha.paisagem { width: 297mm; min-height: 210mm; }
 
 /* Papel timbrado */
-.timbre { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid var(--azul); padding-bottom: 8px; margin-bottom: 16px; }
+.timbre { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #0e3d7a; padding-bottom: 8px; margin-bottom: 16px; }
 .timbre img { width: 78px; height: 78px; }
 .timbre div { flex: 1; text-align: center; font-size: 9.5pt; line-height: 1.35; }
 .timbre b { font-size: 11pt; }

@@ -6,6 +6,14 @@
 <title>Secretaria IEL</title>
 <link rel="icon" href="icone.png">
 <link rel="stylesheet" href="app.css">
+<script>
+// Aplica o tema salvo antes de desenhar a tela (evita a "piscada" branca). Sem escolha, segue o Windows.
+try {
+  var t = localStorage.getItem('iel-tema');
+  if (t !== 'claro' && t !== 'escuro') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+  document.documentElement.dataset.tema = t;
+} catch (e) { document.documentElement.dataset.tema = 'claro'; }
+</script>
 </head>
 <body>
 <div id="raiz"></div>

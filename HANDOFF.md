@@ -36,7 +36,7 @@
 | Usuários | Só a secretaria. **Login por pessoa + perfis**: `admin` (Samara, Kevin) e `aprendiz` (Duda). O admin acessa configurações, importação, auditoria, CEBAS e declaração de pagamento. |
 | ACADESC | **Importar exportações .xlsx** (formatos já mapeados, ver §5). Ler o MySQL direto só se a TI liberar. |
 | Entrega | **Por etapas**, cada uma testada antes da próxima. |
-| Visual | **Menu lateral azul** (#0e3d7a) com detalhes **amarelos** (#f5c21b); logo em `app/public/logo.png`. |
+| Visual | **Menu lateral azul** (#0e3d7a) com detalhes **amarelos** (#f5c21b); logo em `app/public/logo.png`. Tem **modo claro e escuro** (ver §4). |
 | LGPD | Dados reais de menores **nunca** vão para o GitHub. Testes usam **dados fictícios** ("Carregar demonstração") ou leitura **só em memória**. |
 | Aprovação | Projeto pessoal do Kevin por enquanto, ainda **sem aprovação da Samara ou da Diretoria**. |
 
@@ -148,6 +148,17 @@ SecretariaIEL/
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
    └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, doc.html/doc.css/doc.js
 ```
+
+**Claro e escuro (regra importante ao mexer no visual):**
+- Todas as cores moram nas variáveis do `:root` em `app.css`. O modo escuro (`:root[data-tema="escuro"]`) só troca os valores.
+- **Nunca escrever cor fixa** (`#fff`, `#333`) no CSS nem em `style="..."` do JS: usar as variáveis
+  (`--superficie`, `--superficie-2`, `--texto`, `--texto-2`, `--borda`, `--titulo`, `--pri`, `--realce`, `--aviso-txt`, `--roxo`…).
+  As únicas exceções são o **papel** dos documentos (`.folha` em `doc.css`, sempre branco) e o logo.
+- O tema é aplicado por um `<script>` no `<head>` de `index.html` e de `doc.html`, antes de a tela aparecer (evita piscar).
+  Guardado em `localStorage['iel-tema']`, só quando a pessoa clica no botão; quem nunca escolheu segue o Windows.
+- No bloco `@media print` as variáveis voltam ao claro com o seletor **`:root, :root[data-tema="escuro"]`** — sem o segundo
+  seletor, as cores escuras venceriam por especificidade e a impressão sairia com fundo escuro.
+- O botão fica na barra lateral (`#tema`, classe `.tema-btn`) e a tecla `/` leva o foco para a busca.
 
 **Convenções do código:**
 - Tudo em português (nomes de funções, variáveis e mensagens).

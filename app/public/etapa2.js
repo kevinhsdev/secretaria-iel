@@ -295,7 +295,7 @@ TELAS.bolsas = async (c) => {
   c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Bolsas de estudo (CEBAS) ${d.ano}</h1>
     <p class="sub">Requerimentos a partir de ${dataBR(cfg.cebas_retirada)} · entrega de ${dataBR(cfg.cebas_entrega_ini)} a ${dataBR(cfg.cebas_entrega_fim)} · resultado a partir de ${dataBR(cfg.cebas_resultado)} · prestação de contas até ${dataBR(cfg.cebas_prestacao)}</p></div>
     <div class="acoes"><label class="btn">📥 Importar Planilha Bolsas<input type="file" id="arqB" accept=".xlsx" hidden></label><button class="btn ama" id="novoB">＋ Novo processo</button></div></div>
-  <div class="faixa-demo" style="background:#f3e8ff;border-color:#b58ad8;color:#4b2273">🔒 Dados socioeconômicos: uso exclusivo para análise da bolsa (LGPD, edital item 6.7). Não compartilhe prints desta tela.</div>
+  <div class="faixa-lgpd">🔒 Dados socioeconômicos: uso exclusivo para análise da bolsa (LGPD, edital item 6.7). Não compartilhe prints desta tela.</div>
   <div class="grade g4">
     <div class="cartao kpi destaque"><div class="rot">Processos</div><div class="val">${d.bolsas.length}</div><div class="det">${d.bolsas.filter((b) => b.tipo === 'renovacao').length} renovações · ${d.bolsas.filter((b) => b.tipo === 'novo').length} pedidos novos</div></div>
     <div class="cartao kpi"><div class="rot">Em análise</div><div class="val">${['inscrito', 'conferido', 'assistente', 'visita'].reduce((s, k) => s + (cont[k] || 0), 0)}</div><div class="det">${d.bolsas.filter((b) => !completos(b) && ['inscrito', 'conferido'].includes(b.status)).length} com documentos faltando</div></div>
