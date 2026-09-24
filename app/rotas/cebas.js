@@ -25,7 +25,7 @@ const STATUS = {
 };
 
 module.exports = function cebas(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, lerCorpo, exigirAdmin, S, agoraIso, transacao, lerPlanilha, L } = ctx;
+  const { rota, db, cfg, registrar, falha, conferirVersao, json, corpoJson, lerCorpo, exigirAdmin, S, agoraIso, transacao, lerPlanilha, L } = ctx;
   const CAMPOS = ['ano', 'tipo', 'aluno_id', 'nome_aluno', 'serie', 'responsavel', 'telefone', 'endereco', 'escola_origem', 'req_enviado', 'req_entregue',
     'visitas', 'percentual_atual', 'per_capita', 'ofertado', 'aprovado', 'contrato_assinado', 'status', 'checklist', 'obs'];
 
@@ -65,7 +65,9 @@ module.exports = function cebas(ctx) {
   rota('PUT', '/api/bolsas/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
     const atual = db.prepare('SELECT * FROM bolsas WHERE id = ?').get(+p.id) || falha(404, 'Processo não encontrado');
-    const b = limpar(await corpoJson(req));
+    const bruto = await corpoJson(req);
+    conferirVersao(atual, bruto, u);
+    const b = limpar(bruto);
     b.atualizado_em = agoraIso(); b.atualizado_por = u.login;
     const ks = Object.keys(b);
     db.prepare(`UPDATE bolsas SET ${ks.map((k) => k + ' = ?').join(', ')} WHERE id = ?`).run(...ks.map((k) => b[k]), atual.id);

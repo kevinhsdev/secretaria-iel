@@ -174,6 +174,11 @@ for (const c of ['ra', 'rg', 'endereco', 'bairro', 'cidade', 'uf', 'cep', 'cpf_r
 }
 // Etapa 4: marca de aluno cujos dados pessoais já foram descartados (LGPD)
 if (!colunasAluno.has('anonimizado')) db.exec('ALTER TABLE alunos ADD COLUMN anonimizado TEXT');
+// 4.6.0: quem alterou por último e quando (aviso quando duas pessoas editam a mesma coisa)
+for (const [tabela, cols] of [['alunos', ['atualizado_por']], ['interessados', ['atualizado_em', 'atualizado_por']], ['atendimentos', ['atualizado_em', 'atualizado_por']]]) {
+  const tem = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
+  for (const c of cols) if (!tem.has(c)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${c} TEXT`);
+}
 
 function hashSenha(senha) {
   const sal = crypto.randomBytes(16).toString('hex');

@@ -2,7 +2,7 @@
 'use strict';
 
 module.exports = function rotina(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, S, turmaRotulo, L } = ctx;
+  const { rota, db, cfg, registrar, falha, conferirVersao, json, corpoJson, exigirAdmin, hoje, agoraIso, S, turmaRotulo, L } = ctx;
 
   const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -208,9 +208,10 @@ module.exports = function rotina(ctx) {
     const b = await corpoJson(req);
     const t = db.prepare('SELECT * FROM atendimentos WHERE id = ?').get(+p.id) || falha(404, 'Atendimento não encontrado');
     if (b.canal && !CANAIS[b.canal]) falha(400, 'Canal inválido');
+    conferirVersao(t, b, u);
     const ks = CAMPOS_AT.filter((k) => b[k] !== undefined);
-    if (ks.length) db.prepare(`UPDATE atendimentos SET ${ks.map((k) => k + ' = ?').join(', ')} WHERE id = ?`)
-      .run(...ks.map((k) => (k === 'resolvido' ? (b[k] ? 1 : 0) : b[k] === '' ? null : b[k])), t.id);
+    if (ks.length) db.prepare(`UPDATE atendimentos SET ${ks.map((k) => k + ' = ?').join(', ')}, atualizado_em = ?, atualizado_por = ? WHERE id = ?`)
+      .run(...ks.map((k) => (k === 'resolvido' ? (b[k] ? 1 : 0) : b[k] === '' ? null : b[k])), agoraIso(), u.login, t.id);
     registrar(u.login, 'atualizou atendimento', { aluno_id: t.aluno_id, campos: ks });
     json(res, 200, { ok: true });
   });

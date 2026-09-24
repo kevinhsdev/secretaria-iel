@@ -366,7 +366,7 @@ function formBolsa(d, b) {
         checklist: Object.fromEntries($$('[data-chk]', el).filter((i) => i.checked).map((i) => [i.dataset.chk, true])) };
       ['nome_aluno', 'serie', 'responsavel', 'telefone', 'escola_origem', 'req_enviado', 'req_entregue', 'per_capita', 'percentual_atual', 'ofertado', 'aprovado', 'endereco', 'visitas'].forEach((k) => { corpo[k] = $('#b_' + k, el).value.trim(); });
       if (!corpo.nome_aluno) return toast('Informe o nome do aluno', true);
-      if (novo) await api('POST', '/api/bolsas', corpo); else await api('PUT', '/api/bolsas/' + b.id, corpo);
+      if (novo) await api('POST', '/api/bolsas', corpo); else await salvarComVersao('/api/bolsas/' + b.id, corpo, b);
       fechar(); toast('Processo salvo'); rotear();
     });
     if ($('#delB', el)) $('#delB', el).onclick = tentar(async () => { if (!(await confirmar('Excluir o processo de ' + b.nome_aluno + '?', 'Excluir'))) return; await api('DELETE', '/api/bolsas/' + b.id); fechar(); rotear(); });

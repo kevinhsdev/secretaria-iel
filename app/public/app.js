@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.5.0';
+const VERSAO = '4.6.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -38,9 +38,31 @@ async function api(metodo, url, corpo, bruto) {
   if (r.status === 404 && /rota não encontrada/i.test(dados.erro || '')) {
     throw new Error('Esta tela é mais nova que o sistema que está aberto. Feche a janela preta do "Iniciar Secretaria" e abra de novo.');
   }
-  if (!r.ok) throw new Error(dados.erro || 'Erro ' + r.status);
+  if (!r.ok) { const e = new Error(dados.erro || 'Erro ' + r.status); e.status = r.status; e.dados = dados; throw e; }
   if (metodo === 'DELETE' && dados.lixeira_id) avisarLixeira(dados.lixeira_id);
   return dados;
+}
+
+// Salva mandando a versão que a tela carregou (atualizado_em). Se outra pessoa salvou no meio do caminho,
+// o servidor recusa e aqui a pessoa decide: passar por cima ou desistir (a janela continua aberta com o que ela digitou).
+// "original" é o registro como a tela carregou: só vão os campos que a pessoa mudou, então se duas pessoas mexeram
+// em campos diferentes, o trabalho das duas fica (em vez de um apagar o do outro).
+async function salvarComVersao(url, corpoTodo, original) {
+  const corpo = Object.fromEntries(Object.entries(corpoTodo).filter(([k, v]) => !(k in original) || String(v ?? '') !== String(original[k] ?? '')));
+  if (!Object.keys(corpo).length) return { ok: true, nada: true };
+  try { return await api('PUT', url, { ...corpo, _versao: original.atualizado_em ?? null }); } catch (e) {
+    const c = e.dados && e.dados.conflito;
+    if (!c) throw e;
+    const quando = new Date(c.em);
+    const min = Math.max(0, Math.round((Date.now() - quando) / 60000));
+    const ha = min < 1 ? 'agora há pouco' : min < 60 ? `há ${plural(min, 'minuto', 'minutos')}` : 'às ' + quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const campos = Object.keys(corpo).length;
+    const sim = await confirmar(`${c.por} alterou este registro ${ha}, enquanto você estava com ele aberto. Se você salvar agora, só `
+      + `${campos === 1 ? 'o campo que você mudou será gravado' : `os ${campos} campos que você mudou serão gravados`} — se ${c.por} tiver mexido `
+      + `${campos === 1 ? 'nele' : 'neles'} também, vale o seu. O resto do que ${c.por} fez fica como está. Salvar mesmo assim?`, 'Salvar mesmo assim');
+    if (sim) return api('PUT', url, { ...corpo, _forcar: true });
+    throw new Error(`Nada foi salvo. Para ver o que ${c.por} mudou, feche esta janela e abra de novo.`);
+  }
 }
 
 // ───────────── quando o servidor cai ─────────────
@@ -645,7 +667,7 @@ function formAluno(a) {
         fechar(); invalidar(); toast('Aluno cadastrado'); location.hash = '#/aluno/' + r.id;
       } else {
         delete b.mat;
-        await api('PUT', '/api/alunos/' + a.id, b);
+        await salvarComVersao('/api/alunos/' + a.id, b, a);
         fechar(); invalidar(); toast('Dados salvos'); rotear();
       }
     });
@@ -894,7 +916,7 @@ function formInteressado(i) {
       ev.preventDefault();
       const b = {};
       ['aluno', 'dt_nasc', 'serie_interesse', 'responsavel', 'contato', 'email', 'escola_atual', 'endereco', 'tipo_contato', 'data', 'ultimo_contato', 'status', 'obs'].forEach((k) => { b[k] = $('#i_' + k, el).value.trim(); });
-      if (novo) await api('POST', '/api/interessados', b); else await api('PUT', '/api/interessados/' + i.id, b);
+      if (novo) await api('POST', '/api/interessados', b); else await salvarComVersao('/api/interessados/' + i.id, b, i);
       fechar(); toast('Salvo'); rotear();
     });
     if ($('#del', el)) $('#del', el).onclick = tentar(async () => {

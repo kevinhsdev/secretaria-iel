@@ -525,7 +525,7 @@ function formAtendimento(d, at, alunoFixo) {
       const corpo = { aluno_id: alunoId, canal: $('#a_canal', el).value, pessoa: $('#a_pessoa', el).value, telefone: $('#a_tel', el).value,
         data: $('#a_data', el).value, hora: $('#a_hora', el).value, categoria: $('#a_cat', el).value, assunto: $('#a_assunto', el).value,
         detalhe: $('#a_det', el).value, resolvido: $('#a_res', el).checked, encaminhado: $('#a_enc', el).value, retorno_em: $('#a_ret', el).value };
-      if (novo) await api('POST', '/api/atendimentos', corpo); else await api('PUT', '/api/atendimentos/' + at.id, corpo);
+      if (novo) await api('POST', '/api/atendimentos', corpo); else await salvarComVersao('/api/atendimentos/' + at.id, corpo, at);
       fechar(); toast('Atendimento registrado'); rotear();
     });
     if ($('#delA', el)) $('#delA', el).onclick = tentar(async () => {

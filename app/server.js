@@ -61,8 +61,22 @@ function sessaoDe(req) {
 }
 
 // ───────────────────────── utilitários HTTP ─────────────────────────
-class ErroHttp extends Error { constructor(status, msg) { super(msg); this.status = status; } }
-const falha = (status, msg) => { throw new ErroHttp(status, msg); };
+class ErroHttp extends Error { constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; } }
+const falha = (status, msg, extra) => { throw new ErroHttp(status, msg, extra); };
+
+// Duas pessoas editando a mesma ficha: quem salva por último não passa por cima em silêncio.
+// A tela manda _versao (o atualizado_em que ela carregou). Se outra pessoa gravou depois, devolve 409 com quem e quando,
+// e a tela pergunta se quer salvar mesmo assim (_forcar). Tira _versao e _forcar do corpo antes de gravar.
+function conferirVersao(atual, b, u) {
+  const versao = b._versao, forcar = b._forcar;
+  delete b._versao; delete b._forcar;
+  if (versao === undefined || forcar) return;
+  if ((atual.atualizado_em || null) === (versao || null)) return;
+  if (!atual.atualizado_por || atual.atualizado_por === u.login) return;
+  const nome = atual.atualizado_por === 'importacao' ? 'A importação do ACADESC'
+    : db.prepare('SELECT nome FROM usuarios WHERE login = ?').get(atual.atualizado_por)?.nome || atual.atualizado_por;
+  falha(409, `${nome} alterou isto enquanto você editava.`, { conflito: { por: nome, em: atual.atualizado_em } });
+}
 
 function json(res, status, dados, extras = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...extras });
@@ -226,7 +240,7 @@ function importarAlunos(abas, usuario) {
       delete reg.descclasse;
       if (s) reg.serie_chave = s.chave;
       else if (!buscar.get(mat)) res.sem_serie.push(nome);
-      reg.atualizado_em = agoraIso();
+      reg.atualizado_em = agoraIso(); reg.atualizado_por = 'importacao';
       const ex = buscar.get(mat);
       const ks = Object.keys(reg);
       if (ex) {
@@ -413,7 +427,7 @@ rota('POST', '/api/alunos', async (req, res, { u }) => {
   const reg = {};
   for (const k of CAMPOS_EDITAVEIS) if (b[k] !== undefined) reg[k] = b[k] === '' ? null : b[k];
   const s = S.porChave(b.serie_chave);
-  Object.assign(reg, { descricao: s.descricao, serie: s.serie, novo: 1, atualizado_em: agoraIso(), mat: b.mat ? String(b.mat) : null });
+  Object.assign(reg, { descricao: s.descricao, serie: s.serie, novo: 1, atualizado_em: agoraIso(), atualizado_por: u.login, mat: b.mat ? String(b.mat) : null });
   const ks = Object.keys(reg);
   const r = db.prepare(`INSERT INTO alunos (${ks.join(', ')}) VALUES (${ks.map(() => '?').join(', ')})`).run(...ks.map((k) => reg[k]));
   const id = Number(r.lastInsertRowid);
@@ -424,15 +438,16 @@ rota('POST', '/api/alunos', async (req, res, { u }) => {
 rota('PUT', '/api/alunos/:id', async (req, res, { u, p }) => {
   const b = await corpoJson(req);
   const a = db.prepare('SELECT * FROM alunos WHERE id = ?').get(+p.id) || falha(404, 'Aluno não encontrado');
+  conferirVersao(a, b, u);
   const reg = {};
   for (const k of CAMPOS_EDITAVEIS) if (b[k] !== undefined) reg[k] = b[k] === '' ? null : b[k];
   if (reg.filho_funcionario !== undefined) { exigirAdmin(u); reg.filho_funcionario = reg.filho_funcionario ? 1 : 0; }
   if (reg.serie_chave) { const s = S.porChave(reg.serie_chave) || falha(400, 'Série inválida'); reg.descricao = s.descricao; reg.serie = s.serie; }
   if (!Object.keys(reg).length) return json(res, 200, { ok: true });
-  reg.atualizado_em = agoraIso();
+  reg.atualizado_em = agoraIso(); reg.atualizado_por = u.login;
   const ks = Object.keys(reg);
   db.prepare(`UPDATE alunos SET ${ks.map((k) => k + ' = ?').join(', ')} WHERE id = ?`).run(...ks.map((k) => reg[k]), a.id);
-  const mud = ks.filter((k) => k !== 'atualizado_em' && String(a[k] ?? '') !== String(reg[k] ?? ''));
+  const mud = ks.filter((k) => k !== 'atualizado_em' && k !== 'atualizado_por' && String(a[k] ?? '') !== String(reg[k] ?? ''));
   registrar(u.login, 'editou dados do aluno', { aluno_id: a.id, nome: a.nome, campos: mud });
   json(res, 200, { ok: true });
 });
@@ -556,9 +571,12 @@ rota('POST', '/api/interessados', async (req, res, { u }) => {
 rota('PUT', '/api/interessados/:id', async (req, res, { u, p }) => {
   const b = await corpoJson(req);
   if (b.status && !STATUS_INT.includes(b.status)) falha(400, 'Status inválido');
+  const atual = db.prepare('SELECT * FROM interessados WHERE id = ?').get(+p.id) || falha(404, 'Contato não encontrado');
+  conferirVersao(atual, b, u);
   const ks = CAMPOS_INT.filter((k) => b[k] !== undefined);
   if (!ks.length) return json(res, 200, { ok: true });
-  db.prepare(`UPDATE interessados SET ${ks.map((k) => k + ' = ?').join(', ')} WHERE id = ?`).run(...ks.map((k) => (b[k] === '' ? null : b[k])), +p.id);
+  db.prepare(`UPDATE interessados SET ${ks.map((k) => k + ' = ?').join(', ')}, atualizado_em = ?, atualizado_por = ? WHERE id = ?`)
+    .run(...ks.map((k) => (b[k] === '' ? null : b[k])), agoraIso(), u.login, +p.id);
   registrar(u.login, 'atualizou interessado', { id: +p.id, campos: ks });
   json(res, 200, { ok: true });
 });
@@ -717,7 +735,7 @@ rota('GET', '/api/admin/log', async (req, res, { u }) => {
 });
 
 // ── Etapa 2: documentos, atividades extras e bolsas ──
-const ctx = { rota, db, cfg, cfgPublica, registrar, transacao, falha, json, corpoJson, lerCorpo, exigirAdmin, hoje, somarDias, agoraIso, S, turmaRotulo, foneWhats, destinoDe, lerPlanilha, serialParaIso, PASTA_DADOS, sessoes, L };
+const ctx = { rota, db, cfg, cfgPublica, registrar, transacao, falha, conferirVersao, json, corpoJson, lerCorpo, exigirAdmin, hoje, somarDias, agoraIso, S, turmaRotulo, foneWhats, destinoDe, lerPlanilha, serialParaIso, PASTA_DADOS, sessoes, L };
 require('./rotas/documentos')(ctx);
 require('./rotas/extras')(ctx);
 require('./rotas/cebas')(ctx);
@@ -775,7 +793,7 @@ const servidor = http.createServer(async (req, res) => {
   } catch (e) {
     const status = e.status || 500;
     if (status === 500) console.error(new Date().toISOString(), req.method, url.pathname, e);
-    if (!res.headersSent) json(res, status, { erro: status === 500 ? 'Erro interno: ' + e.message : e.message });
+    if (!res.headersSent) json(res, status, { erro: status === 500 ? 'Erro interno: ' + e.message : e.message, ...(e.extra || {}) });
   }
 });
 
