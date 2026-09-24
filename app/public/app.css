@@ -159,6 +159,13 @@ textarea { width: 100%; min-height: 160px; resize: vertical; }
 .dica { background: var(--azul-fundo); border-left: 3px solid var(--azul-claro); padding: 10px 12px; border-radius: 6px; font-size: 13px; color: #33475b; margin: 10px 0; }
 .mono { font-family: Consolas, monospace; font-size: 12px; }
 
+/* Etapa 3 */
+.linha-alerta td { background: #fffaf0; }
+.mes-atual { border-top: 3px solid var(--amarelo); }
+label.chk { display: inline-flex; align-items: center; gap: 6px; }
+label.chk input { width: 16px; height: 16px; accent-color: var(--azul); }
+.checklist td, .checklist th { border: none; }
+
 /* Impressão: só a lista */
 .so-impressao { display: none; }
 @media print {

@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **23/09/2026**, ao fim da **Etapa 2**. A próxima é a **Etapa 3**.
+> Última atualização: **23/09/2026**, ao fim da **Etapa 3**. A próxima é a **Etapa 4**.
 
 ---
 
@@ -78,11 +78,44 @@
   - importação da "Planilha Bolsas" (Ofertado 1 = 100%, 0,5 = 50%)
 - **Importação ampliada:** aceita também a exportação de **responsáveis** do ACADESC (DescClasse, cpfresp, RGResp, Endereco, Bairro, Cidade, Estado, CEP). Com ela, o contrato 2027 passa a sair com endereço, CPF e RG.
 
+### Etapa 3 (pronta): boletos, fotos, saída, rotina, calendário e atendimentos
+- **Boletos** (`rotas/boletos.js`, menu *Boletos*), aberto também para a aprendiz:
+  - **Conferência de descontos** (POP 5.3): cruza **filhos de funcionários** (isentos, % configurável), **bolsas CEBAS**
+    `ofertada`/`concedida` (usa `aprovado`, senão `ofertado`) e **atividades extras** do ano e do ano anterior.
+    Regra adotada: **os descontos não somam, vale o maior**. Cada linha traz o desconto esperado, a origem, as extras,
+    o campo "% no ACADESC" (acusa divergência), e as marcas **conferido** e **lançado**. Tem marcação em lote e lista imprimível.
+  - **Protocolo de entrega**: *remessas* de boletos; por turma, marca quem recebeu, quando, como e quem retirou.
+    Imprime uma folha de assinatura por turma.
+- **Mutirão de fotos** (`rotas/fotos.js`): lista quem não tem foto e o checklist dos **3 sistemas** (ACADESC, SED, Lanche Card),
+  com marcação em lote por turma e folha de controle imprimível. Marcar qualquer sistema já considera a foto tirada.
+  O arquivo encontrado por `lib/fotos.js` é só uma pista: sem a pasta (fora do PC da escola) tudo continua funcionando na marcação manual.
+- **Autorização de saída** (`rotas/saida.js`, menu *Portão · Saída*):
+  - por aluno: **sai sozinho** (com data do termo), transporte e a lista de **quem pode buscar** (nome, parentesco, documento, telefone);
+  - **avisos do dia** ("hoje quem busca é outra pessoa") com canal, quem avisou e horário; no portão, o botão **Liberar saída** grava quem conferiu;
+  - **aviso só por telefone é recusado** (regra do termo), com confirmação explícita para casos excepcionais (`saida_aviso_telefone`);
+  - **consulta rápida do portão** por nome e lista imprimível por turma.
+- **Tarefas do dia por pessoa** (`rotas/rotina.js`, menu *Meu dia*): cronograma semeado conforme a rotina da secretaria
+  (seg–qua Samara/Duda/Kevin; quinta foco SED e Kevin sozinho; sexta fechamento e Duda sozinha), marcação por dia,
+  tarefas avulsas e editor do cronograma (admin).
+- **Calendário anual/sazonal**: 25 lembretes semeados (jan–dez), marcação **por ano**, aviso de atrasados e destaque do mês atual.
+- **Registro de atendimentos**: balcão, telefone, WhatsApp e e-mail, com aluno opcional, assunto, categoria, se ficou resolvido
+  e com quem ficou. Aparece também na ficha do aluno.
+- **Ficha do aluno** ganhou os blocos de **saída**, **foto nos 3 sistemas** e **últimos atendimentos**; o **painel inicial**
+  ganhou a faixa do dia; o menu ganhou contadores de tarefas e de avisos de saída.
+- **Demonstração** (`lib/demo.js` → `gerarDemoEtapa3`): autorizações, avisos de hoje, fotos, conferência, uma remessa com entregas,
+  34 atendimentos, tarefas do dia e lembretes concluídos.
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
 - "Capa financeiro" e "Atestado de inaptidão para Ed. Física" foram marcados como **obrigatórios**. O atestado não deveria ser, pois gera pendência para todos. **Avisar o Kevin.**
 - Num PC novo o banco começa **vazio**, e é preciso **Carregar demonstração** para testar.
+- O Kevin **já foi avisado** do atestado de Ed. Física; falta ele desmarcar em Configurações › Documentos no PC da escola.
+
+### Segundo computador (casa) — 23/09
+- A Etapa 3 foi feita no PC de casa do Kevin, em `C:\Users\Kevin\OneDrive\Desktop\secretaria-iel` (o Git já estava instalado).
+- Lá **não existem** o banco real, as fotos nem as pastas de prontuário: tudo isso fica só no PC da escola.
+  Por isso, qualquer coisa que dependa de pasta ou arquivo precisa continuar funcionando (ou ser marcável à mão) quando a pasta não existe.
 
 ## 4. Arquitetura
 
@@ -100,6 +133,10 @@ SecretariaIEL/
    ├─ rotas/documentos.js     → dados p/ documentos, emissões, fotos, Consulta Pagamentos, funcionários, feriados
    ├─ rotas/extras.js         → atividades, inscrições, contrato extra, cancelamento, eventos/ingressos
    ├─ rotas/cebas.js          → bolsas (admin), checklist do edital, importação da Planilha Bolsas
+   ├─ rotas/boletos.js        → conferência de descontos e protocolo de entrega (Etapa 3)
+   ├─ rotas/fotos.js          → mutirão de fotos e checklist dos 3 sistemas (Etapa 3)
+   ├─ rotas/saida.js          → autorização de saída, avisos do dia e consulta do portão (Etapa 3)
+   ├─ rotas/rotina.js         → tarefas do dia, calendário, atendimentos e /api/hoje (Etapa 3)
    ├─ lib/db.js               → schema SQLite + migrações (ALTER TABLE) + sementes (usuários, docs, atividades, feriados, funcionários, modelos)
    ├─ lib/zip.js, planilha.js → ler/escrever .xlsx e .csv sem bibliotecas
    ├─ lib/contrato.js         → contrato 2027 + utilitários de modelo (abrirModelo, definirCelula, linhaXml)
@@ -109,7 +146,7 @@ SecretariaIEL/
    ├─ lib/fotos.js            → acha <mat>.jpg / AcaDescMySql.exe00<mat>.jpeg
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
-   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, doc.html/doc.css/doc.js
+   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, doc.html/doc.css/doc.js
 ```
 
 **Convenções do código:**
@@ -136,7 +173,8 @@ SecretariaIEL/
 
 1. `git clone https://github.com/kevinhsdev/secretaria-iel.git` (repositório **privado** da conta `kevinhsdev`; o clone exige login no GitHub) e duplo clique em **`Iniciar Secretaria.bat`**. Na 1ª vez ele baixa o Node sozinho.
 2. Entrar como `kevin` com a senha `luterano`. É obrigatório criar uma senha nova no primeiro acesso.
-3. **Configurações › Importar dados › Carregar demonstração** (alunos, atividades, ingressos e bolsas fictícios).
+3. **Configurações › Importar dados › Carregar demonstração** (alunos, atividades, ingressos, bolsas, autorizações de saída,
+   fotos, conferência e entrega de boletos, tarefas e atendimentos fictícios).
 4. Em Configurações › Geral, **ajustar as pastas** (prontuários e fotos) para os caminhos do PC atual.
 
 **Como validar mudanças (método usado até aqui):**
@@ -145,6 +183,11 @@ SecretariaIEL/
 - Contratos: abrir o `.xlsx` gerado pelo **Excel via COM** (`New-Object -ComObject Excel.Application`) e ler as células, por exemplo `B21`, `C10`, `M10`.
 - Telas: Edge headless com `--remote-debugging-port` e o protocolo DevTools via `WebSocket` do Node 24 para tirar prints. Fazer o login preenchendo o formulário.
 - **Nunca** deixar cópias de dados reais em pastas temporárias. Apague ao terminar.
+- Na Etapa 3 foram usados 4 scripts de teste (numa pasta temporária, fora do Git): um **cliente** de API com login e contador de ok/falha,
+  um teste das **Etapas 1 e 2** (21 checagens), um da **Etapa 3** (70 checagens), um do **perfil aprendiz** (25 checagens, inclusive o que deve dar 403)
+  e um de **migração** (copia o banco, derruba as tabelas novas e confere que o app as recria e completa a demonstração sozinho).
+  Vale recriá-los no próximo chat: é o que pega os erros de verdade.
+- Para copiar o banco a fim de testar, copie **também** `secretaria.db-wal` e `-shm`: no modo WAL boa parte dos dados ainda não está no arquivo principal.
 
 **Armadilhas do ambiente (Windows 10 + PowerShell 5.1):**
 - No PowerShell 5.1 não existe `&&`. Use `;` ou `if ($?)`.
@@ -154,39 +197,46 @@ SecretariaIEL/
 - `Select-Object -First N` num pipe **mata** o processo Node antes de ele terminar.
 - Scripts `.ps1` com acentos precisam ser salvos em UTF-8 **com BOM**.
 - No `.bat`, `set VAR=1 && ...` guarda o valor com espaço no final. Use `set "VAR=1"`.
+- No Bash do Claude Code as **contrabarras somem** dentro de heredoc e de `-e`, e heredocs muito longos quebram:
+  para criar ou alterar arquivos grandes (ou qualquer coisa com caminho do Windows), use a ferramenta de escrita de arquivo, não `cat <<EOF`.
 
-## 7. Etapa 3 (a fazer)
+## 7. Decisões da Etapa 3 e o que vem depois
 
-Escopo escolhido pelo Kevin (ainda não implementado):
-1. **Boletos:**
-   - **Conferência de descontos antes da massa de boletos** (POP 5.3): cruzar alunos com filhos de funcionários (isentos, 100%), bolsas CEBAS concedidas e atividades extras e recreação, gerando a lista de conferência.
-   - **Protocolo de entrega dos boletos físicos** por turma: quem recebeu e quando.
-2. **Mutirão de fotos** (POP 5.2): lista de alunos sem foto e checklist dos 3 sistemas (ACADESC, SED, Lanche Card), marcando em quais a foto já foi inserida. O app já acha fotos pela matrícula (`lib/fotos.js`).
-3. **Autorização de saída**: quem sai sozinho e quem pode buscar cada aluno (nome, parentesco, documento), com consulta rápida no portão. Quando a família avisa por WhatsApp, telefone ou presencialmente que alguém diferente vai buscar, registrar o aviso do dia. Já existe o termo imprimível (`termo_saida`).
-4. **Tarefas do dia por pessoa**, seguindo o cronograma da secretaria:
-   - seg–qua: Samara com históricos e ACADESC; Duda (manhã) com baixas, planilhas, Lanche Card e fotos; Kevin (tarde) com portão, Lanche Card, digitalização e fotos
-   - quinta: foco SED, e Kevin sozinho no balcão
-   - sexta: fechamento, e Duda sozinha
-5. **Calendário anual/sazonal com lembretes:**
-   - jan/fev: boletos, SED, SPTRANS/EMTU
-   - mar/abr: prestação de contas CEBAS até 30/04 e mutirão de fotos
-   - mai–ago: edital de bolsas, festa junina e vouchers
-   - set/out: matrículas e rematrículas
-   - nov/dez: fechamento na SED, certificados e massa de boletos
-6. **Registro de atendimentos** (balcão, telefone e WhatsApp): quem atendeu, aluno, assunto e se foi resolvido.
+### Padrões escolhidos na Etapa 3 (todos configuráveis em Configurações › Geral)
+| Tema | Padrão adotado | Chave |
+|---|---|---|
+| Isenção de filho de funcionário | **100%** | `desconto_funcionario` |
+| Isenção + bolsa no mesmo aluno | **Não somam: vale o maior**, com aviso na linha | — |
+| % da bolsa usado na conferência | `aprovado`, e na falta dele `ofertado`; só bolsas `ofertada`/`concedida` | — |
+| Bolsa ainda só ofertada | Entra na conta, mas com aviso "confirme antes de lançar" | — |
+| Atividades extras do ano seguinte | Como ainda não existem em novembro, o app mostra as do ano anterior como **"confirme se continua"** | — |
+| Vencimento das mensalidades | dia **10** | `boletos_dia_venc` |
+| Mês da massa de boletos | **novembro** | `boletos_mes_massa` |
+| Sistemas do mutirão de fotos | ACADESC; SED; Lanche Card | `fotos_sistemas` |
+| Aviso de saída só por telefone | **Recusado** (regra do termo), com confirmação explícita para exceções | `saida_aviso_telefone` |
+| Dias da semana no cronograma | 1 = segunda … 5 = sexta (sábado e domingo não têm tarefa fixa) | — |
+| Calendário | A marcação de "feito" vale **por ano**; item sem dia vale "durante o mês" | — |
 
 **Fora do escopo por decisão do Kevin:** Lanche Card (estoque), SPTRANS e NFS.
 
-**Pendências abertas e perguntas para o Kevin:**
+### Etapa 4 (sugestão, a combinar com o Kevin)
+1. **Histórico escolar** — é o maior buraco que sobrou. Depende de conseguir as notas (ver pendências).
+2. **Carta de concessão da bolsa** e demais documentos do CEBAS que faltam, quando os modelos chegarem.
+3. **Relatórios e fechamento**: números do ano (matrículas, bolsas, atendimentos, entregas) numa página imprimível para a Samara e a Diretoria.
+4. **Backup automático** do `dados/secretaria.db` (cópia diária numa pasta escolhida, com aviso na tela quando estiver velho demais).
+5. **Uso nos 3 PCs**: testar de verdade em rede (`IEL_REDE=1`), firewall e um atalho para as outras máquinas.
+6. **Educacenso / SED**: conferir o que dá para exportar do app no formato que a SED aceita.
+
+### Pendências abertas e perguntas para o Kevin
 - Histórico escolar: depende das notas da SED ou do ACADESC. Em qual formato dá para exportar?
 - Modelo da **carta de concessão** da bolsa: ainda não foi enviado.
-- Valor da **Recreação** (está vazio) e as **atividades e valores de 2027**.
+- Valor da **Recreação** (está vazio) e as **atividades e valores de 2027**. A conferência de boletos avisa quando a atividade está sem valor.
 - Regra da **categoria** da carteirinha olímpica (A, B, C).
 - **Feriados municipais** de Ferraz de Vasconcelos.
 - Lista oficial de documentos obrigatórios da matrícula: a escola ainda vai decidir.
 - Capacidade das turmas 2027: está numa **planilha do Google** que não foi achada no Drive conectado (provavelmente outra conta). Hoje é digitada em Configurações › Vagas.
 - Descobrir com a TI ou o fornecedor se há acesso de leitura ao MySQL do ACADESC.
-
+- **Confirmar com a Samara** os padrões da tabela acima, principalmente a isenção de 100% do filho de funcionário e a regra de "não somam".
 ## 8. Regras de ouro para quem continuar
 1. Responder em **pt-BR**, com linguagem simples: o usuário é aprendiz, não programador.
 2. **LGPD:** nunca commitar `dados/`, planilhas reais ou modelos sem passar por `ferramentas/sanitizar-modelos.js`. Testar com a demonstração.

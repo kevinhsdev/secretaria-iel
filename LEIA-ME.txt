@@ -31,6 +31,26 @@ CONTRATO DE ATIVIDADE EXTRA
 FOTOS DAS CARTEIRINHAS
   O app procura <matrícula>.jpg nas pastas definidas em Configurações > Geral (ex.: fotos alunos\2ºA\2083.jpg).
 
+BOLETOS (menu "Boletos")
+  "Conferência de descontos": o app cruza sozinho filhos de funcionários (isentos), bolsas CEBAS e
+  atividades extras, e mostra o desconto esperado de cada aluno ANTES de gerar a massa de boletos.
+  Os descontos NÃO somam: vale o maior. Marque "conferido" e depois "lançado" conforme lançar no ACADESC.
+  "Entrega dos boletos": crie uma remessa, marque quem recebeu e imprima o protocolo por turma.
+
+MUTIRÃO DE FOTOS (menu "Mutirão de fotos")
+  Lista quem ainda não tem foto e em quais dos 3 sistemas ela já entrou (ACADESC, SED e Lanche Card).
+  Dá para marcar a turma inteira de uma vez e imprimir a folha de controle do mutirão.
+
+PORTÃO E SAÍDA (menu "Portão · Saída")
+  Digite o nome do aluno e veja na hora se ele pode sair sozinho e quem está autorizado a buscar.
+  Quando a família avisar que hoje é outra pessoa, registre em "Aviso de hoje" e, na saída, clique
+  em "Liberar saída" (fica gravado quem liberou). Autorização só por telefone não é aceita.
+
+MEU DIA, CALENDÁRIO E ATENDIMENTOS
+  "Meu dia" mostra as tarefas de cada pessoa conforme o cronograma da semana (editável pela administração).
+  "Calendário" traz os lembretes do ano (boletos, SED, CEBAS, festa junina, matrículas...). A marcação vale por ano.
+  "Atendimentos" registra balcão, telefone e WhatsApp: quem procurou, o assunto e se ficou resolvido.
+
 USAR NOS 3 PCs DA SECRETARIA (depois)
   1. No PC que ficará como "servidor", edite "Iniciar Secretaria.bat" e, logo ANTES da linha
        "%~dp0node\node.exe" --no-warnings server.js

@@ -133,4 +133,110 @@ function gerarDemoEtapa2(db, anoBolsa, transacao) {
   });
 }
 
-module.exports = { gerarDemo, gerarDemoEtapa2 };
+const tituloNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
+
+// Etapa 3: conferência de boletos, protocolo de entrega, mutirão de fotos, autorizações de saída,
+// tarefas do dia, lembretes do calendário e atendimentos (tudo fictício)
+function gerarDemoEtapa3(db, ano, transacao) {
+  let semente = 31415;
+  const rnd = () => { semente = (semente * 1103515245 + 12345) % 2147483648; return semente / 2147483648; };
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const alunos = db.prepare('SELECT * FROM alunos WHERE demo = 1 AND ativo = 1').all();
+  if (!alunos.length) return;
+  const hoje = new Date();
+  const iso = (d) => d.toLocaleDateString('sv-SE');
+  const diasAtras = (n) => { const d = new Date(hoje); d.setDate(d.getDate() - n); return iso(d); };
+  const agora = hoje.toISOString();
+  const cel = () => `(11) 9${String(Math.floor(rnd() * 90000000) + 10000000).replace(/(\d{4})(\d{4})/, '$1-$2')}`;
+  const rg = () => `${20 + Math.floor(rnd() * 30)}.${String(Math.floor(rnd() * 900) + 100)}.${String(Math.floor(rnd() * 900) + 100)}-${Math.floor(rnd() * 10)}`;
+  const matriculados = db.prepare(`SELECT a.id FROM alunos a JOIN rematriculas r ON r.aluno_id = a.id AND r.ano = ?
+    WHERE a.demo = 1 AND a.ativo = 1 AND r.status IN ('reservada','concluida')`).all(ano).map((x) => x.id);
+
+  const PARENTESCOS = ['Avó', 'Avô', 'Tia', 'Tio', 'Madrinha', 'Padrinho', 'Irmã maior de idade', 'Vizinha de confiança'];
+  const ASSUNTOS = [
+    ['Segunda via do boleto', 'Financeiro / boletos'], ['Declaração de escolaridade', 'Documentos e declarações'],
+    ['Dúvida sobre a rematrícula', 'Matrícula / rematrícula'], ['Inscrição no ballet', 'Atividades extras'],
+    ['Recarga do Lanche Card', 'Lanche Card'], ['Avisou que a avó vai buscar hoje', 'Saída / portão'],
+    ['Entrega de documentos que faltavam', 'Matrícula / rematrícula'], ['Requerimento de bolsa', 'Bolsa (CEBAS)'],
+    ['Pedido de histórico escolar', 'Documentos e declarações'], ['Passe escolar (SPTRANS)', 'Transporte escolar'],
+    ['Reclamação sobre o horário do futsal', 'Atividades extras'], ['Conversa com a coordenação', 'Pedagógico'],
+  ];
+
+  transacao(() => {
+    // Quem sai sozinho e quem pode buscar
+    const insCfg = db.prepare('INSERT INTO saida_config (aluno_id, sai_sozinho, termo_em, transporte, atualizado_em, atualizado_por) VALUES (?,?,?,?,?,?)');
+    const insAut = db.prepare('INSERT INTO saida_autorizados (aluno_id, nome, parentesco, documento, telefone, criado_em, criado_por) VALUES (?,?,?,?,?,?,?)');
+    for (const a of alunos) {
+      const grande = /^(F[6-9]|EM)/.test(a.serie_chave || '');
+      const sozinho = grande && rnd() < 0.55;
+      insCfg.run(a.id, sozinho ? 1 : 0, sozinho ? diasAtras(30 + Math.floor(rnd() * 200)) : null,
+        rnd() < 0.15 ? 'Van escolar' : null, agora, 'demo');
+      const sobre = a.nome.split(' ').slice(1).join(' ') || 'SANTOS';
+      const qtd = sozinho ? (rnd() < 0.5 ? 1 : 0) : 1 + Math.floor(rnd() * 3);
+      for (let i = 0; i < qtd; i++) insAut.run(a.id, `${pick([...MAES, ...PAIS]).toUpperCase()} ${sobre}`, pick(PARENTESCOS), 'RG ' + rg(), cel(), agora, 'demo');
+    }
+    // Avisos de saída de hoje ("hoje quem busca é outra pessoa")
+    const insAviso = db.prepare(`INSERT INTO saida_avisos (aluno_id, data, quem, parentesco, documento, canal, quem_avisou, horario, obs, conferido_em, conferido_por, criado_em, criado_por)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'demo')`);
+    for (let i = 0; i < 6; i++) {
+      const a = pick(alunos);
+      const conferido = rnd() < 0.35;
+      insAviso.run(a.id, iso(hoje), `${pick([...MAES, ...PAIS]).toUpperCase()} ${pick(SOBRENOMES).toUpperCase()}`, pick(PARENTESCOS), 'RG ' + rg(),
+        pick(['whatsapp', 'whatsapp', 'presencial', 'bilhete']), tituloNome((a.nome_mae || 'A mãe').split(' ')[0]),
+        pick(['17:30', '18:00', '12:35', '13:20']), rnd() < 0.3 ? 'Mãe em consulta médica' : null,
+        conferido ? agora : null, conferido ? 'demo' : null, agora);
+    }
+    // Mutirão de fotos: uns sem foto, uns só em parte dos sistemas
+    const insFoto = db.prepare('INSERT INTO fotos_status (aluno_id, tirada, data_foto, acadesc, sed, lanche, atualizado_em, atualizado_por) VALUES (?,?,?,?,?,?,?,?)');
+    for (const a of alunos) {
+      const x = rnd();
+      if (x < 0.22) continue; // ainda sem foto
+      const completo = x > 0.55;
+      insFoto.run(a.id, 1, diasAtras(Math.floor(rnd() * 180)), completo || rnd() < 0.8 ? 1 : 0,
+        completo ? 1 : rnd() < 0.5 ? 1 : 0, completo ? 1 : rnd() < 0.35 ? 1 : 0, agora, 'demo');
+    }
+    // Conferência de descontos e protocolo de entrega dos boletos
+    const insConf = db.prepare('INSERT INTO boletos_conf (aluno_id, ano, conferido, lancado, desconto_acadesc, obs, atualizado_em, atualizado_por) VALUES (?,?,?,?,?,?,?,?)');
+    for (const id of matriculados) {
+      const x = rnd();
+      if (x > 0.45) continue;
+      insConf.run(id, ano, 1, x < 0.3 ? 1 : 0, x < 0.04 ? 50 : null, x < 0.04 ? 'Conferir com a Samara: no ACADESC está 50%.' : null, agora, 'demo');
+    }
+    const rem = db.prepare('INSERT INTO remessas (nome, ano, referencia, obs, criado_em, criado_por, demo) VALUES (?,?,?,?,?,?,1)')
+      .run(`Boletos ${ano} — massa anual`, ano, `Mensalidades de ${ano}`, 'Remessa fictícia da demonstração', agora, 'demo');
+    const insEnt = db.prepare('INSERT INTO remessa_entregas (remessa_id, aluno_id, entregue_em, recebido_por, canal, usuario) VALUES (?,?,?,?,?,?)');
+    for (const id of matriculados) {
+      if (rnd() > 0.4) continue;
+      const a = alunos.find((x) => x.id === id);
+      insEnt.run(Number(rem.lastInsertRowid), id, diasAtras(Math.floor(rnd() * 15)),
+        tituloNome(a.nome_resp || a.nome_mae || a.nome_pai || 'Responsável'), pick(['balcao', 'balcao', 'aluno', 'portao']), 'demo');
+    }
+    // Atendimentos dos últimos dias
+    const insAt = db.prepare(`INSERT INTO atendimentos (data, hora, canal, aluno_id, pessoa, telefone, assunto, categoria, detalhe, resolvido, encaminhado, criado_em, usuario, demo)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)`);
+    for (let i = 0; i < 34; i++) {
+      const a = pick(alunos);
+      const [assunto, categoria] = pick(ASSUNTOS);
+      const resolvido = rnd() < 0.82;
+      insAt.run(diasAtras(Math.floor(rnd() * 18)), `${9 + Math.floor(rnd() * 9)}:${pick(['05', '15', '30', '40', '50'])}`,
+        pick(['balcao', 'balcao', 'telefone', 'whatsapp', 'whatsapp']), a.id,
+        tituloNome(a.nome_resp || a.nome_mae || a.nome_pai || ''), a.cel_mae || cel(), assunto, categoria,
+        rnd() < 0.4 ? 'Atendimento fictício da demonstração.' : null, resolvido ? 1 : 0,
+        resolvido ? null : pick(['Samara', 'Direção', 'Financeiro']), agora, pick(['kevin', 'duda', 'samara']));
+    }
+    // Tarefas avulsas de hoje, cronograma em andamento e lembretes já concluídos
+    const insTd = db.prepare('INSERT INTO tarefas_dia (data, responsavel, titulo, feito, criado_em, criado_por, demo) VALUES (?,?,?,?,?,?,1)');
+    [['kevin', 'Digitalizar os contratos que chegaram ontem', 0], ['kevin', 'Levar a lista de saída atualizada para o portão', 1],
+      ['duda', 'Conferir as baixas do banco de terça', 0], ['samara', 'Ligar para a Diretoria de Ensino sobre o Educacenso', 0]]
+      .forEach(([resp, tit, feito]) => insTd.run(iso(hoje), resp, tit, feito, agora, 'demo'));
+    const insRf = db.prepare('INSERT INTO rotina_feito (tarefa_id, data, feito, quando, usuario) VALUES (?,?,1,?,?)');
+    for (const t of db.prepare('SELECT id FROM rotina_tarefas WHERE ativo = 1').all()) if (rnd() < 0.35) insRf.run(t.id, iso(hoje), agora, 'demo');
+    const insCf = db.prepare('INSERT INTO calendario_feito (item_id, ano, feito_em, usuario) VALUES (?,?,?,?)');
+    const mesAtual = hoje.getMonth() + 1;
+    for (const i of db.prepare('SELECT id, mes FROM calendario WHERE ativo = 1').all()) {
+      if (i.mes < mesAtual && rnd() < 0.75) insCf.run(i.id, hoje.getFullYear(), diasAtras(20 + Math.floor(rnd() * 120)), 'demo');
+    }
+  });
+}
+
+module.exports = { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3 };

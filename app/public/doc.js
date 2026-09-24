@@ -296,7 +296,123 @@ const DOCS = {
     },
     emissao: () => ({ tipo: 'Lista de ingressos', alunos: [null] }),
   },
+
+  // ── Etapa 3 ──
+  protocolo_boletos: {
+    nome: 'Protocolo de entrega de boletos',
+    carregar: async () => api('GET', '/api/remessas/' + P.get('remessa')),
+    campos: ({ remessa, alunos }) => [
+      { id: 'titulo', rot: 'Título', valor: 'PROTOCOLO DE ENTREGA DE BOLETOS — ' + remessa.nome.toUpperCase() },
+      { id: 'turma', rot: 'Turma', tipo: 'select', opcoes: [['', 'Todas as turmas'], ...turmasDe(alunos)], valor: P.get('turma') || '' },
+      { id: 'pendentes', rot: 'Somente quem ainda não recebeu', tipo: 'checkbox', valor: false },
+      { id: 'data', rot: 'Data da entrega (deixe em branco para preencher à mão)', tipo: 'date', valor: '' },
+    ],
+    aviso: 'Uma folha por turma. O responsável (ou o aluno maior) assina ao receber o boleto.',
+    render: (v, { alunos }) => {
+      const l = alunos.filter((a) => (!v.turma || a.turma_rotulo === v.turma) && (!v.pendentes || !a.entregue_em));
+      return grupoPorTurma(l).map(([turma, itens]) => folha(`${TIMBRE}<h2 class="titulo-doc" style="margin:6px 0 4px;font-size:12pt">${esc(v.titulo)}</h2>
+        <p style="font-size:10.5pt;margin:0 0 8px">Turma: <b>${esc(turma)}</b> · ${itens.length} aluno(s)</p>
+        <table class="doc"><thead><tr><th style="width:6mm">#</th><th>Aluno</th><th>Responsável</th><th style="width:22mm">Data</th><th style="width:58mm">Assinatura de quem recebeu</th></tr></thead>
+        <tbody>${itens.map((a, i) => `<tr><td>${i + 1}</td><td>${esc(titulo(a.nome))}</td><td style="font-size:9pt">${esc(titulo(a.responsavel))}</td>
+          <td style="text-align:center">${a.entregue_em ? dataBR(a.entregue_em) : v.data ? dataBR(v.data) : '___/___/____'}</td>
+          <td style="height:9mm">${a.entregue_em && a.recebido_por ? `<small>${esc(titulo(a.recebido_por))}</small>` : ''}</td></tr>`).join('')}</tbody></table>
+        <p class="nota">Recebi o(s) boleto(s) referente(s) a ${esc(P.get('ref') || 'este lote')}. Entregue por: ______________________________ (secretaria).</p>`)).join('')
+        || folha('<p>Nenhum aluno nesta seleção.</p>');
+    },
+    emissao: (v) => ({ tipo: 'Protocolo de entrega de boletos', alunos: [null], descricao: v.turma || 'todas as turmas' }),
+  },
+  conferencia_boletos: {
+    nome: 'Conferência de descontos dos boletos',
+    carregar: async () => api('GET', '/api/boletos/conferencia?ano=' + encodeURIComponent(P.get('ano') || '')),
+    campos: ({ ano, linhas }) => [
+      { id: 'titulo', rot: 'Título', valor: `CONFERÊNCIA DE DESCONTOS — BOLETOS ${ano}` },
+      { id: 'turma', rot: 'Turma', tipo: 'select', opcoes: [['', 'Todas as turmas'], ...turmasDe(linhas)], valor: P.get('turma') || '' },
+      { id: 'filtro', rot: 'Mostrar', tipo: 'select', valor: P.get('filtro') || 'desconto', opcoes: [['', 'Todos os alunos'], ['desconto', 'Só com desconto'],
+        ['extras', 'Só com atividade extra'], ['alerta', 'Só com ponto de atenção'], ['pendente', 'Ainda não conferidos']] },
+    ],
+    aviso: 'Leve esta lista para conferir com o ACADESC antes de gerar a massa de boletos.',
+    render: (v, d) => {
+      const l = d.linhas.filter((x) => (!v.turma || x.turma_rotulo === v.turma)
+        && (v.filtro === '' || (v.filtro === 'desconto' && x.desconto_esperado > 0) || (v.filtro === 'extras' && (x.extras.length || x.extras_anterior.length))
+          || (v.filtro === 'alerta' && x.alertas.length) || (v.filtro === 'pendente' && !x.conferido)));
+      return folha(`${TIMBRE}<h2 class="titulo-doc" style="margin:6px 0 4px;font-size:12pt">${esc(v.titulo)}</h2>
+        <p style="font-size:10pt;margin:0 0 8px">${l.length} aluno(s) · isenção de filho de funcionário: ${d.desconto_funcionario}% · os descontos não somam, vale o maior · impresso em ${dataBR(hojeIso())}</p>
+        <table class="doc" style="font-size:9pt"><thead><tr><th>Aluno</th><th>Turma → ${d.ano}</th><th>Motivo do desconto</th><th style="width:14mm">%</th><th>Atividades extras</th><th style="width:16mm">No ACADESC</th><th style="width:10mm">OK</th></tr></thead>
+        <tbody>${l.map((x) => `<tr><td>${esc(titulo(x.nome))}<br><small>Mat. ${esc(x.mat || '—')}</small></td><td>${esc(x.turma_rotulo)} → ${esc(x.destino)}</td>
+          <td>${esc(x.origem)}${x.alertas.length ? `<br><small>⚠ ${esc(x.alertas.join(' '))}</small>` : ''}</td>
+          <td style="text-align:center"><b>${x.desconto_esperado}%</b></td>
+          <td>${esc(x.extras.map((e) => e.atividade).join(', ') || (x.extras_anterior.length ? `(${d.ano - 1}: ${x.extras_anterior.join(', ')})` : '—'))}</td>
+          <td style="text-align:center">${x.desconto_acadesc != null ? x.desconto_acadesc + '%' : ''}</td>
+          <td style="text-align:center">${x.conferido ? '✓' : '(   )'}</td></tr>`).join('')}</tbody></table>
+        <p class="nota">Conferido por: ______________________________  Data: ____/____/______</p>`);
+    },
+    emissao: (v) => ({ tipo: 'Conferência de descontos', alunos: [null], descricao: v.turma || 'todas as turmas' }),
+  },
+  mutirao_fotos: {
+    nome: 'Lista do mutirão de fotos',
+    carregar: async () => api('GET', '/api/fotos/mutirao'),
+    campos: ({ linhas }) => [
+      { id: 'titulo', rot: 'Título', valor: 'MUTIRÃO DE FOTOS — CONTROLE POR TURMA' },
+      { id: 'turma', rot: 'Turma', tipo: 'select', opcoes: [['', 'Todas as turmas'], ...turmasDe(linhas)], valor: P.get('turma') || '' },
+      { id: 'filtro', rot: 'Mostrar', tipo: 'select', valor: P.get('filtro') || '', opcoes: [['', 'Todos os alunos'], ['sem', 'Só quem está sem foto'],
+        ['incompleto', 'Só quem falta em algum sistema'], ['completo', 'Só os completos']] },
+    ],
+    aviso: 'Uma folha por turma, para marcar à caneta durante o mutirão e depois lançar no app.',
+    render: (v, d) => {
+      const [S1, S2, S3] = d.sistemas;
+      const l = d.linhas.filter((x) => (!v.turma || x.turma_rotulo === v.turma)
+        && (!v.filtro || (v.filtro === 'sem' && !x.tirada) || (v.filtro === 'completo' && x.completo) || (v.filtro === 'incompleto' && x.tirada && !x.completo)));
+      return grupoPorTurma(l).map(([turma, itens]) => folha(`${TIMBRE}<h2 class="titulo-doc" style="margin:6px 0 4px;font-size:12pt">${esc(v.titulo)}</h2>
+        <p style="font-size:10.5pt;margin:0 0 8px">Turma: <b>${esc(turma)}</b> · ${itens.length} aluno(s) · impresso em ${dataBR(hojeIso())}</p>
+        <table class="doc"><thead><tr><th style="width:6mm">#</th><th>Aluno</th><th style="width:16mm">Mat.</th><th style="width:20mm">Foto tirada</th>
+          <th style="width:20mm">${esc(S1)}</th><th style="width:20mm">${esc(S2)}</th><th style="width:22mm">${esc(S3)}</th></tr></thead>
+        <tbody>${itens.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(titulo(x.nome))}</td><td>${esc(x.mat || '—')}</td>
+          ${['tirada', 'acadesc', 'sed', 'lanche'].map((k) => `<td style="text-align:center">${x[k] ? '✓' : '(   )'}</td>`).join('')}</tr>`).join('')}</tbody></table>`)).join('')
+        || folha('<p>Nenhum aluno nesta seleção.</p>');
+    },
+    emissao: (v) => ({ tipo: 'Lista do mutirão de fotos', alunos: [null], descricao: v.turma || 'todas as turmas' }),
+  },
+  saida_turma: {
+    nome: 'Lista de saída por turma (portão)',
+    carregar: async () => api('GET', '/api/saida/turmas'),
+    campos: ({ alunos }) => [
+      { id: 'titulo', rot: 'Título', valor: 'AUTORIZAÇÃO DE SAÍDA — CONSULTA DO PORTÃO' },
+      { id: 'turma', rot: 'Turma', tipo: 'select', opcoes: [['', 'Todas as turmas'], ...turmasDe(alunos)], valor: P.get('turma') || '' },
+      { id: 'avisos', rot: 'Incluir os avisos de hoje', tipo: 'checkbox', valor: true },
+    ],
+    aviso: 'Imprima e deixe no portão. Confira sempre o documento de quem vai buscar.',
+    render: (v, d) => {
+      const l = d.alunos.filter((a) => !v.turma || a.turma_rotulo === v.turma);
+      return grupoPorTurma(l).map(([turma, itens]) => folha(`${TIMBRE}<h2 class="titulo-doc" style="margin:6px 0 4px;font-size:12pt">${esc(v.titulo)}</h2>
+        <p style="font-size:10.5pt;margin:0 0 8px">Turma: <b>${esc(turma)}</b> · lista de ${dataBR(d.data)}</p>
+        <table class="doc" style="font-size:9pt"><thead><tr><th>Aluno</th><th style="width:22mm">Sai sozinho</th><th>Quem pode buscar</th>${v.avisos ? '<th style="width:45mm">Aviso de hoje</th>' : ''}</tr></thead>
+        <tbody>${itens.map((a) => `<tr><td>${esc(titulo(a.nome))}${a.transporte ? `<br><small>🚐 ${esc(a.transporte)}</small>` : ''}</td>
+          <td style="text-align:center">${a.sai_sozinho ? 'SIM' : 'não'}</td>
+          <td>${a.autorizados.length ? a.autorizados.map((x) => `${esc(titulo(x.nome))}${x.parentesco ? ` (${esc(x.parentesco)})` : ''}${x.documento ? ` — ${esc(x.documento)}` : ''}`).join('<br>') : '<small>somente o responsável legal</small>'}</td>
+          ${v.avisos ? `<td>${a.avisos.map((x) => `<b>${esc(titulo(x.quem))}</b>${x.parentesco ? ` (${esc(x.parentesco)})` : ''}`).join('<br>')}</td>` : ''}</tr>`).join('')}</tbody></table>
+        <p class="nota">Aluno sem termo de autorização só sai com o responsável legal. Autorização por telefone não é aceita.</p>`)).join('')
+        || folha('<p>Nenhum aluno nesta seleção.</p>');
+    },
+    emissao: (v) => ({ tipo: 'Lista de saída (portão)', alunos: [null], descricao: v.turma || 'todas as turmas' }),
+  },
 };
+
+// Turmas disponíveis numa lista de alunos, na ordem em que o servidor mandou
+function turmasDe(lista) {
+  const vistas = new Map();
+  for (const l of lista) if (!vistas.has(l.turma_rotulo)) vistas.set(l.turma_rotulo, l.ordem ?? 99);
+  return [...vistas.entries()].sort((a, b) => a[1] - b[1] || String(a[0]).localeCompare(String(b[0]))).map(([t]) => [t, t]);
+}
+function grupoPorTurma(lista) {
+  const g = new Map();
+  for (const l of lista) {
+    if (!g.has(l.turma_rotulo)) g.set(l.turma_rotulo, []);
+    g.get(l.turma_rotulo).push(l);
+  }
+  // Na ordem das séries (Maternal → 3ª EM), e não na ordem alfabética dos alunos
+  const ordem = (itens) => Math.min(...itens.map((x) => x.ordem ?? 99));
+  return [...g.entries()].sort((a, b) => ordem(a[1]) - ordem(b[1]) || String(a[0]).localeCompare(String(b[0])));
+}
 
 function termoCancelamento(tituloDoc, acao, comMatricula, extra) {
   return {

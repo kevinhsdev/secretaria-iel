@@ -75,7 +75,75 @@ CREATE TABLE IF NOT EXISTS bolsas (
   ofertado REAL, aprovado REAL, contrato_assinado INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'inscrito',
   checklist TEXT, obs TEXT, atualizado_em TEXT, atualizado_por TEXT, demo INTEGER NOT NULL DEFAULT 0
 );
+-- ── Etapa 3 ──
+-- Conferência de descontos antes da massa de boletos (POP 5.3)
+CREATE TABLE IF NOT EXISTS boletos_conf (
+  aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE, ano INTEGER NOT NULL,
+  conferido INTEGER NOT NULL DEFAULT 0, desconto_acadesc REAL, lancado INTEGER NOT NULL DEFAULT 0,
+  obs TEXT, atualizado_em TEXT, atualizado_por TEXT, PRIMARY KEY (aluno_id, ano)
+);
+-- Protocolo de entrega dos boletos físicos
+CREATE TABLE IF NOT EXISTS remessas (
+  id INTEGER PRIMARY KEY, nome TEXT NOT NULL, ano INTEGER NOT NULL, referencia TEXT,
+  criado_em TEXT, criado_por TEXT, obs TEXT, demo INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS remessa_entregas (
+  remessa_id INTEGER NOT NULL REFERENCES remessas(id) ON DELETE CASCADE,
+  aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+  entregue_em TEXT, recebido_por TEXT, canal TEXT, obs TEXT, usuario TEXT, PRIMARY KEY (remessa_id, aluno_id)
+);
+-- Mutirão de fotos: em quais dos 3 sistemas a foto já entrou
+CREATE TABLE IF NOT EXISTS fotos_status (
+  aluno_id INTEGER PRIMARY KEY REFERENCES alunos(id) ON DELETE CASCADE, tirada INTEGER NOT NULL DEFAULT 0, data_foto TEXT,
+  acadesc INTEGER NOT NULL DEFAULT 0, sed INTEGER NOT NULL DEFAULT 0, lanche INTEGER NOT NULL DEFAULT 0,
+  obs TEXT, atualizado_em TEXT, atualizado_por TEXT
+);
+-- Autorização de saída
+CREATE TABLE IF NOT EXISTS saida_config (
+  aluno_id INTEGER PRIMARY KEY REFERENCES alunos(id) ON DELETE CASCADE, sai_sozinho INTEGER NOT NULL DEFAULT 0,
+  termo_em TEXT, transporte TEXT, obs TEXT, atualizado_em TEXT, atualizado_por TEXT
+);
+CREATE TABLE IF NOT EXISTS saida_autorizados (
+  id INTEGER PRIMARY KEY, aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE, nome TEXT NOT NULL,
+  parentesco TEXT, documento TEXT, telefone TEXT, ativo INTEGER NOT NULL DEFAULT 1, obs TEXT, criado_em TEXT, criado_por TEXT
+);
+CREATE TABLE IF NOT EXISTS saida_avisos (
+  id INTEGER PRIMARY KEY, aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE, data TEXT NOT NULL,
+  quem TEXT NOT NULL, parentesco TEXT, documento TEXT, canal TEXT, quem_avisou TEXT, horario TEXT, obs TEXT,
+  conferido_em TEXT, conferido_por TEXT, criado_em TEXT, criado_por TEXT
+);
+-- Tarefas do dia (cronograma fixo + tarefas avulsas)
+CREATE TABLE IF NOT EXISTS rotina_tarefas (
+  id INTEGER PRIMARY KEY, titulo TEXT NOT NULL, detalhe TEXT, responsavel TEXT NOT NULL DEFAULT 'todos',
+  dias TEXT, periodo TEXT, ordem INTEGER DEFAULT 0, ativo INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS rotina_feito (
+  tarefa_id INTEGER NOT NULL REFERENCES rotina_tarefas(id) ON DELETE CASCADE, data TEXT NOT NULL,
+  feito INTEGER NOT NULL DEFAULT 1, quando TEXT, usuario TEXT, PRIMARY KEY (tarefa_id, data)
+);
+CREATE TABLE IF NOT EXISTS tarefas_dia (
+  id INTEGER PRIMARY KEY, data TEXT NOT NULL, responsavel TEXT, titulo TEXT NOT NULL, detalhe TEXT,
+  feito INTEGER NOT NULL DEFAULT 0, feito_em TEXT, criado_em TEXT, criado_por TEXT, demo INTEGER NOT NULL DEFAULT 0
+);
+-- Calendário anual/sazonal da secretaria
+CREATE TABLE IF NOT EXISTS calendario (
+  id INTEGER PRIMARY KEY, titulo TEXT NOT NULL, detalhe TEXT, mes INTEGER NOT NULL, dia INTEGER,
+  responsavel TEXT, categoria TEXT, ordem INTEGER DEFAULT 0, ativo INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS calendario_feito (
+  item_id INTEGER NOT NULL REFERENCES calendario(id) ON DELETE CASCADE, ano INTEGER NOT NULL,
+  feito_em TEXT, usuario TEXT, obs TEXT, PRIMARY KEY (item_id, ano)
+);
+-- Registro de atendimentos (balcão, telefone, WhatsApp)
+CREATE TABLE IF NOT EXISTS atendimentos (
+  id INTEGER PRIMARY KEY, data TEXT NOT NULL, hora TEXT, canal TEXT NOT NULL DEFAULT 'balcao',
+  aluno_id INTEGER REFERENCES alunos(id) ON DELETE SET NULL, pessoa TEXT, telefone TEXT, assunto TEXT NOT NULL,
+  categoria TEXT, detalhe TEXT, resolvido INTEGER NOT NULL DEFAULT 1, encaminhado TEXT, retorno_em TEXT,
+  criado_em TEXT, usuario TEXT, demo INTEGER NOT NULL DEFAULT 0
+);
 CREATE INDEX IF NOT EXISTS ix_alunos_nome ON alunos(nome);
+CREATE INDEX IF NOT EXISTS ix_atend_data ON atendimentos(data);
+CREATE INDEX IF NOT EXISTS ix_avisos_data ON saida_avisos(data);
 CREATE INDEX IF NOT EXISTS ix_log_quando ON log(quando);
 `);
 
@@ -120,6 +188,12 @@ const cfgPadrao = {
   cebas_entrega_fim: '2026-07-15',
   cebas_resultado: '2026-08-28',
   cebas_prestacao: '2027-04-30',
+  // Etapa 3
+  desconto_funcionario: '100',      // filho(a) de funcionário: isento (100%)
+  boletos_dia_venc: '10',           // vencimento das mensalidades
+  boletos_mes_massa: '11',          // mês em que a massa de boletos do ano seguinte é gerada
+  fotos_sistemas: 'ACADESC;SED;Lanche Card',
+  saida_aviso_telefone: '0',        // 0 = não aceitar aviso só por telefone (regra do termo de saída)
 };
 
 function inicializar() {
@@ -180,6 +254,61 @@ function inicializar() {
       ['2027-09-07', 'Independência'], ['2027-10-12', 'Nossa Senhora Aparecida'], ['2027-11-02', 'Finados'], ['2027-11-15', 'Proclamação da República'],
       ['2027-11-20', 'Consciência Negra'], ['2027-12-25', 'Natal'],
     ].forEach((f) => ins.run(...f));
+  }
+
+  // Etapa 3 — cronograma da secretaria (dias: 1 = segunda … 5 = sexta). Editável em Meu dia › Cronograma.
+  if (!db.prepare('SELECT 1 FROM rotina_tarefas LIMIT 1').get()) {
+    const ins = db.prepare('INSERT INTO rotina_tarefas (titulo, detalhe, responsavel, dias, periodo, ordem) VALUES (?,?,?,?,?,?)');
+    [
+      ['Conferir os avisos de saída do dia', 'Quem busca hoje? Veja em Portão · Saída antes de liberar qualquer aluno.', 'todos', '1,2,3,4,5', 'dia'],
+      ['Registrar os atendimentos do dia', 'Balcão, telefone e WhatsApp: lance em Atendimentos logo depois de atender.', 'todos', '1,2,3,4,5', 'dia'],
+      ['Históricos escolares e lançamentos no ACADESC', '', 'samara', '1,2,3', 'dia'],
+      ['Baixas de pagamento no ACADESC', 'Conferir o extrato e dar baixa nas parcelas pagas.', 'duda', '1,2,3', 'manha'],
+      ['Planilhas do financeiro', 'Inadimplência, descontos e conferências.', 'duda', '1,2,3', 'manha'],
+      ['Lanche Card (manhã)', 'Recargas, cadastros e conferência da cantina.', 'duda', '1,2,3,4', 'manha'],
+      ['Fotos dos alunos (manhã)', 'Tirar e inserir nos 3 sistemas: ACADESC, SED e Lanche Card.', 'duda', '1,2,3', 'manha'],
+      ['Portão: entrada e saída dos alunos', 'Conferir quem pode buscar antes de liberar.', 'kevin', '1,2,3,4', 'tarde'],
+      ['Lanche Card (tarde)', '', 'kevin', '1,2,3,4', 'tarde'],
+      ['Digitalização e prontuário', 'Digitalizar, renomear no PDF Renamer e guardar na pasta do aluno.', 'kevin', '1,2,3,4', 'tarde'],
+      ['Fotos dos alunos (tarde)', 'Tirar e inserir nos 3 sistemas: ACADESC, SED e Lanche Card.', 'kevin', '1,2,3', 'tarde'],
+      ['Foco na SED', 'Cadastros, transferências, classes e atualizações.', 'samara', '4', 'dia'],
+      ['Foco na SED (apoio)', '', 'duda', '4', 'manha'],
+      ['Balcão sozinho', 'Na quinta a Duda não vem: atendimento e telefone ficam com você.', 'kevin', '4', 'tarde'],
+      ['Fechamento da semana', 'Conferir pendências, e-mails e o que ficou para segunda.', 'samara', '5', 'dia'],
+      ['Fechamento do financeiro da semana', 'Na sexta o Kevin não vem: balcão e telefone ficam com você.', 'duda', '5', 'manha'],
+    ].forEach((t, i) => ins.run(...t, i + 1));
+  }
+
+  // Etapa 3 — calendário anual/sazonal da secretaria (dia em branco = "durante o mês")
+  if (!db.prepare('SELECT 1 FROM calendario LIMIT 1').get()) {
+    const ins = db.prepare('INSERT INTO calendario (titulo, detalhe, mes, dia, responsavel, categoria, ordem) VALUES (?,?,?,?,?,?,?)');
+    [
+      ['Massa de boletos do ano: conferir e distribuir', 'Conferir os descontos antes de gerar e entregar os boletos.', 1, null, 'duda', 'Financeiro'],
+      ['SED: início do ano letivo, turmas e matrículas', '', 1, null, 'samara', 'SED'],
+      ['Passe escolar SPTRANS / EMTU', 'Renovações e pedidos novos das famílias.', 1, null, 'kevin', 'Transporte'],
+      ['Entrega dos boletos físicos por turma', 'Use o protocolo de entrega para registrar quem recebeu.', 2, null, 'duda', 'Financeiro'],
+      ['SED: fechamento das matrículas e das turmas', '', 2, null, 'samara', 'SED'],
+      ['Conferir a documentação dos alunos novos', 'Prazo de 30 dias a partir da matrícula.', 2, null, 'todos', 'Matrícula'],
+      ['Mutirão de fotos', 'Tirar as fotos e inserir no ACADESC, na SED e no Lanche Card.', 3, null, 'kevin', 'Fotos'],
+      ['Preparar a prestação de contas do CEBAS', 'Reunir documentos e planilhas das bolsas concedidas.', 3, null, 'samara', 'Bolsas'],
+      ['Prestação de contas do CEBAS — prazo final', 'Entregar até 30/04.', 4, 30, 'samara', 'Bolsas'],
+      ['Concluir o mutirão de fotos', '', 4, null, 'kevin', 'Fotos'],
+      ['Edital de bolsas: preparar e divulgar', '', 5, null, 'samara', 'Bolsas'],
+      ['Retirada dos requerimentos de bolsa', '', 6, null, 'samara', 'Bolsas'],
+      ['Festa junina: vouchers, ingressos e listas', '', 6, null, 'todos', 'Eventos'],
+      ['Entrega dos requerimentos e conferência dos documentos das bolsas', '', 7, null, 'samara', 'Bolsas'],
+      ['Visitas da assistente social', '', 7, null, 'samara', 'Bolsas'],
+      ['Resultado das bolsas e contratos', '', 8, null, 'samara', 'Bolsas'],
+      ['Abertura das matrículas e rematrículas', '', 9, null, 'todos', 'Matrícula'],
+      ['Campanha de rematrícula: contratos e contatos', '', 9, null, 'todos', 'Matrícula'],
+      ['Rematrículas: cobrança das famílias e pendências', '', 10, null, 'todos', 'Matrícula'],
+      ['Apresentações de fim de ano: ingressos e listas', '', 10, null, 'todos', 'Eventos'],
+      ['Massa de boletos do ano seguinte: conferência de descontos', 'Filhos de funcionários, bolsas CEBAS e atividades extras.', 11, null, 'duda', 'Financeiro'],
+      ['Fechamento na SED: rendimento e frequência', '', 11, null, 'samara', 'SED'],
+      ['Certificados e declarações de conclusão', '', 12, null, 'samara', 'Documentos'],
+      ['Fechamento do ano letivo na SED', '', 12, null, 'samara', 'SED'],
+      ['Entrega dos boletos do ano seguinte', '', 12, null, 'duda', 'Financeiro'],
+    ].forEach((c, i) => ins.run(...c, i + 1));
   }
 
   if (!db.prepare('SELECT 1 FROM modelos LIMIT 1').get()) {

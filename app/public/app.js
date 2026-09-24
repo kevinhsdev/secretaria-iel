@@ -132,6 +132,7 @@ function telaTrocarSenha(obrigatoria) {
 // ───────────── estrutura ─────────────
 const MENU = [
   { rota: '', ic: '🏠', nome: 'Início' },
+  { rota: 'hoje', ic: '📌', nome: 'Meu dia', badge: 'tarefas' },
   { rota: 'alunos', ic: '👩‍🎓', nome: 'Alunos' },
   { sep: 'Matrícula ' },
   { rota: 'rematricula', ic: '📝', nome: 'Rematrícula' },
@@ -141,6 +142,12 @@ const MENU = [
   { rota: 'documentos', ic: '🖨️', nome: 'Documentos' },
   { rota: 'extras', ic: '🩰', nome: 'Atividades extras' },
   { rota: 'bolsas', ic: '🎓', nome: 'Bolsas (CEBAS)', admin: true },
+  { rota: 'boletos', ic: '💳', nome: 'Boletos' },
+  { rota: 'fotos', ic: '📷', nome: 'Mutirão de fotos' },
+  { sep: 'Dia a dia' },
+  { rota: 'portao', ic: '🚪', nome: 'Portão · Saída', badge: 'saida' },
+  { rota: 'atendimentos', ic: '☎️', nome: 'Atendimentos' },
+  { rota: 'calendario', ic: '📅', nome: 'Calendário' },
   { sep: 'Ferramentas' },
   { rota: 'mensagens', ic: '💬', nome: 'Modelos de mensagem' },
   { rota: 'config', ic: '⚙️', nome: 'Configurações', admin: true },
@@ -150,7 +157,7 @@ async function iniciar() {
   try { EU = await api('GET', '/api/eu'); } catch { return; }
   if (EU.trocar_senha) return telaTrocarSenha(true);
   const ano = EU.config.ano_matricula;
-  MENU[2].sep = 'Matrícula ' + ano;
+  MENU.find((m) => m.sep === 'Matrícula ').sep = 'Matrícula ' + ano;
   $('#raiz').innerHTML = `
   <div class="app">
     <nav class="lateral" aria-label="Menu principal">
@@ -221,6 +228,7 @@ async function atualizarBadge() {
     const p = await api('GET', '/api/painel');
     const b = $('#badge-pend');
     if (b) { const n = p.pendencias.vencidas + p.pendencias.vencendo; b.hidden = !n; b.textContent = n; b.title = 'Vencidas ou vencendo em 7 dias'; }
+    if (window.badgesEtapa3) window.badgesEtapa3();
   } catch { /* silencioso */ }
 }
 
@@ -237,7 +245,7 @@ TELAS[''] = async (c) => {
     ['Fim da garantia de vaga', cfg.data_garantia_vaga], ['Encerramento das matrículas', cfg.data_fim],
   ];
   const diasAte = (iso) => Math.round((Date.parse(iso) - Date.parse(hojeIso())) / 86400000);
-  c.innerHTML = `${faixaDemo(p)}
+  c.innerHTML = `${faixaDemo(p)}<div id="painelEtapa3"></div>
   <h1>Painel da secretaria</h1><p class="sub">Matrícula e rematrícula ${p.ano} · ${p.total_alunos} alunos ativos cadastrados</p>
   <div class="grade g4">
     <div class="cartao kpi destaque"><div class="rot">Rematrículas concluídas</div><div class="val">${s.concluida}<small style="font-size:14px;color:var(--texto-2)"> / ${p.veteranos}</small></div><div class="det">${pct(s.concluida)} dos veteranos (sem 3ª série EM)</div></div>
@@ -266,6 +274,7 @@ TELAS[''] = async (c) => {
     </div>
   </div>`;
   $$('tr[data-id]', c).forEach((tr) => (tr.onclick = () => (location.hash = '#/aluno/' + tr.dataset.id)));
+  if (window.painelEtapa3) window.painelEtapa3($('#painelEtapa3')).catch(() => {});
 };
 
 // ───────────── Alunos ─────────────
@@ -401,6 +410,7 @@ TELAS.aluno = async (c, id) => {
       ${dado('Endereço', [a.endereco, a.bairro, a.cidade, a.cep].filter(Boolean).join(' · '))}
     </div></div>
   <div id="fichaEtapa2"></div>
+  <div id="fichaEtapa3"></div>
   ${f.historico.length ? `<div class="cartao" style="margin-top:14px"><h2>Histórico</h2><table><tbody>${f.historico.map((h) => `<tr><td class="dado" style="width:150px">${new Date(h.quando).toLocaleString('pt-BR')}</td><td>${esc(h.usuario)}</td><td>${esc(h.acao)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
 
   const salvarRem = tentar(async (corpo) => { await api('PUT', `/api/alunos/${a.id}/rematricula`, corpo); invalidar(); toast('Rematrícula atualizada'); rotear(); });
@@ -422,6 +432,7 @@ TELAS.aluno = async (c, id) => {
   $('#btnPasta').onclick = tentar(async () => { const r2 = await api('POST', `/api/alunos/${a.id}/abrir-pasta`); toast('Abrindo ' + r2.pasta); });
   $('#btnEditar').onclick = () => formAluno(a);
   if (window.fichaEtapa2) window.fichaEtapa2($('#fichaEtapa2'), a, f).catch((e) => toast(e.message, true));
+  if (window.fichaEtapa3) window.fichaEtapa3($('#fichaEtapa3'), a, f).catch((e) => toast(e.message, true));
   $('#btnContrato').onclick = async (e) => {
     e.preventDefault();
     try {
@@ -635,12 +646,20 @@ TELAS.config = async (c, aba = 'geral') => {
     <h3 style="margin-top:18px">Bolsa social (CEBAS)</h3><div class="campos">
       ${campo('cebas_ano', 'Ano das bolsas', 'number')}${campo('cebas_retirada', 'Retirada do requerimento')}${campo('cebas_entrega_ini', 'Entrega: início')}
       ${campo('cebas_entrega_fim', 'Entrega: fim')}${campo('cebas_resultado', 'Divulgação do resultado')}${campo('cebas_prestacao', 'Prestação de contas')}</div>
+    <h3 style="margin-top:18px">Boletos, fotos e saída</h3><div class="campos">
+      ${campo('desconto_funcionario', 'Desconto do filho de funcionário (%)', 'number')}${campo('boletos_dia_venc', 'Dia de vencimento das mensalidades', 'number')}
+      ${campo('boletos_mes_massa', 'Mês da massa de boletos (11 = novembro)', 'number')}${campo('fotos_sistemas', 'Sistemas do mutirão de fotos (separe com ;)', 'text')}
+      <div class="campo"><label>Aviso de saída só por telefone</label><select id="c_saida_aviso_telefone">
+        <option value="0" ${cfg.saida_aviso_telefone !== '1' ? 'selected' : ''}>Não aceitar (regra do termo)</option>
+        <option value="1" ${cfg.saida_aviso_telefone === '1' ? 'selected' : ''}>Aceitar sem avisar</option></select></div></div>
+    <p class="dado">Na conferência dos boletos os descontos não somam: vale o maior entre a isenção de funcionário e a bolsa CEBAS.</p>
     <div class="rodape" style="display:flex;justify-content:flex-end"><button class="btn pri">Salvar</button></div></form>`;
     $('#fg').onsubmit = tentar(async (ev) => {
       ev.preventDefault();
       const b = {}; ['ano_matricula', 'prazo_dias', 'data_inicio', 'data_desconto', 'data_garantia_vaga', 'data_fim', 'pasta_prontuario', 'pastas_fotos', 'inep',
         'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
-        'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao'].forEach((k) => { b[k] = $('#c_' + k).value.trim(); });
+        'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
+        'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone'].forEach((k) => { b[k] = $('#c_' + k).value.trim(); });
       await api('PUT', '/api/admin/config', b); EU = await api('GET', '/api/eu'); toast('Configurações salvas');
     });
   }

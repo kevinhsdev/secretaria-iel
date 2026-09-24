@@ -10,7 +10,7 @@ const { lerPlanilha, serialParaIso } = require('./lib/planilha');
 const S = require('./lib/series');
 const { gerarContrato } = require('./lib/contrato');
 const prontuario = require('./lib/prontuario');
-const { gerarDemo, gerarDemoEtapa2 } = require('./lib/demo');
+const { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3 } = require('./lib/demo');
 
 inicializar();
 
@@ -555,7 +555,8 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
   const b = await corpoJson(req);
   const permitidas = ['ano_matricula', 'prazo_dias', 'data_inicio', 'data_desconto', 'data_garantia_vaga', 'data_fim', 'pasta_prontuario', 'pastas_fotos', 'inep',
     'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
-    'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao'];
+    'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
+    'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone'];
   for (const k of permitidas) if (b[k] !== undefined) db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(k, String(b[k]));
   prontuario.limparCache();
   registrar(u.login, 'alterou configurações', b);
@@ -625,6 +626,7 @@ rota('POST', '/api/admin/demo', async (req, res, { u }) => {
   if (db.prepare('SELECT 1 FROM alunos WHERE demo = 0 LIMIT 1').get()) falha(400, 'Já existem alunos reais cadastrados; a demonstração não pode ser misturada a eles.');
   const n = gerarDemo(db, +cfg().ano_matricula, transacao);
   gerarDemoEtapa2(db, +cfg().cebas_ano, transacao);
+  gerarDemoEtapa3(db, +cfg().ano_matricula, transacao);
   registrar(u.login, 'carregou dados de demonstração', { alunos: n });
   json(res, 200, { alunos: n });
 });
@@ -635,6 +637,12 @@ rota('DELETE', '/api/admin/demo', async (req, res, { u }) => {
     db.prepare('DELETE FROM alunos WHERE demo = 1').run();
     db.prepare('DELETE FROM interessados WHERE demo = 1').run();
     db.prepare("DELETE FROM eventos WHERE obs = 'DEMO'").run();
+    // Etapa 3 (o que depende de aluno some junto com ele; o resto tem marca de demonstração)
+    db.prepare('DELETE FROM remessas WHERE demo = 1').run();
+    db.prepare('DELETE FROM atendimentos WHERE demo = 1').run();
+    db.prepare('DELETE FROM tarefas_dia WHERE demo = 1').run();
+    db.prepare("DELETE FROM rotina_feito WHERE usuario = 'demo'").run();
+    db.prepare("DELETE FROM calendario_feito WHERE usuario = 'demo'").run();
   });
   registrar(u.login, 'apagou dados de demonstração', '');
   json(res, 200, { ok: true });
@@ -649,11 +657,21 @@ const ctx = { rota, db, cfg, registrar, transacao, falha, json, corpoJson, lerCo
 require('./rotas/documentos')(ctx);
 require('./rotas/extras')(ctx);
 require('./rotas/cebas')(ctx);
+require('./rotas/boletos')(ctx);
+require('./rotas/fotos')(ctx);
+require('./rotas/saida')(ctx);
+require('./rotas/rotina')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {
   gerarDemoEtapa2(db, +cfg().cebas_ano, transacao);
   registrar('sistema', 'completou a demonstração com atividades extras e bolsas', '');
+}
+// O mesmo para quem já tinha a demonstração antes da Etapa 3
+if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM atendimentos LIMIT 1').get()
+  && !db.prepare('SELECT 1 FROM saida_autorizados LIMIT 1').get()) {
+  gerarDemoEtapa3(db, +cfg().ano_matricula, transacao);
+  registrar('sistema', 'completou a demonstração com boletos, fotos, saída e atendimentos', '');
 }
 
 // ───────────────────────── servidor ─────────────────────────
