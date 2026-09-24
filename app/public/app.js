@@ -122,12 +122,6 @@ function aplicarDensidade(d, escolhido) {
   const compacta = d === 'compacta';
   document.documentElement.dataset.densidade = compacta ? 'compacta' : 'normal';
   if (escolhido) { try { localStorage.setItem('iel-compacto', compacta ? '1' : '0'); } catch { /* sem armazenamento */ } }
-  const b = $('#densidade');
-  if (b) {
-    b.innerHTML = icone(compacta ? 'largo' : 'compacto');
-    b.title = compacta ? 'Voltar ao tamanho normal' : 'Modo compacto: cabe mais linha na tela';
-    b.setAttribute('aria-label', b.title);
-  }
 }
 
 // Atalhos e escuta do tema do Windows — ligados uma vez só
@@ -256,11 +250,11 @@ async function iniciar() {
   $('#raiz').innerHTML = `
   <div class="app">
     <nav class="lateral" aria-label="Menu principal">
-      <div class="marca"><img src="icone.png" alt=""><div><b>Secretaria IEL</b><small>Instituto Educacional Luterano</small></div></div>
+      <div class="marca"><img src="logo.png" alt=""><div><b>Secretaria IEL</b><small>Instituto Educacional Luterano</small></div></div>
       <ul class="menu">${MENU.filter((m) => !m.admin || EU.perfil === 'admin').map((m) => m.sep ? `<li class="sep">${esc(m.sep)}</li>`
         : `<li><a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.ic)}${esc(m.nome)}${m.badge ? `<span class="num" id="badge-${m.badge}" hidden></span>` : ''}</a></li>`).join('')}</ul>
-      <div class="usuario"><span class="av">${esc(EU.nome[0])}</span><span>${esc(EU.nome)}<br><small style="color:var(--azul-claro)">${EU.perfil === 'admin' ? 'Administração' : 'Aprendiz'}</small></span>
-        <button id="densidade" class="tema-btn"></button><button id="tema" class="tema-btn"></button><button id="sair" title="Sair">Sair</button></div>
+      <div class="usuario"><span class="av">${esc(EU.nome[0])}</span><span class="quem">${esc(EU.nome)}<br><small style="color:var(--azul-claro)">${EU.perfil === 'admin' ? 'Administração' : 'Aprendiz'}</small></span>
+        <button id="tema" class="tema-btn"></button><button id="sair" title="Sair">Sair</button></div>
     </nav>
     <div class="principal">
       <header class="topo">
@@ -277,7 +271,6 @@ async function iniciar() {
   aplicarTema(temaAtual());
   $('#tema').onclick = () => aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro', true);
   aplicarDensidade(densidadeAtual());
-  $('#densidade').onclick = () => aplicarDensidade(densidadeAtual() === 'compacta' ? 'normal' : 'compacta', true);
   ligarAtalhos();
   if (window.ligarBloqueio) window.ligarBloqueio();
   if (EU.bloqueada && window.mostrarBloqueio) window.mostrarBloqueio();
@@ -769,7 +762,12 @@ TELAS.config = async (c, aba = 'geral') => {
         <option value="0" ${cfg.saida_aviso_telefone !== '1' ? 'selected' : ''}>Não aceitar (regra do termo)</option>
         <option value="1" ${cfg.saida_aviso_telefone === '1' ? 'selected' : ''}>Aceitar sem avisar</option></select></div></div>
     <p class="dado">Na conferência dos boletos os descontos não somam: vale o maior entre a isenção de funcionário e a bolsa CEBAS.</p>
+    <h3 style="margin-top:18px">Aparência (vale só neste computador)</h3>
+    <label class="chk"><input type="checkbox" id="c_compacto"> Modo compacto: linhas mais juntas, cabe mais aluno na tela</label>
+    <p class="dado">O claro/escuro fica no botão da barra lateral, embaixo.</p>
     <div class="rodape" style="display:flex;justify-content:flex-end"><button class="btn pri">Salvar</button></div></form>`;
+    $('#c_compacto').checked = densidadeAtual() === 'compacta';
+    $('#c_compacto').onchange = (ev) => aplicarDensidade(ev.target.checked ? 'compacta' : 'normal', true);
     $('#fg').onsubmit = tentar(async (ev) => {
       ev.preventDefault();
       const b = {}; ['ano_matricula', 'prazo_dias', 'data_inicio', 'data_desconto', 'data_garantia_vaga', 'data_fim', 'pasta_prontuario', 'pastas_fotos', 'inep',
