@@ -400,9 +400,10 @@ function desenharAtualizacao(el, d, resultado) {
     ${impedido ? `<div class="dica">${esc(d.aviso || 'Não dá para atualizar automaticamente neste computador.')}</div>`
       : `<p class="dica">O sistema busca a versão nova no GitHub, <b>faz uma cópia de segurança do banco</b>, troca os arquivos e reinicia.
         Os dados da secretaria não são tocados — só o programa.</p>`}
-    ${d.limpo === false ? `<div class="aviso-fixo perigo" style="border-radius:8px;margin-top:10px">⚠️ <b>Há arquivos alterados nesta pasta:</b>
-      <span class="mono">${d.mudancas_locais.slice(0, 8).map(esc).join(', ')}${d.mudancas_locais.length > 8 ? '…' : ''}</span>.
-      Atualizar apagaria essas mudanças, então está bloqueado. Se não foi você que mexeu, chame quem cuida do sistema.</div>` : ''}
+    ${d.limpo === false ? `<div class="aviso-fixo perigo" style="border-radius:8px;margin-top:10px;display:block">
+      ⚠️ <b>Há arquivos alterados nesta pasta.</b> Atualizar apagaria essas mudanças, então está bloqueado.
+      Se não foi você que mexeu, chame quem cuida do sistema.
+      <br><span class="mono">${d.mudancas_locais.slice(0, 8).map(esc).join(', ')}${d.mudancas_locais.length > 8 ? '…' : ''}</span></div>` : ''}
     <div id="atResultado" style="margin-top:12px">${resultado || '<p class="dado">Clique em "Verificar se há atualização" quando quiser. Não precisa ser sempre — só quando eu avisar que tem novidade.</p>'}</div>
     ${d.origem ? `<p class="dado" style="margin-top:12px">Origem: <span class="mono">${esc(d.origem)}</span> · ramo <span class="mono">${esc(d.ramo)}</span></p>` : ''}
   </div>`;
