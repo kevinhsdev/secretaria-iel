@@ -152,6 +152,12 @@ CREATE TABLE IF NOT EXISTS acessos (
   usuario TEXT NOT NULL, aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
   data TEXT NOT NULL, vezes INTEGER NOT NULL DEFAULT 1, ultima TEXT, PRIMARY KEY (usuario, aluno_id, data)
 );
+-- Lixeira: o que foi excluído fica aqui por lixeira_dias antes de sumir de vez.
+-- "dados" é uma fotografia em JSON das linhas apagadas (e das linhas filhas), para devolver com o mesmo id.
+CREATE TABLE IF NOT EXISTS lixeira (
+  id INTEGER PRIMARY KEY, tipo TEXT NOT NULL, rotulo TEXT, aluno_id INTEGER, dados TEXT NOT NULL,
+  usuario TEXT, excluido_em TEXT NOT NULL, demo INTEGER NOT NULL DEFAULT 0
+);
 CREATE INDEX IF NOT EXISTS ix_alunos_nome ON alunos(nome);
 CREATE INDEX IF NOT EXISTS ix_atend_data ON atendimentos(data);
 CREATE INDEX IF NOT EXISTS ix_avisos_data ON saida_avisos(data);
@@ -216,6 +222,7 @@ const cfgPadrao = {
   backup_senha: '',                 // se preenchida, o arquivo do backup sai cifrado (AES-256)
   bloqueio_minutos: '20',           // bloqueia a tela após este tempo parado (0 = não bloquear)
   lgpd_anos_descarte: '5',          // depois de quantos anos um ex-aluno pode ser anonimizado
+  lixeira_dias: '30',               // quantos dias o que foi excluído fica na lixeira antes de sumir de vez
 };
 
 // Nunca sai do servidor para a tela (nem para o admin): só se diz se está definida ou não.

@@ -5,7 +5,7 @@ const path = require('path');
 const { fotoDe } = require('../lib/fotos');
 
 module.exports = function documentos(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, lerCorpo, exigirAdmin, S, turmaRotulo, destinoDe, lerPlanilha, serialParaIso, agoraIso } = ctx;
+  const { rota, db, cfg, registrar, falha, json, corpoJson, lerCorpo, exigirAdmin, S, turmaRotulo, destinoDe, lerPlanilha, serialParaIso, agoraIso, L } = ctx;
 
   const horarioDe = (c, chave) => ({ infantil: c.horario_infantil, fund1: c.horario_fund1, fund2: c.horario_fund2, medio: c.horario_medio }[S.segmento(chave)] || '');
 
@@ -120,8 +120,9 @@ module.exports = function documentos(ctx) {
   });
   rota('DELETE', '/api/feriados/:data', async (req, res, { u, p }) => {
     exigirAdmin(u);
-    db.prepare('DELETE FROM feriados WHERE data = ?').run(p.data);
-    registrar(u.login, 'excluiu feriado', p.data);
-    json(res, 200, { ok: true });
+    const f = db.prepare('SELECT nome FROM feriados WHERE data = ?').get(p.data) || falha(404, 'Feriado não encontrado');
+    const lixeira_id = L.excluir({ tipo: 'feriado', rotulo: `${p.data.split('-').reverse().join('/')} · ${f.nome || ''}`, usuario: u.login, tabela: 'feriados', onde: 'data = ?', params: [p.data] });
+    registrar(u.login, 'excluiu feriado (foi para a lixeira)', p.data);
+    json(res, 200, { ok: true, lixeira_id });
   });
 };

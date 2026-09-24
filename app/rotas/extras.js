@@ -3,7 +3,7 @@
 const { gerarContratoExtra } = require('../lib/contrato-extra');
 
 module.exports = function extras(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, turmaRotulo, transacao } = ctx;
+  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, turmaRotulo, transacao, L } = ctx;
 
   // Regra da planilha de vocês: parcelas mensais do mês da inscrição até novembro, vencimento dia 10
   function calcularParcelas(dataIso, c) {
@@ -103,9 +103,10 @@ module.exports = function extras(ctx) {
   rota('DELETE', '/api/inscricoes/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
     const i = db.prepare('SELECT * FROM inscricoes WHERE id = ?').get(+p.id) || falha(404, 'Inscrição não encontrada');
-    db.prepare('DELETE FROM inscricoes WHERE id = ?').run(i.id);
-    registrar(u.login, 'excluiu inscrição (lançada por engano)', { aluno_id: i.aluno_id });
-    json(res, 200, { ok: true });
+    const rot = db.prepare('SELECT a.nome || \' · \' || t.nome r FROM alunos a, atividades t WHERE a.id = ? AND t.id = ?').get(i.aluno_id, i.atividade_id);
+    const lixeira_id = L.excluir({ tipo: 'inscricao', rotulo: rot?.r, usuario: u.login, aluno_id: i.aluno_id, tabela: 'inscricoes', onde: 'id = ?', params: [i.id] });
+    registrar(u.login, 'excluiu inscrição (lançada por engano; foi para a lixeira)', { aluno_id: i.aluno_id });
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   rota('GET', '/api/inscricoes/:id/contrato', async (req, res, { u, p }) => {
@@ -141,9 +142,11 @@ module.exports = function extras(ctx) {
   });
   rota('DELETE', '/api/eventos/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
-    db.prepare('DELETE FROM eventos WHERE id = ?').run(+p.id);
-    registrar(u.login, 'excluiu evento', p.id);
-    json(res, 200, { ok: true });
+    const ev = db.prepare('SELECT nome FROM eventos WHERE id = ?').get(+p.id) || falha(404, 'Evento não encontrado');
+    const lixeira_id = L.excluir({ tipo: 'evento', rotulo: ev.nome, usuario: u.login, tabela: 'eventos', onde: 'id = ?', params: [+p.id],
+      filhas: [{ tabela: 'ingressos', onde: 'evento_id = ?', params: [+p.id] }] });
+    registrar(u.login, 'excluiu evento (foi para a lixeira)', ev.nome);
+    json(res, 200, { ok: true, lixeira_id });
   });
   // Lista de alunos para o evento. "atividade" limita aos inscritos (ex.: só alunas de ballet)
   rota('GET', '/api/eventos/:id/ingressos', async (req, res, { p, url }) => {

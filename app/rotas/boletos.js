@@ -2,7 +2,7 @@
 'use strict';
 
 module.exports = function boletos(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, S, turmaRotulo, foneWhats, destinoDe, transacao } = ctx;
+  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, S, turmaRotulo, foneWhats, destinoDe, transacao, L } = ctx;
   const ordemSerie = (a) => (a.novo ? 100 : 0) + (S.SERIES.findIndex((s) => s.chave === a.serie_chave) + 1 || 50);
 
   // Quem vai ter boleto no ano: alunos com a matrícula em andamento ou concluída
@@ -146,9 +146,10 @@ module.exports = function boletos(ctx) {
   rota('DELETE', '/api/remessas/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
     const r = db.prepare('SELECT nome FROM remessas WHERE id = ?').get(+p.id) || falha(404, 'Remessa não encontrada');
-    db.prepare('DELETE FROM remessas WHERE id = ?').run(+p.id);
-    registrar(u.login, 'excluiu remessa de boletos', r.nome);
-    json(res, 200, { ok: true });
+    const lixeira_id = L.excluir({ tipo: 'remessa', rotulo: r.nome, usuario: u.login, tabela: 'remessas', onde: 'id = ?', params: [+p.id],
+      filhas: [{ tabela: 'remessa_entregas', onde: 'remessa_id = ?', params: [+p.id] }] });
+    registrar(u.login, 'excluiu remessa de boletos (foi para a lixeira)', r.nome);
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   // Lista de entrega da remessa (agrupada por turma no front)

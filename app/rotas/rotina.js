@@ -2,7 +2,7 @@
 'use strict';
 
 module.exports = function rotina(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, S, turmaRotulo } = ctx;
+  const { rota, db, cfg, registrar, falha, json, corpoJson, exigirAdmin, hoje, agoraIso, S, turmaRotulo, L } = ctx;
 
   const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -94,9 +94,10 @@ module.exports = function rotina(ctx) {
     json(res, 200, { ok: true });
   });
   rota('DELETE', '/api/tarefas-dia/:id', async (req, res, { u, p }) => {
-    db.prepare('DELETE FROM tarefas_dia WHERE id = ?').run(+p.id);
-    registrar(u.login, 'excluiu tarefa do dia', p.id);
-    json(res, 200, { ok: true });
+    const t = db.prepare('SELECT titulo, data FROM tarefas_dia WHERE id = ?').get(+p.id) || falha(404, 'Tarefa não encontrada');
+    const lixeira_id = L.excluir({ tipo: 'tarefa', rotulo: `${t.titulo} (${t.data.split('-').reverse().join('/')})`, usuario: u.login, tabela: 'tarefas_dia', onde: 'id = ?', params: [+p.id] });
+    registrar(u.login, 'excluiu tarefa do dia (foi para a lixeira)', t.titulo);
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   // ── Calendário anual / sazonal ──
@@ -149,9 +150,10 @@ module.exports = function rotina(ctx) {
   rota('DELETE', '/api/calendario/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
     const i = db.prepare('SELECT titulo FROM calendario WHERE id = ?').get(+p.id) || falha(404, 'Lembrete não encontrado');
-    db.prepare('DELETE FROM calendario WHERE id = ?').run(+p.id);
-    registrar(u.login, 'excluiu lembrete do calendário', i.titulo);
-    json(res, 200, { ok: true });
+    const lixeira_id = L.excluir({ tipo: 'lembrete', rotulo: i.titulo, usuario: u.login, tabela: 'calendario', onde: 'id = ?', params: [+p.id],
+      filhas: [{ tabela: 'calendario_feito', onde: 'item_id = ?', params: [+p.id] }] });
+    registrar(u.login, 'excluiu lembrete do calendário (foi para a lixeira)', i.titulo);
+    json(res, 200, { ok: true, lixeira_id });
   });
   rota('PUT', '/api/calendario/:id/feito', async (req, res, { u, p }) => {
     const b = await corpoJson(req);
@@ -214,9 +216,11 @@ module.exports = function rotina(ctx) {
   });
   rota('DELETE', '/api/atendimentos/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
-    db.prepare('DELETE FROM atendimentos WHERE id = ?').run(+p.id);
-    registrar(u.login, 'excluiu atendimento', p.id);
-    json(res, 200, { ok: true });
+    const a = db.prepare('SELECT assunto, data, aluno_id FROM atendimentos WHERE id = ?').get(+p.id) || falha(404, 'Atendimento não encontrado');
+    const lixeira_id = L.excluir({ tipo: 'atendimento', rotulo: `${a.assunto} (${a.data.split('-').reverse().join('/')})`, usuario: u.login, aluno_id: a.aluno_id,
+      tabela: 'atendimentos', onde: 'id = ?', params: [+p.id] });
+    registrar(u.login, 'excluiu atendimento (foi para a lixeira)', { assunto: a.assunto, ...(a.aluno_id ? { aluno_id: a.aluno_id } : {}) });
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   // ── Resumo do dia (tela "Meu dia" e faixa do painel) ──

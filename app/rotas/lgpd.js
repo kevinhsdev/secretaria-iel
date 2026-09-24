@@ -45,6 +45,8 @@ module.exports = function lgpd(ctx) {
       avisos_de_saida: todos('SELECT * FROM saida_avisos WHERE aluno_id = ? ORDER BY data DESC LIMIT 200', id),
       atendimentos: todos('SELECT * FROM atendimentos WHERE aluno_id = ? ORDER BY data DESC', id),
       documentos_emitidos: todos('SELECT * FROM emissoes WHERE aluno_id = ? ORDER BY id DESC', id),
+      na_lixeira: todos('SELECT tipo, rotulo, usuario, excluido_em, dados FROM lixeira WHERE aluno_id = ? ORDER BY id DESC', id)
+        .map((l) => ({ ...l, dados: JSON.parse(l.dados) })),
       quem_consultou: todos('SELECT usuario, data, vezes FROM acessos WHERE aluno_id = ? ORDER BY data DESC LIMIT 200', id),
       alteracoes: todos(`SELECT quando, usuario, acao FROM log WHERE detalhe LIKE ? ORDER BY id DESC LIMIT 300`, `%"aluno_id":${id},%`),
     };
@@ -111,6 +113,8 @@ module.exports = function lgpd(ctx) {
         db.prepare('UPDATE atendimentos SET pessoa = NULL, telefone = NULL, detalhe = NULL WHERE aluno_id = ?').run(id);
         db.prepare(`UPDATE bolsas SET nome_aluno = ?, responsavel = NULL, telefone = NULL, endereco = NULL, obs = NULL WHERE aluno_id = ?`).run(apelido, id);
         db.prepare('DELETE FROM acessos WHERE aluno_id = ?').run(id);
+        // O descarte é para valer: nada deste aluno pode ficar esperando na lixeira
+        db.prepare('DELETE FROM lixeira WHERE aluno_id = ?').run(id);
         n++;
       }
     });

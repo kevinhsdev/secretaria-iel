@@ -25,7 +25,7 @@ const STATUS = {
 };
 
 module.exports = function cebas(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, lerCorpo, exigirAdmin, S, agoraIso, transacao, lerPlanilha } = ctx;
+  const { rota, db, cfg, registrar, falha, json, corpoJson, lerCorpo, exigirAdmin, S, agoraIso, transacao, lerPlanilha, L } = ctx;
   const CAMPOS = ['ano', 'tipo', 'aluno_id', 'nome_aluno', 'serie', 'responsavel', 'telefone', 'endereco', 'escola_origem', 'req_enviado', 'req_entregue',
     'visitas', 'percentual_atual', 'per_capita', 'ofertado', 'aprovado', 'contrato_assinado', 'status', 'checklist', 'obs'];
 
@@ -74,10 +74,10 @@ module.exports = function cebas(ctx) {
   });
   rota('DELETE', '/api/bolsas/:id', async (req, res, { u, p }) => {
     exigirAdmin(u);
-    const atual = db.prepare('SELECT nome_aluno FROM bolsas WHERE id = ?').get(+p.id) || falha(404, 'Processo não encontrado');
-    db.prepare('DELETE FROM bolsas WHERE id = ?').run(+p.id);
-    registrar(u.login, 'excluiu processo de bolsa', { nome: atual.nome_aluno });
-    json(res, 200, { ok: true });
+    const atual = db.prepare('SELECT nome_aluno, aluno_id FROM bolsas WHERE id = ?').get(+p.id) || falha(404, 'Processo não encontrado');
+    const lixeira_id = L.excluir({ tipo: 'bolsa', rotulo: atual.nome_aluno, usuario: u.login, aluno_id: atual.aluno_id, tabela: 'bolsas', onde: 'id = ?', params: [+p.id] });
+    registrar(u.login, 'excluiu processo de bolsa (foi para a lixeira)', { nome: atual.nome_aluno });
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   // Importa a "Planilha Bolsas" (abas "Processos (Renovação)" e "Processos 2º fase")

@@ -2,7 +2,7 @@
 'use strict';
 
 module.exports = function saida(ctx) {
-  const { rota, db, cfg, registrar, falha, json, corpoJson, hoje, agoraIso, S, turmaRotulo, foneWhats } = ctx;
+  const { rota, db, cfg, registrar, falha, json, corpoJson, hoje, agoraIso, S, turmaRotulo, foneWhats, L } = ctx;
 
   const CANAIS = { whatsapp: 'WhatsApp', telefone: 'Telefone', presencial: 'Presencial', bilhete: 'Bilhete na agenda' };
 
@@ -79,9 +79,9 @@ module.exports = function saida(ctx) {
 
   rota('DELETE', '/api/saida/autorizados/:id', async (req, res, { u, p }) => {
     const at = db.prepare('SELECT * FROM saida_autorizados WHERE id = ?').get(+p.id) || falha(404, 'Autorização não encontrada');
-    db.prepare('DELETE FROM saida_autorizados WHERE id = ?').run(at.id);
-    registrar(u.login, 'removeu pessoa autorizada a buscar', { aluno_id: at.aluno_id, quem: at.nome });
-    json(res, 200, { ok: true });
+    const lixeira_id = L.excluir({ tipo: 'autorizado', rotulo: at.nome, usuario: u.login, aluno_id: at.aluno_id, tabela: 'saida_autorizados', onde: 'id = ?', params: [at.id] });
+    registrar(u.login, 'removeu pessoa autorizada a buscar (foi para a lixeira)', { aluno_id: at.aluno_id, quem: at.nome });
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   // ── Avisos do dia: "hoje quem busca é outra pessoa" ──
@@ -125,9 +125,10 @@ module.exports = function saida(ctx) {
 
   rota('DELETE', '/api/saida/avisos/:id', async (req, res, { u, p }) => {
     const v = db.prepare('SELECT * FROM saida_avisos WHERE id = ?').get(+p.id) || falha(404, 'Aviso não encontrado');
-    db.prepare('DELETE FROM saida_avisos WHERE id = ?').run(v.id);
-    registrar(u.login, 'excluiu aviso de saída', { aluno_id: v.aluno_id, quem: v.quem });
-    json(res, 200, { ok: true });
+    const lixeira_id = L.excluir({ tipo: 'aviso_saida', rotulo: `${v.quem} (${v.data.split('-').reverse().join('/')})`, usuario: u.login, aluno_id: v.aluno_id,
+      tabela: 'saida_avisos', onde: 'id = ?', params: [v.id] });
+    registrar(u.login, 'excluiu aviso de saída (foi para a lixeira)', { aluno_id: v.aluno_id, quem: v.quem });
+    json(res, 200, { ok: true, lixeira_id });
   });
 
   // Lista por turma (tela e impressão do portão)

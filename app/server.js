@@ -77,6 +77,7 @@ function servirEstatico(req, res, url) {
 const hoje = () => new Date().toLocaleDateString('sv-SE'); // AAAA-MM-DD no fuso local
 const somarDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
 const agoraIso = () => new Date().toISOString();
+const L = require('./lib/lixeira')({ db, transacao, agoraIso });
 
 const STATUS = {
   pendente: 'Não iniciada',
@@ -533,9 +534,10 @@ rota('PUT', '/api/interessados/:id', async (req, res, { u, p }) => {
   json(res, 200, { ok: true });
 });
 rota('DELETE', '/api/interessados/:id', async (req, res, { u, p }) => {
-  db.prepare('DELETE FROM interessados WHERE id = ?').run(+p.id);
-  registrar(u.login, 'excluiu interessado', { id: +p.id });
-  json(res, 200, { ok: true });
+  const i = db.prepare('SELECT aluno FROM interessados WHERE id = ?').get(+p.id) || falha(404, 'Contato não encontrado');
+  const lixeira_id = L.excluir({ tipo: 'interessado', rotulo: i.aluno, usuario: u.login, tabela: 'interessados', onde: 'id = ?', params: [+p.id] });
+  registrar(u.login, 'excluiu interessado (foi para a lixeira)', { id: +p.id });
+  json(res, 200, { ok: true, lixeira_id });
 });
 rota('POST', '/api/interessados/importar', async (req, res, { u, url }) => {
   const buf = await lerCorpo(req);
@@ -558,9 +560,10 @@ rota('PUT', '/api/modelos/:id', async (req, res, { u, p }) => {
   json(res, 200, { ok: true });
 });
 rota('DELETE', '/api/modelos/:id', async (req, res, { u, p }) => {
-  db.prepare('DELETE FROM modelos WHERE id = ?').run(+p.id);
-  registrar(u.login, 'excluiu modelo de mensagem', p.id);
-  json(res, 200, { ok: true });
+  const m = db.prepare('SELECT titulo FROM modelos WHERE id = ?').get(+p.id) || falha(404, 'Modelo não encontrado');
+  const lixeira_id = L.excluir({ tipo: 'modelo', rotulo: m.titulo, usuario: u.login, tabela: 'modelos', onde: 'id = ?', params: [+p.id] });
+  registrar(u.login, 'excluiu modelo de mensagem (foi para a lixeira)', m.titulo);
+  json(res, 200, { ok: true, lixeira_id });
 });
 
 // ── Administração ──
@@ -582,7 +585,7 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
     'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
     'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
     'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone',
-    'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte'];
+    'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte', 'lixeira_dias'];
   for (const k of permitidas) if (b[k] !== undefined) db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(k, String(b[k]));
   prontuario.limparCache();
   registrar(u.login, 'alterou configurações', b);
@@ -669,6 +672,7 @@ rota('DELETE', '/api/admin/demo', async (req, res, { u }) => {
     db.prepare('DELETE FROM tarefas_dia WHERE demo = 1').run();
     db.prepare("DELETE FROM rotina_feito WHERE usuario = 'demo'").run();
     db.prepare("DELETE FROM calendario_feito WHERE usuario = 'demo'").run();
+    db.prepare('DELETE FROM lixeira WHERE demo = 1').run();
   });
   registrar(u.login, 'apagou dados de demonstração', '');
   json(res, 200, { ok: true });
@@ -679,7 +683,7 @@ rota('GET', '/api/admin/log', async (req, res, { u }) => {
 });
 
 // ── Etapa 2: documentos, atividades extras e bolsas ──
-const ctx = { rota, db, cfg, cfgPublica, registrar, transacao, falha, json, corpoJson, lerCorpo, exigirAdmin, hoje, somarDias, agoraIso, S, turmaRotulo, foneWhats, destinoDe, lerPlanilha, serialParaIso, PASTA_DADOS, sessoes };
+const ctx = { rota, db, cfg, cfgPublica, registrar, transacao, falha, json, corpoJson, lerCorpo, exigirAdmin, hoje, somarDias, agoraIso, S, turmaRotulo, foneWhats, destinoDe, lerPlanilha, serialParaIso, PASTA_DADOS, sessoes, L };
 require('./rotas/documentos')(ctx);
 require('./rotas/extras')(ctx);
 require('./rotas/cebas')(ctx);
@@ -691,6 +695,7 @@ require('./rotas/backup')(ctx);
 require('./rotas/lgpd')(ctx);
 require('./rotas/relatorios')(ctx);
 require('./rotas/atualizacao')(ctx);
+require('./rotas/lixeira')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {

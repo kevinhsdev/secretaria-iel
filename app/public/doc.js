@@ -445,6 +445,7 @@ const DOCS = {
         ${tab('Boletos entregues', [['Remessa', (l) => l.remessa], ['Entregue em', (l) => dataBR(l.entregue_em)], ['Recebido por', (l) => titulo(l.recebido_por)]], d.boletos_entregues)}
         ${d.foto ? `<h3 class="sec">Foto</h3><div class="grade-dados">${dado('Foto tirada', sim(d.foto.tirada))}${dado('Data', dataBR(d.foto.data_foto))}
           ${dado('Inserida no ACADESC', sim(d.foto.acadesc))}${dado('Inserida na SED', sim(d.foto.sed))}${dado('Inserida no Lanche Card', sim(d.foto.lanche))}</div>` : ''}
+        ${tab('Excluídos, ainda na lixeira', [['Excluído em', (l) => dataBR(l.excluido_em)], ['O quê', (l) => l.tipo], ['Descrição', (l) => titulo(l.rotulo || '')], ['Por', (l) => l.usuario]], d.na_lixeira || [])}
         ${v.tudo ? tab('Quem consultou esta ficha', [['Data', (l) => dataBR(l.data)], ['Pessoa', (l) => l.usuario], ['Vezes', (l) => l.vezes]], d.quem_consultou) : ''}
         ${v.tudo ? tab('Alterações registradas', [['Quando', (l) => new Date(l.quando).toLocaleString('pt-BR')], ['Pessoa', (l) => l.usuario], ['O que foi feito', (l) => l.acao]], d.alteracoes) : ''}
         <p class="nota">Relatório gerado pelo sistema da secretaria em ${new Date(d.gerado_em).toLocaleString('pt-BR')} por ${esc(d.gerado_por)}.

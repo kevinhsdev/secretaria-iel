@@ -4,7 +4,7 @@ Copie **tudo o que está entre as linhas** e cole como primeira mensagem no Clau
 
 ---
 
-Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Em chats anteriores você construiu comigo as **Etapas 1 a 4** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro, hoje na **versão 4.2.0**.
+Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Em chats anteriores você construiu comigo as **Etapas 1 a 4** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro, hoje na **versão 4.3.0**.
 
 **Repositório (privado):** https://github.com/kevinhsdev/secretaria-iel
 
@@ -22,7 +22,7 @@ Faça nesta ordem:
 6. **Combine comigo o que fazer**, seguindo o §7.2 do HANDOFF. A ordem que ficou recomendada é:
    1. **Piloto com dado real de um módulo só** (Atendimentos ou Portão) — é o que falta de verdade, e depende mais de mim do que de você. Me ajude a preparar isso: o que configurar, o que combinar com a Samara e como medir se deu certo.
    2. **Histórico escolar** — depende de eu conseguir as notas (SED ou ACADESC).
-   3. **Busca global**, **aviso de edição simultânea**, **não perder o formulário quando o servidor cai**, **lixeira de 30 dias**.
+   3. **Busca global**, **aviso de edição simultânea**, **não perder o formulário quando o servidor cai**, **ajuda dentro da tela** (a lixeira de 30 dias já foi feita na 4.3.0).
    Me diga o que dá para fazer já com o que temos e o que depende de eu conseguir alguma informação na escola.
 7. **Teste de verdade** antes de me entregar: `node --check` em tudo, os scripts de API, o teste que abre todas as telas, prints no Edge headless, e corrija o que encontrar.
 8. **Entregue:**

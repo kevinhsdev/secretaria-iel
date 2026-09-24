@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **24/09/2026**, versão **4.2.0** (Etapa 4 + página inicial reorganizada). O que vem a seguir está em §7.
+> Última atualização: **24/09/2026**, versão **4.3.0** (Etapa 4 + página inicial reorganizada + lixeira). O que vem a seguir está em §7.
 
 ---
 
@@ -148,6 +148,26 @@
 - `/api/hoje` ganhou `lembretes_atrasados`. No celular os cartões ficam 2 por linha (`.grade.g4.kpis`).
 - Teste novo `t-inicio` (navegador): confere os blocos, os 8 links, os atalhos abrindo as janelas certas e todas as telas do menu, como admin (35 ok) e como aprendiz (32 ok).
 
+### Lixeira de 30 dias e "Desfazer" (versão 4.3.0, 24/09/2026)
+- **Excluir não apaga na hora.** `lib/lixeira.js` guarda uma fotografia em JSON das linhas apagadas (e das linhas filhas que o
+  `ON DELETE CASCADE` levaria junto) na tabela `lixeira`, e só então apaga. Restaurar insere de volta **com o mesmo id**,
+  então links, histórico da ficha e auditoria continuam valendo. Usa só as colunas que ainda existem na tabela (sobrevive a migrações).
+- Passam pela lixeira: atendimento, aviso de saída, pessoa autorizada a buscar, tarefa do dia, lembrete do calendário (com as
+  marcações de feito), interessado (SIG), modelo de mensagem, remessa de boletos (com as entregas), processo de bolsa,
+  inscrição em atividade extra, evento (com os ingressos) e feriado. **Ao criar um DELETE novo, use `L.excluir(...)`** (vem no `ctx`).
+- **Não** passam pela lixeira, de propósito: o **descarte da LGPD** (é para valer, e apaga também o que estava na lixeira sobre
+  aquele aluno), **apagar a demonstração** (leva junto os itens de demonstração da lixeira) e as cópias de segurança (são arquivos).
+- **Desfazer:** toda exclusão responde `lixeira_id`; o `api()` do front percebe e a mensagem seguinte ("Excluído") ganha o botão
+  **Desfazer** por 8 segundos. Se a tela não mostrar mensagem nenhuma, aparece uma sozinha.
+- **Tela Lixeira** (menu Ferramentas, `public/lixeira.js`, rotas em `rotas/lixeira.js`): filtro por tipo e busca, **Restaurar**,
+  e para a administração **Apagar de vez**, **Esvaziar** e o prazo. A aprendiz vê e restaura **só o que ela excluiu** (e nunca bolsas).
+- Restaurar com conflito (alguém cadastrou de novo no mesmo lugar) ou com o aluno que não existe mais responde **409 em português**
+  e não mexe em nada. A limpeza do que passou do prazo roda ao abrir e a cada 6 horas.
+- O relatório de **dados do aluno (LGPD)** agora lista também o que dele está na lixeira (`na_lixeira`).
+- Testes novos: `t-lixeira` (API, **93 ok**: os 12 tipos vão e voltam idênticos, entregas da remessa voltam juntas, conflito,
+  restaurar duas vezes, permissões da aprendiz, prazo, auditoria, LGPD) e `t-lixeira-tela` (navegador, 12 ok para admin e aprendiz:
+  excluir → Desfazer → excluir → restaurar pela tela). Migração conferida: banco sem a tabela `lixeira` recebe a tabela ao abrir, sem perder dados.
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -184,6 +204,8 @@ SecretariaIEL/
    ├─ rotas/lgpd.js           → registro de consultas, dados do aluno e descarte (Etapa 4)
    ├─ rotas/relatorios.js     → números do ano para a Direção (Etapa 4)
    ├─ rotas/atualizacao.js    → verificar e aplicar versão nova pelo Git (Etapa 4)
+   ├─ rotas/lixeira.js        → listar, restaurar, apagar de vez e limpeza automática da lixeira (4.3.0)
+   ├─ lib/lixeira.js          → excluir guardando a fotografia das linhas, restaurar e limpar (4.3.0)
    ├─ lib/atualizacao.js      → conversa com o Git; nada aqui lança erro, tudo volta explicado (Etapa 4)
    ├─ lib/versao.js           → a constante VERSAO, repetida em public/app.js (Etapa 4)
    ├─ lib/backup.js           → VACUUM INTO, cifra AES-256-GCM, retenção e restauração agendada (Etapa 4)
@@ -196,7 +218,7 @@ SecretariaIEL/
    ├─ lib/fotos.js            → acha <mat>.jpg / AcaDescMySql.exe00<mat>.jpeg
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
-   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js,
+   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js, lixeira.js,
                                 tema.js (claro/escuro antes de desenhar), doc.html/doc.css/doc.js
 ```
 
@@ -260,7 +282,8 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
   **impressão no modo escuro** (5, conferindo as cores calculadas); **versão** (6, inclusive fingindo servidor velho);
   **atualização** (16, montando um "GitHub" local com `git init --bare` para não depender da internet) e
   **atualização de ponta a ponta** (12, subindo o app com `IEL_RAIZ` apontado para o repositório de teste);
-  **página inicial** (`t-inicio`, 35 ok como admin e 32 como aprendiz); **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
+  **página inicial** (`t-inicio`, 36 ok como admin e 33 como aprendiz, agora com a Lixeira no menu); **lixeira** (`t-lixeira`, 93 ok,
+  e `t-lixeira-tela`, 12 ok por perfil); **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
   que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
 - Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
 - Para copiar o banco a fim de testar, copie **também** `secretaria.db-wal` e `-shm`: no modo WAL boa parte dos dados ainda não está no arquivo principal.
@@ -291,6 +314,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 | **"Quantos alunos temos?" para a Diretoria** | Tela de Relatórios + uma folha timbrada de fechamento |
 | **Cara de protótipo** | Ícones SVG, esqueleto de carregamento, telas vazias que ensinam, modo compacto, claro/escuro |
 | **Depender do Kevin para atualizar** | Botão "Verificar atualizações": mostra o que mudou, faz backup, aplica e reinicia sozinho |
+| **Excluir era para sempre** (4.3.0) | Lixeira de 30 dias, botão Desfazer logo depois de excluir e tela para restaurar |
 
 ### 7.2 Próximos passos, na ordem que eu faria
 1. **Piloto de verdade, com dado real, de um módulo só** — sugestão: *Atendimentos* ou *Portão*, por duas semanas.
@@ -303,7 +327,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
    silêncio. Avisar "a Duda alterou esta ficha há 2 minutos" antes de salvar.
 5. **Quando o PC servidor cai** — os outros não podem perder o que já foi digitado; hoje some. Guardar o formulário
    e avisar em português, em vez de mostrar erro técnico.
-6. **Lixeira de 30 dias e desfazer** — excluir hoje é para sempre.
+6. ~~**Lixeira de 30 dias e desfazer**~~ — **feito na 4.3.0** (ver §3).
 7. **Uso real nos 3 PCs** — `IEL_REDE=1`, firewall e atalho nas outras máquinas, testado no local.
 8. **Ajuda dentro da tela** — um "?" por tela explicando o POP correspondente. Importa porque a secretaria tem
    rotatividade de aprendizes: o próximo precisa conseguir usar sozinho.
@@ -341,6 +365,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 | Senha do backup | opcional; fica guardada no banco para as cópias automáticas saírem cifradas — protege o **arquivo que sai do PC**, não o banco | `backup_senha` |
 | Bloqueio de tela | **20 minutos** parado (0 desliga) | `bloqueio_minutos` |
 | Descarte de ex-alunos | sugerido a partir de **5 anos** sem matrícula; nunca automático, sempre escolhido na tela | `lgpd_anos_descarte` |
+| Lixeira (4.3.0) | o excluído fica **30 dias** e depois some de vez; a aprendiz vê só o que ela excluiu | `lixeira_dias` |
 
 ### 7.6 Pendências e perguntas para o Kevin
 - Histórico escolar: em qual formato dá para exportar as notas (SED ou ACADESC)?

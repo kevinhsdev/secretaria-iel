@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.2.0';
+const VERSAO = '4.3.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -33,17 +33,39 @@ async function api(metodo, url, corpo, bruto) {
     throw new Error('Esta tela é mais nova que o sistema que está aberto. Feche a janela preta do "Iniciar Secretaria" e abra de novo.');
   }
   if (!r.ok) throw new Error(dados.erro || 'Erro ' + r.status);
+  if (metodo === 'DELETE' && dados.lixeira_id) avisarLixeira(dados.lixeira_id);
   return dados;
 }
 
 let toastTimer;
+// Quando uma exclusão foi para a lixeira, a próxima mensagem ("Excluído") ganha o botão Desfazer
+let desfazerPendente = null;
 function toast(msg, erro) {
   let t = $('.toast');
   if (!t) { t = document.createElement('div'); document.body.appendChild(t); }
   t.className = 'toast' + (erro ? ' erro' : '');
   t.textContent = msg;
+  let tempo = erro ? 5000 : 2600;
+  const d = desfazerPendente;
+  if (!erro && d && Date.now() - d.em < 2000) {
+    desfazerPendente = null;
+    const b = document.createElement('button');
+    b.textContent = 'Desfazer';
+    b.onclick = tentar(async () => {
+      b.disabled = true;
+      await api('POST', `/api/lixeira/${d.id}/restaurar`);
+      invalidar(); toast('Pronto, voltou para o lugar'); rotear();
+    });
+    t.append(' · Foi para a lixeira. ', b);
+    tempo = 8000;
+  }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.remove(), erro ? 5000 : 2600);
+  toastTimer = setTimeout(() => t.remove(), tempo);
+}
+// Chamado pelo api() depois de um DELETE que foi para a lixeira. Se a tela não mostrar mensagem nenhuma, mostra uma.
+function avisarLixeira(id) {
+  desfazerPendente = { id, em: Date.now() };
+  setTimeout(() => { if (desfazerPendente && desfazerPendente.id === id) toast('Excluído'); }, 400);
 }
 const tentar = (fn) => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
 
@@ -172,6 +194,7 @@ function ligarAtalhos() {
 // Desenhados aqui mesmo (traço de 1.8, grade de 24) para ficarem iguais em qualquer Windows,
 // ao contrário dos emojis, que cada computador desenha de um jeito.
 const ICONES = {
+  lixeira: '<path d="M3.6 6.4h16.8"/><path d="M8.4 6.4V4.6a1.4 1.4 0 0 1 1.4-1.4h4.4a1.4 1.4 0 0 1 1.4 1.4v1.8"/><path d="m18.4 6.4-.9 12.6a1.8 1.8 0 0 1-1.8 1.7H8.3A1.8 1.8 0 0 1 6.5 19L5.6 6.4"/><path d="M10 11v5.4M14 11v5.4"/>',
   casa: '<path d="M4 10.6 12 4.2l8 6.4V19a1.6 1.6 0 0 1-1.6 1.6h-3.6v-5.6H9.2v5.6H5.6A1.6 1.6 0 0 1 4 19z"/>',
   dia: '<path d="M9 4.6H6.6A1.6 1.6 0 0 0 5 6.2v13.2A1.6 1.6 0 0 0 6.6 21h10.8a1.6 1.6 0 0 0 1.6-1.6V6.2a1.6 1.6 0 0 0-1.6-1.6H15"/><path d="M9.4 3h5.2a.8.8 0 0 1 .8.8v1.6a.8.8 0 0 1-.8.8H9.4a.8.8 0 0 1-.8-.8V3.8a.8.8 0 0 1 .8-.8z"/><path d="m8.8 13.4 2.2 2.2 4.4-4.4"/>',
   alunos: '<path d="M15.5 20.5v-1.7a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.8v1.7"/><path d="M9.2 12a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4z"/><path d="M21 20.5v-1.7a3.4 3.4 0 0 0-2.6-3.3"/><path d="M15.8 4.8a3.4 3.4 0 0 1 0 6.6"/>',
@@ -262,6 +285,7 @@ const MENU = [
   { sep: 'Ferramentas' },
   { rota: 'relatorios', ic: 'relatorios', nome: 'Relatórios', admin: true },
   { rota: 'mensagens', ic: 'mensagens', nome: 'Mensagens' },
+  { rota: 'lixeira', ic: 'lixeira', nome: 'Lixeira' },
   { rota: 'config', ic: 'config', nome: 'Configurações', admin: true },
 ];
 
