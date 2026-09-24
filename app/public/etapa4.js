@@ -372,3 +372,83 @@ TELAS.relatorios = async (c, ano) => {
   $('#relAnoAnt').onclick = () => (location.hash = '#/relatorios/' + (d.ano - 1));
   $('#relAnoProx').onclick = () => (location.hash = '#/relatorios/' + (d.ano + 1));
 };
+
+// ───────────── Configurações › Atualizações ─────────────
+window.abaAtualizacao = async (el) => {
+  const d = await api('GET', '/api/admin/atualizacao');
+  desenharAtualizacao(el, d);
+};
+
+function desenharAtualizacao(el, d, resultado) {
+  const impedido = !d.git || !d.repositorio;
+  el.innerHTML = `
+  <div class="grade g4">
+    <div class="cartao kpi destaque"><div class="rot">Versão instalada</div><div class="val" style="font-size:22px">${esc(d.versao || '—')}</div>
+      <div class="det">${d.atual ? 'de ' + esc(d.atual.data) : 'sem informação'}</div></div>
+    <div class="cartao kpi"><div class="rot">Última mudança</div><div class="val" style="font-size:15px;line-height:1.35">${esc((d.atual && d.atual.assunto) || '—')}</div>
+      <div class="det">${d.atual ? 'código ' + esc(d.atual.hash) : ''}</div></div>
+    <div class="cartao kpi ${d.limpo === false ? 'alerta' : ''}"><div class="rot">Arquivos alterados aqui</div>
+      <div class="val">${d.mudancas_locais ? d.mudancas_locais.length : 0}</div>
+      <div class="det">${d.limpo === false ? 'a atualização fica bloqueada até resolver' : 'nada mexido à mão'}</div></div>
+    <div class="cartao kpi"><div class="rot">Cópia de segurança</div><div class="val" style="font-size:15px;line-height:1.35">feita antes de atualizar</div>
+      <div class="det">sempre, automaticamente</div></div>
+  </div>
+
+  <div class="cartao" style="margin-top:14px">
+    <div class="acoes" style="justify-content:space-between"><h2 style="margin:0">🔄 Atualizações do sistema</h2>
+      ${impedido ? '' : '<button class="btn pri" id="atVerificar">Verificar se há atualização</button>'}</div>
+    ${impedido ? `<div class="dica">${esc(d.aviso || 'Não dá para atualizar automaticamente neste computador.')}</div>`
+      : `<p class="dica">O sistema busca a versão nova no GitHub, <b>faz uma cópia de segurança do banco</b>, troca os arquivos e reinicia.
+        Os dados da secretaria não são tocados — só o programa.</p>`}
+    ${d.limpo === false ? `<div class="aviso-fixo perigo" style="border-radius:8px;margin-top:10px">⚠️ <b>Há arquivos alterados nesta pasta:</b>
+      <span class="mono">${d.mudancas_locais.slice(0, 8).map(esc).join(', ')}${d.mudancas_locais.length > 8 ? '…' : ''}</span>.
+      Atualizar apagaria essas mudanças, então está bloqueado. Se não foi você que mexeu, chame quem cuida do sistema.</div>` : ''}
+    <div id="atResultado" style="margin-top:12px">${resultado || '<p class="dado">Clique em "Verificar se há atualização" quando quiser. Não precisa ser sempre — só quando eu avisar que tem novidade.</p>'}</div>
+    ${d.origem ? `<p class="dado" style="margin-top:12px">Origem: <span class="mono">${esc(d.origem)}</span> · ramo <span class="mono">${esc(d.ramo)}</span></p>` : ''}
+  </div>`;
+
+  if ($('#atVerificar')) $('#atVerificar').onclick = tentar(async () => {
+    const b = $('#atVerificar');
+    b.disabled = true; b.textContent = 'Procurando no GitHub…';
+    $('#atResultado').innerHTML = '<div class="carregando"><div class="bloco" style="height:64px"></div></div>';
+    let r;
+    try { r = await api('POST', '/api/admin/atualizacao/verificar'); }
+    finally { b.disabled = false; b.textContent = 'Verificar se há atualização'; }
+    if (!r.verificado) {
+      $('#atResultado').innerHTML = `<div class="aviso-fixo perigo" style="border-radius:8px">😕 ${esc(r.aviso || 'Não consegui verificar agora.')}</div>`;
+      return;
+    }
+    if (!r.disponivel) {
+      $('#atResultado').innerHTML = `<div class="dica">✅ <b>O sistema já está na versão mais nova.</b> Nada a fazer.</div>`;
+      return;
+    }
+    $('#atResultado').innerHTML = `<div class="dica" style="background:var(--amarelo-claro);border-left-color:var(--amarelo);color:var(--aviso-txt)">
+        🎁 <b>Existe atualização disponível</b> — ${r.novidades.length} mudança(s) desde a sua versão.</div>
+      <ul class="checklist">${r.novidades.map((n) => `<li><span class="nome"><span>${esc(n.assunto)}</span><small>${esc(n.data)} · ${esc(n.hash)}</small></span></li>`).join('')}</ul>
+      <div class="acoes" style="margin-top:12px">${r.limpo === false ? '<span class="dado">Resolva os arquivos alterados acima antes de atualizar.</span>'
+        : '<button class="btn pri" id="atAplicar">Atualizar agora</button><span class="dado">Faz cópia de segurança, troca os arquivos e reinicia o sistema.</span>'}</div>`;
+    if ($('#atAplicar')) $('#atAplicar').onclick = tentar(() => aplicarAtualizacao(r.novidades.length));
+  });
+}
+
+async function aplicarAtualizacao(quantas) {
+  if (!(await confirmar(`Atualizar o sistema agora (${quantas} mudança(s))? Vou fazer uma cópia de segurança antes e reiniciar no fim. ` +
+    'Quem estiver usando em outro computador vai precisar entrar de novo.', 'Atualizar'))) return;
+  $('#atResultado').innerHTML = '<div class="dica">⏳ Fazendo cópia de segurança e baixando a versão nova…</div>';
+  const r = await api('POST', '/api/admin/atualizacao/aplicar');
+  if (!r.ok) {
+    $('#atResultado').innerHTML = `<div class="aviso-fixo perigo" style="border-radius:8px">😕 ${esc(r.aviso || 'A atualização não foi aplicada.')}
+      ${r.copia ? `<br><small>Sua cópia de segurança foi gravada assim mesmo: <span class="mono">${esc(r.copia)}</span></small>` : ''}</div>`;
+    return;
+  }
+  if (!r.atualizou) {
+    $('#atResultado').innerHTML = '<div class="dica">✅ Já estava tudo em dia — nada mudou.</div>';
+    return;
+  }
+  toast('Atualizado! Reiniciando o sistema…');
+  try { await api('POST', '/api/admin/reiniciar'); } catch { /* o servidor cai no meio da resposta */ }
+  $('#raiz').innerHTML = `<div class="login"><form><img src="logo.png" alt=""><h1>Atualizando…</h1>
+    <p>O sistema baixou a versão nova (${esc(r.de)} → ${esc(r.para)}) e está reiniciando.<br>Esta página volta sozinha em alguns segundos.</p></form></div>`;
+  const voltar = async () => { try { await fetch('/api/backups/estado', { headers: { 'X-IEL': '1' } }); location.reload(); } catch { setTimeout(voltar, 1500); } };
+  setTimeout(voltar, 4000);
+}

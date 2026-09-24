@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **24/09/2026**, ao fim da **Etapa 4**. A próxima é a **Etapa 5** (ver §7).
+> Última atualização: **24/09/2026**, versão **4.1.0** (fim da **Etapa 4**). O que vem a seguir está em §7.
 
 ---
 
@@ -127,6 +127,14 @@
 - **Relatórios** (`rotas/relatorios.js`, menu Relatórios, admin): números do ano em cartões e barrinhas
   (alunos, rematrícula, atendimentos, financeiro, bolsas, fotos, saída, equipe) e a **versão de uma folha com o
   papel timbrado** (documento `fechamento`) para levar à Samara e à Diretoria.
+- **Atualização com um botão** (`lib/atualizacao.js`, `rotas/atualizacao.js`, Configurações › Atualizações):
+  usa o **Git que já baixou o projeto** para ver se há versão nova no GitHub, mostrar **o que mudou** (assunto e data de
+  cada commit), fazer **cópia de segurança antes**, aplicar com `git pull --ff-only` e **reiniciar sozinho**.
+  Recusa atualizar se houver arquivo alterado na pasta (para não apagar o trabalho de alguém) e explica em português
+  quando falta internet, quando o GitHub pede login (`GIT_TERMINAL_PROMPT=0`, sem travar esperando digitação) ou
+  quando a pasta foi copiada à mão em vez de clonada.
+- **Controle de versão** (`lib/versao.js` + `VERSAO` em `app.js`): se o navegador carregar telas novas enquanto a janela
+  preta ainda roda o servidor antigo, aparece uma faixa vermelha explicando — antes isso dava "Rota não encontrada".
 - **Acabamento:** ícones **SVG desenhados no próprio código** (`ICONES` em `app.js`) no lugar dos emojis do menu,
   esqueleto cinza no carregamento, telas vazias que explicam o próximo passo, **modo compacto** (mais linhas na tela),
   layout de celular para o portão e atalho `/` para a busca.
@@ -166,6 +174,9 @@ SecretariaIEL/
    ├─ rotas/backup.js         → cópias de segurança, restauração e reinício (Etapa 4)
    ├─ rotas/lgpd.js           → registro de consultas, dados do aluno e descarte (Etapa 4)
    ├─ rotas/relatorios.js     → números do ano para a Direção (Etapa 4)
+   ├─ rotas/atualizacao.js    → verificar e aplicar versão nova pelo Git (Etapa 4)
+   ├─ lib/atualizacao.js      → conversa com o Git; nada aqui lança erro, tudo volta explicado (Etapa 4)
+   ├─ lib/versao.js           → a constante VERSAO, repetida em public/app.js (Etapa 4)
    ├─ lib/backup.js           → VACUUM INTO, cifra AES-256-GCM, retenção e restauração agendada (Etapa 4)
    ├─ lib/db.js               → schema SQLite + migrações (ALTER TABLE) + sementes (usuários, docs, atividades, feriados, funcionários, modelos)
    ├─ lib/zip.js, planilha.js → ler/escrever .xlsx e .csv sem bibliotecas
@@ -237,7 +248,10 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
   um **cliente** de API com login e contador de ok/falha; **Etapas 1 e 2** (20); **Etapa 3** (70); **perfil aprendiz** (25,
   inclusive o que precisa dar 403); **segurança e LGPD** (28); **backup** (34, com restauração de verdade e reinício do servidor);
   **migração** (derruba as tabelas novas e confere que o app as recria sem perder dados); **tema e atalho** (15, no navegador);
-  **impressão no modo escuro** (5, conferindo as cores calculadas); e os scripts de **print das telas** no Edge headless,
+  **impressão no modo escuro** (5, conferindo as cores calculadas); **versão** (6, inclusive fingindo servidor velho);
+  **atualização** (16, montando um "GitHub" local com `git init --bare` para não depender da internet) e
+  **atualização de ponta a ponta** (12, subindo o app com `IEL_RAIZ` apontado para o repositório de teste);
+  **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
   que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
 - Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
 - Para copiar o banco a fim de testar, copie **também** `secretaria.db-wal` e `-shm`: no modo WAL boa parte dos dados ainda não está no arquivo principal.
@@ -267,25 +281,24 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 | **Senha fraca / script estranho na página** | Mínimo de 8 caracteres, recusa de senhas óbvias, cabeçalho CSP |
 | **"Quantos alunos temos?" para a Diretoria** | Tela de Relatórios + uma folha timbrada de fechamento |
 | **Cara de protótipo** | Ícones SVG, esqueleto de carregamento, telas vazias que ensinam, modo compacto, claro/escuro |
+| **Depender do Kevin para atualizar** | Botão "Verificar atualizações": mostra o que mudou, faz backup, aplica e reinicia sozinho |
 
 ### 7.2 Próximos passos, na ordem que eu faria
 1. **Piloto de verdade, com dado real, de um módulo só** — sugestão: *Atendimentos* ou *Portão*, por duas semanas.
    Risco baixo, valor visível no primeiro dia, e é o que ganha a Samara. **Sem isso, o resto é só código.**
 2. **Histórico escolar** — maior buraco funcional. Depende de conseguir as notas (SED ou ACADESC): é a pergunta
    que mais vale a pena responder na escola.
-3. **Atualizar sem depender do Kevin** — hoje é `git pull` no terminal. Um botão "Verificar atualizações" que faz
-   backup, baixa e reinicia. Enquanto não existir, **o sistema depende de uma pessoa só**, que um dia sai da escola.
-4. **Busca global** — um campo que ache aluno, atendimento, bolsa, documento emitido e aviso, agrupado por tipo.
+3. **Busca global** — um campo que ache aluno, atendimento, bolsa, documento emitido e aviso, agrupado por tipo.
    É o recurso que mais dá sensação de "sistema profissional" pelo esforço que custa.
-5. **Conflito entre duas pessoas** — hoje, se o Kevin e a Duda editarem a mesma ficha, a última gravação vence em
+4. **Conflito entre duas pessoas** — hoje, se o Kevin e a Duda editarem a mesma ficha, a última gravação vence em
    silêncio. Avisar "a Duda alterou esta ficha há 2 minutos" antes de salvar.
-6. **Quando o PC servidor cai** — os outros não podem perder o que já foi digitado; hoje some. Guardar o formulário
+5. **Quando o PC servidor cai** — os outros não podem perder o que já foi digitado; hoje some. Guardar o formulário
    e avisar em português, em vez de mostrar erro técnico.
-7. **Lixeira de 30 dias e desfazer** — excluir hoje é para sempre.
-8. **Uso real nos 3 PCs** — `IEL_REDE=1`, firewall e atalho nas outras máquinas, testado no local.
-9. **Ajuda dentro da tela** — um "?" por tela explicando o POP correspondente. Importa porque a secretaria tem
+6. **Lixeira de 30 dias e desfazer** — excluir hoje é para sempre.
+7. **Uso real nos 3 PCs** — `IEL_REDE=1`, firewall e atalho nas outras máquinas, testado no local.
+8. **Ajuda dentro da tela** — um "?" por tela explicando o POP correspondente. Importa porque a secretaria tem
    rotatividade de aprendizes: o próximo precisa conseguir usar sozinho.
-10. **Desempenho com 535 alunos reais** — a conferência de boletos e o mutirão viram páginas longas; paginar ou
+9. **Desempenho com 535 alunos reais** — a conferência de boletos e o mutirão viram páginas longas; paginar ou
     virtualizar quando incomodar (com a demonstração de 160 ainda está tranquilo).
 
 ### 7.3 O que eu recomendo **não** fazer

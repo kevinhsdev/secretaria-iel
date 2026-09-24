@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.0.0';
+const VERSAO = '4.1.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -755,7 +755,7 @@ TELAS.config = async (c, aba = 'geral') => {
   if (EU.perfil !== 'admin') { c.innerHTML = '<div class="cartao">Somente a administração acessa as configurações.</div>'; return; }
   const d = await api('GET', '/api/admin');
   const ABAS = { geral: 'Geral', importar: 'Importar dados', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários',
-    backup: 'Cópias de segurança', lgpd: 'LGPD e acessos', log: 'Auditoria' };
+    backup: 'Cópias de segurança', atualizacao: 'Atualizações', lgpd: 'LGPD e acessos', log: 'Auditoria' };
   c.innerHTML = `<h1>Configurações</h1><p class="sub">Só a administração vê esta área.</p>
     <div class="abas">${Object.entries(ABAS).map(([k, v]) => `<button data-aba="${k}" class="${aba === k ? 'on' : ''}">${v}</button>`).join('')}</div><div id="aba"></div>`;
   $$('[data-aba]').forEach((b) => (b.onclick = () => (location.hash = '#/config/' + b.dataset.aba)));
@@ -875,6 +875,7 @@ TELAS.config = async (c, aba = 'geral') => {
   }
 
   if (aba === 'backup' && window.abaBackup) await window.abaBackup(el);
+  if (aba === 'atualizacao' && window.abaAtualizacao) await window.abaAtualizacao(el);
   if (aba === 'lgpd' && window.abaLgpd) await window.abaLgpd(el);
 
   if (aba === 'log') {

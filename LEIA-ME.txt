@@ -6,10 +6,15 @@ COMO ABRIR
   Uma janela preta vai abrir. Ela é o "motor" do sistema; deixe-a aberta (pode minimizar).
   O navegador abre sozinho em http://localhost:3000
 
-DEPOIS DE ATUALIZAR O SISTEMA (git pull / versao nova)
-  FECHE A JANELA PRETA E ABRA O "Iniciar Secretaria.bat" DE NOVO.
-  O navegador pega as telas novas na hora, mas a janela preta continua rodando a versao antiga
-  ate ser reaberta — e ai algumas telas reclamam. O proprio app avisa em vermelho quando isso acontece.
+ATUALIZAR O SISTEMA (Configuracoes > Atualizacoes)
+  Clique em "Verificar se ha atualizacao". Se houver, o app mostra o que mudou e, ao confirmar,
+  faz uma copia de seguranca, baixa a versao nova e reinicia sozinho. Nao precisa de terminal.
+  Se alguem tiver mexido nos arquivos da pasta, o app recusa atualizar e avisa quais arquivos sao.
+  Se o sistema pedir login do GitHub, abra o Prompt de Comando na pasta e rode "git pull" uma vez.
+
+  Se voce atualizar por fora (git pull no terminal), FECHE A JANELA PRETA E ABRA DE NOVO:
+  o navegador pega as telas novas na hora, mas a janela preta continua rodando a versao antiga.
+  O proprio app avisa em vermelho quando isso acontece.
 
 PRIMEIRO ACESSO
   Usuários: samara (administração), kevin (administração), duda (aprendiz)
