@@ -342,3 +342,12 @@ label.chk input { width: 16px; height: 16px; accent-color: var(--azul); }
 .ajuda ol, .ajuda ul { margin: 0; padding-left: 22px; }
 .ajuda li { margin: 5px 0; line-height: 1.45; }
 @media print { .ajuda-btn { display: none; } }
+
+/* Listas longas: "Mostrar mais" e turmas que abrem e fecham */
+tr.mais-linhas td { text-align: center; background: var(--superficie-2); padding: 12px; }
+details.turma-grupo > summary { cursor: pointer; list-style: none; display: flex; align-items: center; }
+details.turma-grupo > summary::-webkit-details-marker { display: none; }
+details.turma-grupo > summary::before { content: '▸'; color: var(--texto-2); font-size: 16px; line-height: 1; margin-left: 16px; transition: transform .15s; }
+details.turma-grupo[open] > summary::before { transform: rotate(90deg); }
+details.turma-grupo > summary:hover { background: var(--azul-fundo); }
+@media print { details.turma-grupo > summary::before { display: none; } }

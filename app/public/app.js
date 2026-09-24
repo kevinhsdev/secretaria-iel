@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.7.0';
+const VERSAO = '4.8.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -516,6 +516,36 @@ async function atualizarBadge() {
   } catch { /* silencioso */ }
 }
 
+// ───────────── listas longas em partes ─────────────
+// Com os ~535 alunos reais, algumas listas passavam de 30 telas de rolagem. Aqui a tabela mostra as primeiras
+// PASSO_LISTA linhas e oferece "Mostrar mais" / "Mostrar todas". Na impressão sai sempre tudo.
+// ligar(tbody): religa os cliques/campos das linhas (roda de novo a cada parte desenhada).
+const PASSO_LISTA = 100;
+function emPartes(tbody, linhas, { colunas, vazio = '', ligar } = {}) {
+  const ant = tbody._partes;
+  // Mesma lista redesenhada (ex.: depois de marcar uma caixa): mantém o quanto já estava aberto
+  const mostrar = ant && ant.total === linhas.length ? ant.mostrar : PASSO_LISTA;
+  tbody._partes = { linhas, colunas, vazio, ligar, total: linhas.length, mostrar };
+  desenharPartes(tbody);
+}
+function desenharPartes(tbody) {
+  const p = tbody._partes;
+  if (!p.linhas.length) { tbody.innerHTML = p.vazio; if (p.ligar) p.ligar(tbody); return; }
+  const n = Math.min(p.mostrar, p.linhas.length), resto = p.linhas.length - n;
+  tbody.innerHTML = p.linhas.slice(0, n).join('') + (resto ? `<tr class="mais-linhas nao-imprimir"><td colspan="${p.colunas}">
+    Mostrando <b>${n}</b> de <b>${p.linhas.length}</b>. <button type="button" class="btn peq" data-mais>Mostrar mais ${Math.min(PASSO_LISTA, resto)}</button>
+    <button type="button" class="btn peq" data-todas>Mostrar todas</button> <span class="dado">Dica: os filtros acima encurtam a lista.</span></td></tr>` : '');
+  const mais = $('[data-mais]', tbody), todas = $('[data-todas]', tbody);
+  if (mais) mais.onclick = () => { p.mostrar += PASSO_LISTA; desenharPartes(tbody); };
+  if (todas) todas.onclick = () => { p.mostrar = Infinity; desenharPartes(tbody); };
+  if (p.ligar) p.ligar(tbody);
+}
+// Imprimir sempre sai com a lista inteira (e com as turmas fechadas abertas)
+window.addEventListener('beforeprint', () => {
+  $$('tbody').forEach((t) => { if (t._partes && t._partes.mostrar < t._partes.linhas.length) { t._partes.mostrar = Infinity; desenharPartes(t); } });
+  $$('details.turma-grupo').forEach((d) => { d.open = true; });
+});
+
 const faixaDemo = (p) => (p.demo ? '<div class="faixa-demo">⚠️ <b>Modo demonstração:</b> os alunos exibidos são fictícios. Para usar dados reais, apague a demonstração e importe o ACADESC em Configurações.</div>' : '');
 
 // ───────────── Início ─────────────
@@ -629,10 +659,10 @@ TELAS.alunos = async (c) => {
   const desenhar = () => {
     const q = norm($('#q').value), t = $('#t').value, s = $('#s').value, nv = $('#nv').checked;
     const f = lista.filter((a) => (!q || [a.nome, a.mat, a.nome_mae, a.nome_pai, a.nome_resp].some((v) => norm(v).includes(q))) && (!t || a.turma_rotulo === t) && (!s || a.status === s) && (!nv || a.novo));
-    $('#tb').innerHTML = f.length ? f.map((a) => `<tr class="clic" data-id="${a.id}"><td class="mono">${esc(a.mat || '—')}</td><td><b>${esc(titulo(a.nome))}</b> ${a.novo ? '<span class="tag t-novo">novo</span>' : ''}</td>
-      <td>${esc(a.novo ? '—' : a.turma_rotulo)}</td><td>${esc(a.destino)}</td><td><span class="tag t-${a.status}">${STATUS[a.status]}</span></td><td>${esc(titulo(a.nome_resp || a.nome_mae || ''))}</td></tr>`).join('')
-      : '<tr><td colspan="6" class="vazio">Nenhum aluno com esses filtros</td></tr>';
-    $$('tr[data-id]').forEach((tr) => (tr.onclick = () => (location.hash = '#/aluno/' + tr.dataset.id)));
+    emPartes($('#tb'), f.map((a) => `<tr class="clic" data-id="${a.id}"><td class="mono">${esc(a.mat || '—')}</td><td><b>${esc(titulo(a.nome))}</b> ${a.novo ? '<span class="tag t-novo">novo</span>' : ''}</td>
+      <td>${esc(a.novo ? '—' : a.turma_rotulo)}</td><td>${esc(a.destino)}</td><td><span class="tag t-${a.status}">${STATUS[a.status]}</span></td><td>${esc(titulo(a.nome_resp || a.nome_mae || ''))}</td></tr>`), {
+      colunas: 6, vazio: '<tr><td colspan="6" class="vazio">Nenhum aluno com esses filtros</td></tr>',
+      ligar: (tb) => $$('tr[data-id]', tb).forEach((tr) => (tr.onclick = () => (location.hash = '#/aluno/' + tr.dataset.id))) });
   };
   ['q', 't', 's', 'nv'].forEach((id) => ($('#' + id).oninput = desenhar));
   desenhar();
@@ -812,15 +842,16 @@ TELAS.rematricula = async (c) => {
     const fs = $('#fs').value;
     $('#tl').textContent = serie ? 'Vão para ' + rotulos[serie] : 'Todos os alunos';
     const f = lista.filter((a) => (!serie || a.destino === rotulos[serie]) && (!fs || a.status === fs) && a.destino && !a.destino.startsWith('Concluinte'));
-    $('#tb').innerHTML = f.length ? f.map((a) => `<tr><td><a href="#/aluno/${a.id}"><b>${esc(titulo(a.nome))}</b></a> ${a.novo ? '<span class="tag t-novo">novo</span>' : ''}</td>
+    emPartes($('#tb'), f.map((a) => `<tr><td><a href="#/aluno/${a.id}"><b>${esc(titulo(a.nome))}</b></a> ${a.novo ? '<span class="tag t-novo">novo</span>' : ''}</td>
       <td>${esc(a.novo ? '—' : a.turma_rotulo)}</td><td>${esc(a.destino)}</td>
       <td><select data-id="${a.id}" aria-label="Situação">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${a.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
-      <td><span class="tag t-${a.status}">${STATUS[a.status]}</span></td></tr>`).join('') : '<tr><td colspan="5" class="vazio">Nenhum aluno</td></tr>';
-    $$('#tb select').forEach((s) => (s.onchange = tentar(async () => {
-      await api('PUT', `/api/alunos/${s.dataset.id}/rematricula`, { status: s.value });
-      const al = lista.find((x) => x.id === +s.dataset.id); al.status = s.value;
-      toast('Atualizado: ' + titulo(al.nome)); desenhar();
-    })));
+      <td><span class="tag t-${a.status}">${STATUS[a.status]}</span></td></tr>`), {
+      colunas: 5, vazio: '<tr><td colspan="5" class="vazio">Nenhum aluno</td></tr>',
+      ligar: (tb) => $$('select', tb).forEach((s) => (s.onchange = tentar(async () => {
+        await api('PUT', `/api/alunos/${s.dataset.id}/rematricula`, { status: s.value });
+        const al = lista.find((x) => x.id === +s.dataset.id); al.status = s.value;
+        toast('Atualizado: ' + titulo(al.nome)); desenhar();
+      }))) });
   };
   $$('[data-serie]').forEach((el) => (el.onclick = el.onkeydown = (e) => { if (e.type === 'keydown' && e.key !== 'Enter') return; serie = el.dataset.serie; desenhar(); $('#tl').scrollIntoView({ behavior: 'smooth' }); }));
   $('#todas').onclick = () => { serie = ''; desenhar(); };
@@ -849,15 +880,19 @@ TELAS.pendencias = async (c) => {
     const f = lista.filter((p) => (!fs || p.situacao === fs) && (!ft || p.turma === ft) && (!q || norm(p.nome + ' ' + p.faltam.join(' ')).includes(q)));
     const grupos = {};
     f.forEach((p) => (grupos[p.turma] ??= []).push(p));
-    $('#corpo').innerHTML = f.length ? `<p class="dado nao-imprimir">${f.length} alunos · ${f.filter((p) => p.situacao === 'vencida').length} vencidos</p>` +
-      Object.keys(grupos).sort(porOrdem).map((t, i) => `<div class="cartao ${i ? 'quebra' : ''}" style="margin-bottom:12px;padding:0">
-        <h3 style="padding:14px 16px 0">${esc(t)} <span class="dado">(${grupos[t].length})</span><span class="so-impressao dado">Instituto Educacional Luterano · Pendências de documentos ${esc(EU.config.ano_matricula)} · impresso em ${dataBR(hojeIso())}</span></h3>
+    // Lista longa (muitas turmas): cada turma começa fechada, com o resumo; filtrou ou é curta: tudo aberto
+    const abertas = f.length <= PASSO_LISTA || ft || q;
+    $('#corpo').innerHTML = f.length ? `<p class="dado nao-imprimir">${f.length} alunos · ${f.filter((p) => p.situacao === 'vencida').length} vencidos
+        ${abertas ? '' : ' · <button class="btn peq" id="abrirTodas">Abrir todas as turmas</button> Clique numa turma para ver os alunos.'}</p>` +
+      Object.keys(grupos).sort(porOrdem).map((t, i) => `<details class="cartao turma-grupo ${i ? 'quebra' : ''}" ${abertas ? 'open' : ''} style="margin-bottom:12px;padding:0">
+        <summary><h3 style="padding:14px 16px 12px 8px;margin:0">${esc(t)} <span class="dado">(${grupos[t].length}${grupos[t].some((p) => p.situacao === 'vencida') ? ` · ${grupos[t].filter((p) => p.situacao === 'vencida').length} vencidos` : ''})</span><span class="so-impressao dado">Instituto Educacional Luterano · Pendências de documentos ${esc(EU.config.ano_matricula)} · impresso em ${dataBR(hojeIso())}</span></h3></summary>
         <div class="tabela-wrap"><table><thead><tr><th>Aluno</th><th>Documentos faltantes</th><th>Prazo</th><th class="nao-imprimir"></th></tr></thead><tbody>
         ${grupos[t].map((p) => `<tr><td><a href="#/aluno/${p.aluno_id}"><b>${esc(titulo(p.nome))}</b></a>${p.novo ? ' <span class="tag t-novo">novo</span>' : ''}<br><small class="dado">Resp.: ${esc(titulo(p.responsavel))}</small></td>
           <td>${esc(p.faltam.join(', '))}</td>
           <td>${dataBR(p.prazo)} <span class="tag t-${p.situacao}">${p.dias == null ? '' : p.dias < 0 ? `venceu há ${-p.dias}d` : p.dias === 0 ? 'hoje' : `${p.dias}d`}</span></td>
           <td class="nao-imprimir"><button class="btn peq zap" data-zap="${p.aluno_id}">WhatsApp</button></td></tr>`).join('')}
-        </tbody></table></div></div>`).join('') : '<div class="cartao vazio">Nenhuma pendência com esses filtros 🎉</div>';
+        </tbody></table></div></details>`).join('') : '<div class="cartao vazio">Nenhuma pendência com esses filtros 🎉</div>';
+    if ($('#abrirTodas')) $('#abrirTodas').onclick = () => $$('details.turma-grupo').forEach((d) => { d.open = true; });
     $$('[data-zap]').forEach((b) => (b.onclick = tentar(() => {
       const p = lista.find((x) => x.aluno_id === +b.dataset.zap);
       return janelaWhats({ aluno: titulo(p.nome), responsavel: titulo(p.responsavel.split(' ')[0]), serie: p.turma, serie_destino: p.destino, documentos: p.faltam.join(', '), prazo: dataBR(p.prazo), whatsapp: p.whatsapp }, 0);
@@ -1014,9 +1049,9 @@ TELAS.config = async (c, aba = 'geral') => {
         <label class="btn pri">Escolher arquivo…<input type="file" id="arqA" accept=".xlsx,.csv" hidden></label>
         <div id="resA" style="margin-top:12px"></div></div>
       <div class="cartao"><h2>🧪 Dados de demonstração</h2>
-        <p>Cria cerca de 160 alunos <b>fictícios</b> para testar e apresentar o sistema sem expor dados reais (LGPD).</p>
+        <p>Cria alunos <b>fictícios</b> para testar e apresentar o sistema sem expor dados reais (LGPD): cerca de 160, ou uns 535 no tamanho real da escola.</p>
         ${p.demo ? '<p><span class="tag t-demo">Demonstração carregada</span></p><button class="btn perigo" id="apagarDemo">Apagar dados de demonstração</button>'
-          : '<button class="btn" id="carregarDemo">Carregar demonstração</button>'}
+          : '<div class="acoes"><button class="btn" id="carregarDemo">Carregar demonstração</button><button class="btn" id="carregarDemoReal" title="Uns 535 alunos fictícios, como a escola de verdade">Demonstração no tamanho real</button></div>'}
         <p class="dado" style="margin-top:12px">Antes de importar os alunos reais, apague a demonstração.</p></div></div>`;
     $('#arqA').onchange = tentar(async (e) => {
       const file = e.target.files[0]; if (!file) return;
@@ -1025,7 +1060,9 @@ TELAS.config = async (c, aba = 'geral') => {
       invalidar();
       $('#resA').innerHTML = `<div class="dica">✅ <b>${r.novos}</b> novos · <b>${r.atualizados}</b> atualizados · ${r.ignorados} linhas ignoradas${r.sem_serie.length ? `<br>⚠️ ${r.sem_serie.length} sem série reconhecida: ${esc(r.sem_serie.slice(0, 10).join(', '))}${r.sem_serie.length > 10 ? '…' : ''}` : ''}</div>`;
     });
-    if ($('#carregarDemo')) $('#carregarDemo').onclick = tentar(async () => { const r = await api('POST', '/api/admin/demo'); invalidar(); toast(r.alunos + ' alunos fictícios criados'); location.hash = '#/'; });
+    const demo = (tam) => tentar(async () => { const r = await api('POST', '/api/admin/demo' + (tam ? '?tamanho=' + tam : '')); invalidar(); toast(r.alunos + ' alunos fictícios criados'); location.hash = '#/'; });
+    if ($('#carregarDemo')) $('#carregarDemo').onclick = demo('');
+    if ($('#carregarDemoReal')) $('#carregarDemoReal').onclick = demo('real');
     if ($('#apagarDemo')) $('#apagarDemo').onclick = tentar(async () => {
       if (!(await confirmar('Apagar todos os alunos e contatos fictícios da demonstração?', 'Apagar'))) return;
       await api('DELETE', '/api/admin/demo'); invalidar(); toast('Demonstração apagada'); rotear();

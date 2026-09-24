@@ -175,7 +175,7 @@ async function abaConferencia(el) {
     filtrados = d.linhas.filter((l) => (!ft || l.turma_rotulo === ft) && (!q || norm([l.nome, l.mat, l.responsavel].join(' ')).includes(q))
       && (fv === '' || (fv === 'desconto' && l.desconto_esperado > 0) || (fv === 'extras' && (l.extras.length || l.extras_anterior.length))
         || (fv === 'alerta' && l.alertas.length) || (fv === 'pendente' && !l.conferido) || (fv === 'conferido' && l.conferido)));
-    $('#tb').innerHTML = filtrados.length ? filtrados.map((l) => `<tr data-a="${l.aluno_id}" class="${l.divergencia ? 'linha-alerta' : ''}">
+    emPartes($('#tb'), filtrados.map((l) => `<tr data-a="${l.aluno_id}" class="${l.divergencia ? 'linha-alerta' : ''}">
       <td><a href="#/aluno/${l.aluno_id}"><b>${esc(titulo(l.nome))}</b></a>${l.filho_funcionario ? ' <span class="tag t-func">func.</span>' : ''}
         <br><small class="dado">Mat. ${esc(l.mat || '—')} · ${esc(titulo(l.responsavel))}</small></td>
       <td>${esc(l.turma_rotulo)}<br><small class="dado">→ ${esc(l.destino)}</small></td>
@@ -186,9 +186,11 @@ async function abaConferencia(el) {
       <td><input type="number" data-k="desconto_acadesc" value="${l.desconto_acadesc ?? ''}" min="0" max="100" style="width:70px" placeholder="%"></td>
       <td style="text-align:center"><input type="checkbox" data-k="conferido" ${l.conferido ? 'checked' : ''}></td>
       <td style="text-align:center"><input type="checkbox" data-k="lancado" ${l.lancado ? 'checked' : ''}></td>
-      <td><input data-k="obs" value="${esc(l.obs)}" placeholder="—" style="width:150px">${l.atualizado_por ? `<br><small class="dado">${esc(nomePessoa(l.atualizado_por))}</small>` : ''}</td></tr>`).join('')
-      : '<tr><td colspan="8" class="vazio">Nenhum aluno com esses filtros.</td></tr>';
-    $$('#tb [data-k]').forEach((i) => (i.onchange = tentar(async () => {
+      <td><input data-k="obs" value="${esc(l.obs)}" placeholder="—" style="width:150px">${l.atualizado_por ? `<br><small class="dado">${esc(nomePessoa(l.atualizado_por))}</small>` : ''}</td></tr>`),
+    { colunas: 8, vazio: '<tr><td colspan="8" class="vazio">Nenhum aluno com esses filtros.</td></tr>', ligar: ligarConferencia });
+  };
+  const ligarConferencia = (tb) => {
+    $$('[data-k]', tb).forEach((i) => (i.onchange = tentar(async () => {
       const id = i.closest('tr').dataset.a;
       const v = i.type === 'checkbox' ? i.checked : i.value;
       await api('PUT', '/api/boletos/conferencia/' + id, { [i.dataset.k]: v, ano: d.ano });
@@ -252,14 +254,16 @@ async function detalheRemessa(id) {
     const t = $('#rt').value, s = $('#rs').value, q = norm($('#rq').value);
     const f = d.alunos.filter((a) => (!t || a.turma_rotulo === t) && (!q || norm(a.nome + ' ' + a.responsavel).includes(q))
       && (!s || (s === 'entregue' ? a.entregue_em : !a.entregue_em)));
-    $('#rtb').innerHTML = f.length ? f.map((a) => `<tr data-a="${a.aluno_id}"><td><a href="#/aluno/${a.aluno_id}"><b>${esc(titulo(a.nome))}</b></a><br><small class="dado">Resp.: ${esc(titulo(a.responsavel))}</small></td>
+    emPartes($('#rtb'), f.map((a) => `<tr data-a="${a.aluno_id}"><td><a href="#/aluno/${a.aluno_id}"><b>${esc(titulo(a.nome))}</b></a><br><small class="dado">Resp.: ${esc(titulo(a.responsavel))}</small></td>
       <td>${esc(a.turma_rotulo)}</td>
       <td><label><input type="checkbox" data-k="entregue" ${a.entregue_em ? 'checked' : ''}> ${a.entregue_em ? dataBR(a.entregue_em) : ''}</label></td>
       <td><input data-k="recebido_por" value="${esc(a.recebido_por)}" placeholder="quem retirou" style="width:150px"></td>
       <td><select data-k="canal"><option value=""></option>${Object.entries({ balcao: 'Balcão', aluno: 'Pela agenda do aluno', portao: 'No portão', correio: 'Correio/e-mail' }).map(([k, v]) => `<option value="${k}" ${a.canal === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
-      <td><input data-k="obs" value="${esc(a.obs)}" style="width:140px"></td></tr>`).join('')
-      : '<tr><td colspan="6" class="vazio">Ninguém com esses filtros.</td></tr>';
-    $$('#rtb [data-k]').forEach((i) => (i.onchange = tentar(async () => {
+      <td><input data-k="obs" value="${esc(a.obs)}" style="width:140px"></td></tr>`),
+    { colunas: 6, vazio: '<tr><td colspan="6" class="vazio">Ninguém com esses filtros.</td></tr>', ligar: ligarEntregas });
+  };
+  const ligarEntregas = (tb) => {
+    $$('[data-k]', tb).forEach((i) => (i.onchange = tentar(async () => {
       const aid = +i.closest('tr').dataset.a;
       const a = d.alunos.find((x) => x.aluno_id === aid);
       const corpo = { entregue: a.entregue_em ? true : false, recebido_por: a.recebido_por, canal: a.canal, obs: a.obs };
@@ -311,16 +315,26 @@ TELAS.fotos = async (c) => {
     filtrados = d.linhas.filter((l) => (!ft || l.turma_rotulo === ft) && (!q || norm(l.nome + ' ' + (l.mat || '')).includes(q))
       && (!fs || (fs === 'sem' && !l.tirada) || (fs === 'completo' && l.completo) || (fs === 'incompleto' && l.tirada && !l.completo)));
     const col = (l, k) => `<td style="text-align:center"><input type="checkbox" data-k="${k}" ${l[k] ? 'checked' : ''}></td>`;
-    $('#tb').innerHTML = filtrados.length ? filtrados.map((l) => `<tr data-a="${l.aluno_id}">
+    emPartes($('#tb'), filtrados.map((l) => `<tr data-a="${l.aluno_id}">
       <td><a href="#/aluno/${l.aluno_id}"><b>${esc(titulo(l.nome))}</b></a> ${l.tem_arquivo ? '<span class="pdf-ok" title="Arquivo de foto encontrado">📷 arquivo</span>' : ''}
         <br><small class="dado">Mat. ${esc(l.mat || '—')}${l.data_foto ? ' · foto de ' + dataBR(l.data_foto) : ''}</small></td>
       <td>${esc(l.turma_rotulo)}</td>${col(l, 'tirada')}${col(l, 'acadesc')}${col(l, 'sed')}${col(l, 'lanche')}
-      <td><input data-k="obs" value="${esc(l.obs)}" placeholder="—" style="width:150px"></td></tr>`).join('')
-      : '<tr><td colspan="7" class="vazio">Ninguém com esses filtros 🎉</td></tr>';
-    $$('#tb [data-k]').forEach((i) => (i.onchange = tentar(async () => {
+      <td><input data-k="obs" value="${esc(l.obs)}" placeholder="—" style="width:150px"></td></tr>`),
+    { colunas: 7, vazio: '<tr><td colspan="7" class="vazio">Ninguém com esses filtros 🎉</td></tr>', ligar: ligarFotos });
+  };
+  // Marcar uma caixa atualiza só a linha na memória e redesenha a lista: não volta para o topo da página
+  // (com 535 alunos, perder a posição a cada clique tornava o mutirão impraticável). Os cartões do alto se atualizam ao reabrir a tela.
+  const ligarFotos = (tb) => {
+    $$('[data-k]', tb).forEach((i) => (i.onchange = tentar(async () => {
       const id = +i.closest('tr').dataset.a;
-      await api('PUT', '/api/fotos/mutirao/' + id, { [i.dataset.k]: i.type === 'checkbox' ? i.checked : i.value });
-      toast('Salvo'); rotear();
+      const k = i.dataset.k, v = i.type === 'checkbox' ? i.checked : i.value;
+      await api('PUT', '/api/fotos/mutirao/' + id, { [k]: v });
+      const l = d.linhas.find((x) => x.aluno_id === id);
+      l[k] = i.type === 'checkbox' ? !!v : v;
+      // Mesma regra do servidor: se já foi para algum sistema, a foto existe; completo = nos 3 sistemas
+      l.tirada = !!(l.tirada || l.acadesc || l.sed || l.lanche);
+      l.completo = !!(l.acadesc && l.sed && l.lanche);
+      toast('Salvo'); desenhar();
     })));
   };
   ['fs', 'ft', 'fq'].forEach((id) => ($('#' + id).oninput = desenhar));

@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **24/09/2026**, versão **4.3.0** (Etapa 4 + página inicial reorganizada + lixeira). O que vem a seguir está em §7.
+> Última atualização: **24/09/2026**, versão **4.8.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda e desempenho). O que vem a seguir está em §7.
 
 ---
 
@@ -168,6 +168,59 @@
   restaurar duas vezes, permissões da aprendiz, prazo, auditoria, LGPD) e `t-lixeira-tela` (navegador, 12 ok para admin e aprendiz:
   excluir → Desfazer → excluir → restaurar pela tela). Migração conferida: banco sem a tabela `lixeira` recebe a tabela ao abrir, sem perder dados.
 
+### Busca global (versão 4.4.0, 24/09/2026)
+- O campo de cima (tecla `/`) procura em **tudo** (`rotas/busca.js`, `GET /api/busca?q=`): alunos (nome, mãe, pai, responsável,
+  matrícula, CPF), quem pode buscar, avisos de saída, atendimentos, interessados do SIG, documentos emitidos e bolsas
+  (**bolsas só para a administração**). Sem acento e sem maiúscula (comparação no JS com `S.norm`; o LIKE do SQLite não sabe).
+  Números (CPF, telefone) casam só pelos dígitos. Até 6 por grupo, com "Ver todos os N →".
+- `#/tela?q=texto` preenche o filtro da tela (`#fq`, ou `#q` em Alunos) — é assim que "Ver todos" e os resultados de
+  atendimento/SIG/bolsa abrem a tela já filtrada (`rotear()` separa o `?`).
+- Testes: `t-busca` (API, 11) e `t-busca-tela` (navegador, 9).
+
+### Não perder o que foi digitado quando o servidor cai (versão 4.5.0)
+- **Sessões no banco** (tabela `sessoes`, só o **hash** SHA-256 do token): reiniciar o servidor (atualização, restauração,
+  queda) não desloga ninguém. A memória é cache; o banco só é gravado no login, no bloqueio/desbloqueio e a cada 10 min de uso.
+  Redefinir a senha de alguém encerra as sessões dessa pessoa.
+- **Servidor fora do ar:** o `api()` pega a falha de rede, mostra faixa vermelha fixa (`#semConexao`) e testa `GET /api/versao`
+  (pública, só devolve a versão) a cada 4 s; quando volta, some e avisa. A janela aberta continua com tudo o que foi digitado.
+- **Rascunho das janelas** (`ligarRascunho` em `modal()`): o que é digitado vai para o `sessionStorage` (some ao fechar o
+  navegador — LGPD); fechar a janela normalmente apaga. Se a página recarregar, aparece a faixa "Ficou sem salvar" com o
+  caminho de volta e, ao abrir a mesma janela, **"Recuperar o que foi digitado"**. Senhas e arquivos nunca são guardados.
+  A chave é o título da janela; janelas "Confirmar" e "Ajuda" não têm rascunho.
+- Teste: `t-conexao` (19): **derruba o servidor de verdade** com a janela aberta, confere a faixa, religa e salva; recarrega a
+  página e recupera o rascunho; senha redefinida derruba a sessão.
+
+### Aviso quando duas pessoas editam a mesma ficha (versão 4.6.0)
+- `conferirVersao(atual, corpo, u)` no servidor (vai no `ctx`): a tela manda `_versao` (o `atualizado_em` que carregou); se
+  outra pessoa gravou depois, responde **409** com `conflito: { por, em }`. `_forcar: true` grava mesmo assim.
+- Vale para **aluno, atendimento, interessado e bolsa**. Colunas novas `atualizado_por` (alunos) e `atualizado_em/por`
+  (atendimentos, interessados); a importação do ACADESC grava `atualizado_por = 'importacao'`.
+- Na tela, `salvarComVersao(url, corpo, original)` manda **só os campos que a pessoa mudou**: se duas pessoas mexeram em campos
+  diferentes, o trabalho das duas fica. No conflito, pergunta com nome e hora; desistir mantém a janela aberta.
+- Ações de um clique (marcar documento, mudar situação na lista, "Resolvido") não passam por isso: são atômicas.
+- Teste: `t-conflito` (17, inclusive a tela e a junção dos campos).
+
+### Ajuda dentro de cada tela (versão 4.7.0)
+- Botão **"? Ajuda"** na barra de cima e a tecla **?** (`public/ajuda.js`): para que serve a tela, passo a passo e cuidados,
+  escrita para o próximo aprendiz. Tem ajuda própria para as 18 telas do menu e a ficha do aluno; dá para ver a de outra tela.
+  A aprendiz não vê a ajuda de Bolsas, Relatórios e Configurações. **Tela nova = acrescentar a ajuda dela em `AJUDA`.**
+- Teste: `t-ajuda` (45: toda tela do menu abre a ajuda certa, nos dois perfis).
+
+### Desempenho com 535 alunos (versão 4.8.0)
+- **Demonstração no tamanho real** (Configurações › Importar dados, ou `POST /api/admin/demo?tamanho=real`): ~530 alunos fictícios.
+- Medido com 530 alunos: a API responde tudo em menos de 30 ms e nenhuma tela passa de 0,4 s. O problema era o **tamanho**:
+  Rematrícula, Fotos e Boletos passavam de 29 mil px (30 telas de rolagem).
+- `emPartes(tbody, linhas, { colunas, vazio, ligar })` em `app.js`: mostra 100 linhas, com "Mostrar mais 100" e "Mostrar todas".
+  Redesenhar a mesma lista mantém o quanto estava aberto. **Na impressão sai tudo** (evento `beforeprint`). Usado em Alunos,
+  Rematrícula, Conferência de boletos, Entrega de boletos e Mutirão de fotos.
+- **Pendências**: com mais de 100 alunos, cada turma vira um bloco que abre e fecha (`details.turma-grupo`), com o resumo
+  "(N · X vencidos)"; filtrar abre tudo; imprimir abre tudo.
+- **Mutirão de fotos**: marcar uma caixa não recarrega mais a tela inteira (antes voltava ao topo a cada clique, impraticável com
+  535 alunos); atualiza a linha com a mesma regra do servidor. Os cartões do alto se atualizam ao reabrir a tela.
+- Depois: Rematrícula 30.568 → 6.665 px, Fotos 30.742 → 6.283, Boletos 29.085 → 10.088, Pendências 23.128 → 2.141, Alunos 20.982 → 4.263.
+- Testes: `t-desempenho` (mede API e telas) e `t-partes` (18: mostrar mais/todas, filtro, impressão, fotos sem voltar ao topo, turmas).
+- Migração conferida (4.4–4.8): banco sem `sessoes`, `lixeira` e as colunas `atualizado_*` recebe tudo ao abrir, sem perder dados.
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -206,6 +259,7 @@ SecretariaIEL/
    ├─ rotas/atualizacao.js    → verificar e aplicar versão nova pelo Git (Etapa 4)
    ├─ rotas/lixeira.js        → listar, restaurar, apagar de vez e limpeza automática da lixeira (4.3.0)
    ├─ lib/lixeira.js          → excluir guardando a fotografia das linhas, restaurar e limpar (4.3.0)
+   ├─ rotas/busca.js          → busca global em todos os tipos de registro (4.4.0)
    ├─ lib/atualizacao.js      → conversa com o Git; nada aqui lança erro, tudo volta explicado (Etapa 4)
    ├─ lib/versao.js           → a constante VERSAO, repetida em public/app.js (Etapa 4)
    ├─ lib/backup.js           → VACUUM INTO, cifra AES-256-GCM, retenção e restauração agendada (Etapa 4)
@@ -218,7 +272,7 @@ SecretariaIEL/
    ├─ lib/fotos.js            → acha <mat>.jpg / AcaDescMySql.exe00<mat>.jpeg
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
-   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js, lixeira.js,
+   └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js, lixeira.js, ajuda.js,
                                 tema.js (claro/escuro antes de desenhar), doc.html/doc.css/doc.js
 ```
 
@@ -283,7 +337,10 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
   **atualização** (16, montando um "GitHub" local com `git init --bare` para não depender da internet) e
   **atualização de ponta a ponta** (12, subindo o app com `IEL_RAIZ` apontado para o repositório de teste);
   **página inicial** (`t-inicio`, 36 ok como admin e 33 como aprendiz, agora com a Lixeira no menu); **lixeira** (`t-lixeira`, 93 ok,
-  e `t-lixeira-tela`, 12 ok por perfil); **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
+  e `t-lixeira-tela`, 12 ok por perfil); **busca** (`t-busca` 11, `t-busca-tela` 9); **servidor caindo** (`t-conexao`, 19, derruba
+  e religa o servidor de verdade); **edição ao mesmo tempo** (`t-conflito`, 17); **ajuda** (`t-ajuda`, 45); **listas em partes**
+  (`t-partes`, 18, com a demonstração no tamanho real) e **desempenho** (`t-desempenho`, mede). Um `nav.mjs` reúne o Edge
+  headless para os testes de tela; **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
   que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
 - Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
 - Para copiar o banco a fim de testar, copie **também** `secretaria.db-wal` e `-shm`: no modo WAL boa parte dos dados ainda não está no arquivo principal.
@@ -315,24 +372,29 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 | **Cara de protótipo** | Ícones SVG, esqueleto de carregamento, telas vazias que ensinam, modo compacto, claro/escuro |
 | **Depender do Kevin para atualizar** | Botão "Verificar atualizações": mostra o que mudou, faz backup, aplica e reinicia sozinho |
 | **Excluir era para sempre** (4.3.0) | Lixeira de 30 dias, botão Desfazer logo depois de excluir e tela para restaurar |
+| **Achar as coisas** (4.4.0) | Busca global agrupada por tipo, que abre a tela já filtrada |
+| **Servidor cai e some o que foi digitado** (4.5.0) | Sessões no banco, faixa "sem conexão", janela preservada e rascunho recuperável |
+| **Um passa por cima do outro** (4.6.0) | Aviso com nome e hora; grava só os campos que a pessoa mudou |
+| **Aprendiz novo não sabe usar** (4.7.0) | "? Ajuda" em cada tela |
+| **Tela de 30 metros com 535 alunos** (4.8.0) | Listas em partes de 100, turmas que abrem e fecham, impressão sempre completa |
 
 ### 7.2 Próximos passos, na ordem que eu faria
 1. **Piloto de verdade, com dado real, de um módulo só** — sugestão: *Atendimentos* ou *Portão*, por duas semanas.
    Risco baixo, valor visível no primeiro dia, e é o que ganha a Samara. **Sem isso, o resto é só código.**
 2. **Histórico escolar** — maior buraco funcional. Depende de conseguir as notas (SED ou ACADESC): é a pergunta
    que mais vale a pena responder na escola.
-3. **Busca global** — um campo que ache aluno, atendimento, bolsa, documento emitido e aviso, agrupado por tipo.
-   É o recurso que mais dá sensação de "sistema profissional" pelo esforço que custa.
-4. **Conflito entre duas pessoas** — hoje, se o Kevin e a Duda editarem a mesma ficha, a última gravação vence em
-   silêncio. Avisar "a Duda alterou esta ficha há 2 minutos" antes de salvar.
-5. **Quando o PC servidor cai** — os outros não podem perder o que já foi digitado; hoje some. Guardar o formulário
-   e avisar em português, em vez de mostrar erro técnico.
-6. ~~**Lixeira de 30 dias e desfazer**~~ — **feito na 4.3.0** (ver §3).
-7. **Uso real nos 3 PCs** — `IEL_REDE=1`, firewall e atalho nas outras máquinas, testado no local.
-8. **Ajuda dentro da tela** — um "?" por tela explicando o POP correspondente. Importa porque a secretaria tem
-   rotatividade de aprendizes: o próximo precisa conseguir usar sozinho.
-9. **Desempenho com 535 alunos reais** — a conferência de boletos e o mutirão viram páginas longas; paginar ou
-    virtualizar quando incomodar (com a demonstração de 160 ainda está tranquilo).
+3. ~~**Busca global**~~ — **feito na 4.4.0**.
+4. ~~**Conflito entre duas pessoas**~~ — **feito na 4.6.0**.
+5. ~~**Quando o PC servidor cai**~~ — **feito na 4.5.0**.
+6. ~~**Lixeira de 30 dias e desfazer**~~ — **feito na 4.3.0**.
+7. **Uso real nos 3 PCs** — `IEL_REDE=1`, firewall e atalho nas outras máquinas, testado no local. **Só dá para fazer na escola.**
+   Com as sessões no banco (4.5.0) e o aviso de conflito (4.6.0), o sistema já está preparado para várias pessoas ao mesmo tempo.
+8. ~~**Ajuda dentro da tela**~~ — **feito na 4.7.0**. Quando a escola tiver os POPs numerados, vale citar o número em cada ajuda.
+9. ~~**Desempenho com 535 alunos**~~ — **feito na 4.8.0**, medido com a demonstração no tamanho real.
+
+Tudo o que dependia só de código no §7.2 está feito. O que falta agora depende da escola: **piloto** (item 1), **notas para o
+histórico** (item 2) e **testar nos 3 PCs** (item 7). Ideias para depois, se o piloto aprovar: busca que acha também dentro das
+observações, e ajuda com prints das telas.
 
 ### 7.3 O que eu recomendo **não** fazer
 - **Reescrever em React/Vue:** perderia meses e ganharia dependências e build. Rodar com um duplo clique, sem npm

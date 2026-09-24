@@ -702,10 +702,10 @@ rota('POST', '/api/admin/importar-alunos', async (req, res, { u, url }) => {
   const buf = await lerCorpo(req);
   json(res, 200, importarAlunos(lerPlanilha(buf, url.searchParams.get('arquivo') || 'x.xlsx'), u.login));
 });
-rota('POST', '/api/admin/demo', async (req, res, { u }) => {
+rota('POST', '/api/admin/demo', async (req, res, { u, url }) => {
   exigirAdmin(u);
   if (db.prepare('SELECT 1 FROM alunos WHERE demo = 0 LIMIT 1').get()) falha(400, 'Já existem alunos reais cadastrados; a demonstração não pode ser misturada a eles.');
-  const n = gerarDemo(db, +cfg().ano_matricula, transacao);
+  const n = gerarDemo(db, +cfg().ano_matricula, transacao, { real: url.searchParams.get('tamanho') === 'real' });
   gerarDemoEtapa2(db, +cfg().cebas_ano, transacao);
   gerarDemoEtapa3(db, +cfg().ano_matricula, transacao);
   registrar(u.login, 'carregou dados de demonstração', { alunos: n });

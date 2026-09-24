@@ -4,7 +4,7 @@ Copie **tudo o que está entre as linhas** e cole como primeira mensagem no Clau
 
 ---
 
-Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Em chats anteriores você construiu comigo as **Etapas 1 a 4** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro, hoje na **versão 4.3.0**.
+Olá! Sou o Kevin, aprendiz da secretaria do Instituto Educacional Luterano (Ferraz de Vasconcelos/SP). Em chats anteriores você construiu comigo as **Etapas 1 a 4** do app **Secretaria IEL**: gestão da secretaria em Node.js portátil, SQLite e HTML/JS puro, hoje na **versão 4.8.0**.
 
 **Repositório (privado):** https://github.com/kevinhsdev/secretaria-iel
 
@@ -18,11 +18,12 @@ Faça nesta ordem:
 4. **Rode o app uma vez** para garantir que funciona aqui:
    - `Iniciar Secretaria.bat` baixa o Node sozinho, ou rode `ferramentas\instalar-node.ps1`.
    - Suba um servidor de teste com banco temporário (`IEL_DADOS` e `IEL_PORTA=3999`), carregue a demonstração e confira as telas principais.
-5. **Recrie os scripts de teste** descritos no §6 do HANDOFF (numa pasta temporária, fora do Git). São a rede de proteção do projeto: cliente de API, Etapas 1-3, perfil aprendiz, segurança/LGPD, backup, migração, versão, atualização, todas as telas, e os prints no Edge headless.
+5. **Recrie os scripts de teste** descritos no §6 do HANDOFF (numa pasta temporária, fora do Git). São a rede de proteção do projeto: cliente de API, Etapas 1-3, perfil aprendiz, segurança/LGPD, backup, migração, versão, atualização, lixeira, busca, servidor caindo, edição simultânea, ajuda, listas em partes, todas as telas, e os prints no Edge headless.
 6. **Combine comigo o que fazer**, seguindo o §7.2 do HANDOFF. A ordem que ficou recomendada é:
    1. **Piloto com dado real de um módulo só** (Atendimentos ou Portão) — é o que falta de verdade, e depende mais de mim do que de você. Me ajude a preparar isso: o que configurar, o que combinar com a Samara e como medir se deu certo.
    2. **Histórico escolar** — depende de eu conseguir as notas (SED ou ACADESC).
-   3. **Busca global**, **aviso de edição simultânea**, **não perder o formulário quando o servidor cai**, **ajuda dentro da tela** (a lixeira de 30 dias já foi feita na 4.3.0).
+   3. **Testar nos 3 PCs da secretaria** (rede, firewall e atalho) — só dá na escola.
+   Lixeira, busca global, queda do servidor, edição simultânea, ajuda nas telas e desempenho com 535 alunos já foram feitos (4.3.0 a 4.8.0).
    Me diga o que dá para fazer já com o que temos e o que depende de eu conseguir alguma informação na escola.
 7. **Teste de verdade** antes de me entregar: `node --check` em tudo, os scripts de API, o teste que abre todas as telas, prints no Edge headless, e corrija o que encontrar.
 8. **Entregue:**

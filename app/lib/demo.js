@@ -9,7 +9,8 @@ const SOBRENOMES = ['Almeida', 'Barbosa', 'Cardoso', 'Dias', 'Esteves', 'Ferreir
 const MAES = ['Adriana', 'Camila', 'Daniela', 'Fernanda', 'Juliana', 'Patrícia', 'Renata', 'Tatiane', 'Vanessa', 'Priscila'];
 const PAIS = ['Anderson', 'Bruno', 'Carlos', 'Diego', 'Eduardo', 'Fábio', 'Leandro', 'Marcelo', 'Rodrigo', 'Thiago'];
 
-function gerarDemo(db, ano, transacao) {
+// real = true: tamanho da escola de verdade (~535 alunos), para testar desempenho e treinar sem dado real
+function gerarDemo(db, ano, transacao, { real = false } = {}) {
   let semente = 20260924;
   const rnd = () => { semente = (semente * 1103515245 + 12345) % 2147483648; return semente / 2147483648; };
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -33,7 +34,7 @@ function gerarDemo(db, ano, transacao) {
       const s = S.porChave(chave);
       const idadeBase = { MAT: 3, JD1: 4, JD2: 5 }[chave] ?? (chave.startsWith('EM') ? 14 + +chave.slice(2) : 5 + +chave.slice(1));
       for (const letra of letras) {
-        const qtd = 4 + Math.floor(rnd() * 4);
+        const qtd = real ? 17 + Math.floor(rnd() * 6) : 4 + Math.floor(rnd() * 4);
         for (let i = 0; i < qtd; i++) {
           const sobre = pick(SOBRENOMES) + ' ' + pick(SOBRENOMES);
           const nome = (pick(NOMES) + ' ' + sobre).toUpperCase();
