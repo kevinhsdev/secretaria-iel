@@ -16,7 +16,7 @@ module.exports = function busca(ctx) {
     const dataBR = (iso) => (iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '');
     const grupos = [];
     // todos: tela que lista tudo o que foi achado (quando passa do limite)
-    const TODOS = { aluno: '#/alunos', atendimento: '#/atendimentos', interessado: '#/interessados', bolsa: '#/bolsas' };
+    const TODOS = { aluno: '#/alunos', atendimento: '#/atendimentos', interessado: '#/interessados', bolsa: '#/bolsas', vivencia: '#/vivencias' };
     const grupo = (tipo, nome, itens) => { if (itens.length) grupos.push({ tipo, nome, total: itens.length, itens: itens.slice(0, LIMITE), todos: TODOS[tipo] ? TODOS[tipo] + '?q=' + encodeURIComponent(bruto) : null }); };
 
     // Alunos (inclui os inativos no fim, marcados)
@@ -47,6 +47,12 @@ module.exports = function busca(ctx) {
     const ints = db.prepare('SELECT id, aluno, responsavel, contato, serie_interesse, status FROM interessados ORDER BY id DESC').all();
     grupo('interessado', 'Interessados (SIG)', ints.filter((x) => acha(x.aluno, x.responsavel, x.contato)).map((x) => ({
       titulo: x.aluno, detalhe: `${x.serie_interesse || 'série não informada'} · ${x.responsavel || x.contato || ''}`, link: '#/interessados?q=' + encodeURIComponent(bruto) })));
+
+    // Vivências (crianças que vieram passar um dia na escola)
+    const vivs = db.prepare('SELECT id, aluno, responsavel, telefone, data, status, efetivou FROM vivencias ORDER BY COALESCE(data, criado_em) DESC').all();
+    grupo('vivencia', 'Vivências', vivs.filter((x) => acha(x.aluno, x.responsavel, x.telefone)).map((x) => ({
+      titulo: x.aluno, detalhe: `${x.data ? dataBR(x.data) + ' · ' : ''}${x.status} · matrícula: ${x.efetivou}${x.responsavel ? ' · ' + x.responsavel : ''}`,
+      link: `#/vivencias${x.data ? '/' + x.data.slice(0, 4) : ''}?q=` + encodeURIComponent(bruto) })));
 
     // Documentos emitidos
     const ems = db.prepare('SELECT id, quando, tipo, aluno_id, descricao, usuario FROM emissoes ORDER BY id DESC LIMIT 3000').all();

@@ -160,6 +160,35 @@ CREATE TABLE IF NOT EXISTS lixeira (
 );
 -- Sessões abertas (só o hash do token): sobrevivem a um reinício do servidor
 CREATE TABLE IF NOT EXISTS sessoes (hash TEXT PRIMARY KEY, uid INTEGER NOT NULL, expira INTEGER NOT NULL, bloqueada INTEGER NOT NULL DEFAULT 0);
+-- ── 4.9.0: histórico escolar ──
+-- Matriz curricular (as linhas do histórico). curso: 'fund' (1º ao 9º ano) ou 'medio' (1ª a 3ª série).
+CREATE TABLE IF NOT EXISTS hist_componentes (
+  id INTEGER PRIMARY KEY, curso TEXT NOT NULL CHECK (curso IN ('fund','medio')), area TEXT, nome TEXT NOT NULL,
+  ordem INTEGER DEFAULT 0, ativo INTEGER NOT NULL DEFAULT 1
+);
+-- O que o histórico pede e o cadastro do ACADESC não traz
+CREATE TABLE IF NOT EXISTS hist_alunos (
+  aluno_id INTEGER PRIMARY KEY REFERENCES alunos(id) ON DELETE CASCADE, naturalidade TEXT, uf_nasc TEXT,
+  nacionalidade TEXT, rg_uf TEXT, obs TEXT, atualizado_em TEXT, atualizado_por TEXT
+);
+-- Um ano cursado (uma coluna do histórico): onde, quando, carga, frequência e resultado
+CREATE TABLE IF NOT EXISTS hist_anos (
+  id INTEGER PRIMARY KEY, aluno_id INTEGER NOT NULL REFERENCES alunos(id) ON DELETE CASCADE, serie_chave TEXT NOT NULL,
+  ano_letivo INTEGER, escola TEXT, cidade TEXT, uf TEXT, carga INTEGER, dias_letivos INTEGER, frequencia REAL, resultado TEXT,
+  atualizado_em TEXT, atualizado_por TEXT, UNIQUE (aluno_id, serie_chave)
+);
+CREATE TABLE IF NOT EXISTS hist_notas (
+  ano_id INTEGER NOT NULL REFERENCES hist_anos(id) ON DELETE CASCADE, componente TEXT NOT NULL, nota TEXT,
+  PRIMARY KEY (ano_id, componente)
+);
+-- ── 4.9.0: vivências (a criança passa um dia na escola antes de decidir a matrícula) ──
+CREATE TABLE IF NOT EXISTS vivencias (
+  id INTEGER PRIMARY KEY, aluno TEXT NOT NULL, responsavel TEXT, telefone TEXT, ano_escolar TEXT, classe TEXT,
+  data TEXT, periodo TEXT, escola_atual TEXT, como_conheceu TEXT, status TEXT NOT NULL DEFAULT 'Agendada',
+  efetivou TEXT NOT NULL DEFAULT 'Em análise', data_matricula TEXT, contato_em TEXT, contato_por TEXT, contato_obs TEXT,
+  obs TEXT, criado_em TEXT, criado_por TEXT, atualizado_em TEXT, atualizado_por TEXT, demo INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ix_vivencias_data ON vivencias(data);
 CREATE INDEX IF NOT EXISTS ix_alunos_nome ON alunos(nome);
 CREATE INDEX IF NOT EXISTS ix_atend_data ON atendimentos(data);
 CREATE INDEX IF NOT EXISTS ix_avisos_data ON saida_avisos(data);
@@ -230,6 +259,14 @@ const cfgPadrao = {
   bloqueio_minutos: '20',           // bloqueia a tela após este tempo parado (0 = não bloquear)
   lgpd_anos_descarte: '5',          // depois de quantos anos um ex-aluno pode ser anonimizado
   lixeira_dias: '30',               // quantos dias o que foi excluído fica na lixeira antes de sumir de vez
+  // 4.9.0 — histórico escolar
+  hist_media: '5',                  // nota mínima para aprovação (abaixo disso o app avisa)
+  hist_frequencia: '75',            // frequência mínima (%) exigida pela LDB
+  hist_carga_fund: '1000',          // carga horária anual sugerida no Ensino Fundamental
+  hist_carga_medio: '1000',         // carga horária anual sugerida no Ensino Médio
+  hist_dias: '200',                 // dias letivos sugeridos
+  hist_secretario: '',              // nome de quem assina como secretário(a) de escola
+  hist_diretor: '',                 // nome de quem assina como diretor(a)
 };
 
 // Nunca sai do servidor para a tela (nem para o admin): só se diz se está definida ou não.
@@ -347,6 +384,23 @@ function inicializar() {
       ['Certificados e declarações de conclusão', '', 12, null, 'samara', 'Documentos'],
       ['Fechamento do ano letivo na SED', '', 12, null, 'samara', 'SED'],
       ['Entrega dos boletos do ano seguinte', '', 12, null, 'duda', 'Financeiro'],
+    ].forEach((c, i) => ins.run(...c, i + 1));
+  }
+
+  // 4.9.0 — matriz curricular do histórico (BNCC / Currículo Paulista). A administração ajusta em Histórico escolar › Disciplinas.
+  if (!db.prepare('SELECT 1 FROM hist_componentes LIMIT 1').get()) {
+    const ins = db.prepare('INSERT INTO hist_componentes (curso, area, nome, ordem) VALUES (?,?,?,?)');
+    [
+      ['fund', 'Linguagens', 'Língua Portuguesa'], ['fund', 'Linguagens', 'Arte'], ['fund', 'Linguagens', 'Educação Física'],
+      ['fund', 'Linguagens', 'Língua Inglesa'], ['fund', 'Matemática', 'Matemática'], ['fund', 'Ciências da Natureza', 'Ciências'],
+      ['fund', 'Ciências Humanas', 'Geografia'], ['fund', 'Ciências Humanas', 'História'], ['fund', 'Ensino Religioso', 'Ensino Religioso'],
+      ['medio', 'Linguagens e suas Tecnologias', 'Língua Portuguesa'], ['medio', 'Linguagens e suas Tecnologias', 'Língua Inglesa'],
+      ['medio', 'Linguagens e suas Tecnologias', 'Arte'], ['medio', 'Linguagens e suas Tecnologias', 'Educação Física'],
+      ['medio', 'Matemática e suas Tecnologias', 'Matemática'], ['medio', 'Ciências da Natureza e suas Tecnologias', 'Biologia'],
+      ['medio', 'Ciências da Natureza e suas Tecnologias', 'Física'], ['medio', 'Ciências da Natureza e suas Tecnologias', 'Química'],
+      ['medio', 'Ciências Humanas e Sociais Aplicadas', 'História'], ['medio', 'Ciências Humanas e Sociais Aplicadas', 'Geografia'],
+      ['medio', 'Ciências Humanas e Sociais Aplicadas', 'Filosofia'], ['medio', 'Ciências Humanas e Sociais Aplicadas', 'Sociologia'],
+      ['medio', 'Itinerário formativo', 'Projeto de Vida'],
     ].forEach((c, i) => ins.run(...c, i + 1));
   }
 

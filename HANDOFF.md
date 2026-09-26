@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **24/09/2026**, versão **4.8.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda e desempenho). O que vem a seguir está em §7.
+> Última atualização: **26/09/2026**, versão **4.9.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
 
 ---
 
@@ -221,6 +221,47 @@
 - Testes: `t-desempenho` (mede API e telas) e `t-partes` (18: mostrar mais/todas, filtro, impressão, fotos sem voltar ao topo, turmas).
 - Migração conferida (4.4–4.8): banco sem `sessoes`, `lixeira` e as colunas `atualizado_*` recebe tudo ao abrir, sem perder dados.
 
+### Histórico escolar e vivências (versão 4.9.0, 26/09/2026)
+Pedido do Kevin: "os históricos são feitos à mão; queria uma aba onde coloco as notas e ele cria sozinho" e "uma aba de vivência
+com quantos agendaram, quantos realizaram, o dia, o ano e se foi contatado". A escola controlava as vivências na planilha Google
+"Controle de Vivência" (abas Registro de Vivências / Dashboard / Listas) — lida só na tela para copiar a estrutura; nenhum dado foi copiado.
+
+- **Histórico escolar** (menu Secretaria, `rotas/historico.js`, `public/historico.js`, documento `historico` em `doc.js`):
+  - Tabelas: `hist_componentes` (matriz curricular: curso `fund` 1º–9º ou `medio` 1ª–3ª, área, ordem, ativo), `hist_alunos`
+    (naturalidade, UF, nacionalidade, UF do RG, observações — o que o ACADESC não traz), `hist_anos` (uma coluna do histórico:
+    série, ano letivo, escola, cidade/UF, carga, dias letivos, frequência, resultado; UNIQUE aluno+série) e `hist_notas` (texto:
+    "7,5" ou conceito "MB"). Educação Infantil não tem histórico.
+  - Aba **Alunos**: quem está em dia e quais anos faltam (esperado = do início do curso até a série anterior à atual; aluno novo, uma a menos).
+  - **Notas do aluno** (`#/hist/<id>`): grade como o histórico de papel (linhas = disciplinas, colunas = anos). Enter desce,
+    **colar um bloco do Excel espalha pelas células** (`comoPlanilha`), nota abaixo da média fica vermelha e o **resultado é sugerido**
+    (Aprovado/Retido pela média e pela frequência; escolher à mão vira definitivo). "Preencher o que dá sozinho" põe o ano provável
+    (conta para trás a partir da série atual), carga, dias e — só para veterano — a escola IEL. Salva com `salvarComVersao`
+    (os anos vão como `anos_json`, texto, para a comparação campo a campo funcionar). R.A./RG corrigidos aqui vão para o cadastro.
+  - Aba **Lançar notas da turma**: turma inteira × disciplinas + frequência + resultado, também com colar do Excel; grava como
+    cursado no IEL. Aba **Disciplinas e regras** (admin): incluir, renomear (as notas acompanham), tirar/voltar, mudar a ordem,
+    média, frequência mínima, carga, dias letivos e os nomes de quem assina (`hist_*` na config).
+  - **Documento**: A4 timbrado, identificação, quadro de notas por área, carga/dias/frequência/resultado, estudos realizados,
+    observações, **certificação automática** (conclusão quando todos os anos do curso estão aprovados; senão transferência/parcial,
+    "com direito a matricular-se na série X") e duas assinaturas. Aceita vários alunos (`ids=`): "Históricos desta turma".
+  - Apagar um ano vai para a Lixeira (tipo `hist_ano`, com as notas). LGPD: o relatório do aluno traz o histórico; o descarte
+    apaga `hist_alunos` e mantém as notas sem nome. Botão "🎓 Notas do histórico" na ficha e "🎓 Histórico escolar" em Documentos.
+- **Vivências** (menu Matrícula, `rotas/vivencias.js`, `public/vivencias.js`): tabela `vivencias` com as mesmas colunas da
+  planilha (criança, responsável, telefone, ano escolar, turma da vivência, data, período, escola atual, como conheceu, status,
+  efetivou matrícula, data da matrícula, observação) **mais o contato depois** (`contato_em/por/obs`).
+  - Cartões: total, realizadas, matrículas e **% de efetivação = matrículas ÷ vivências realizadas**. Botões de atenção:
+    sem contato depois da vivência, aguardando resposta da família, agendada com data que já passou.
+  - Ações na linha: Veio / Faltou / Contatei; efetivou "Sim" põe a data da matrícula sozinha. Link de WhatsApp pelo telefone.
+  - Aba **Painel do ano**: os quadros do Dashboard da planilha (status, efetivação, como conheceu, ano escolar, turma, por mês).
+  - **Importar planilha**: a do Google baixada como .xlsx (acha o cabeçalho "Nome do Aluno" + "Status…"), não duplica
+    (mesmo nome + data) e padroniza as listas. Busca global e Lixeira incluem vivências.
+- Demonstração: `gerarDemoHistorico` (notas dos anos anteriores, ~12% de anos faltando de propósito, 25% vindos de outra
+  escola) e `gerarDemoVivencias` (14 fictícias). Banco com demonstração antiga ganha as duas ao abrir.
+- Teste `t-hist` (API, **57 ok**): lista, ano provável, notas com vírgula, conceito, validações, sugestão de resultado,
+  conflito, turma, lixeira, disciplinas (renomear leva as notas), permissões, LGPD, vivências (painel, contato, conflito, busca,
+  lixeira, importação sem duplicar) e a demonstração saindo junto. Migração conferida: banco da 4.8.0 abre com tudo (161 alunos,
+  34 atendimentos) e ganha as tabelas novas. No navegador: as 24 telas/abas abrem sem erro; colar do Excel, resultado automático,
+  "Preencher sozinho" + Salvar, documento de 1 aluno e de uma turma (cabe numa folha A4).
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -260,6 +301,8 @@ SecretariaIEL/
    ├─ rotas/lixeira.js        → listar, restaurar, apagar de vez e limpeza automática da lixeira (4.3.0)
    ├─ lib/lixeira.js          → excluir guardando a fotografia das linhas, restaurar e limpar (4.3.0)
    ├─ rotas/busca.js          → busca global em todos os tipos de registro (4.4.0)
+   ├─ rotas/historico.js      → histórico escolar: notas por aluno e por turma, disciplinas (4.9.0)
+   ├─ rotas/vivencias.js      → vivências: registro, painel, contato e importação da planilha (4.9.0)
    ├─ lib/atualizacao.js      → conversa com o Git; nada aqui lança erro, tudo volta explicado (Etapa 4)
    ├─ lib/versao.js           → a constante VERSAO, repetida em public/app.js (Etapa 4)
    ├─ lib/backup.js           → VACUUM INTO, cifra AES-256-GCM, retenção e restauração agendada (Etapa 4)
@@ -273,6 +316,7 @@ SecretariaIEL/
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
    └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js, lixeira.js, ajuda.js,
+                                historico.js, vivencias.js (4.9.0),
                                 tema.js (claro/escuro antes de desenhar), doc.html/doc.css/doc.js
 ```
 
@@ -339,7 +383,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
   **página inicial** (`t-inicio`, 36 ok como admin e 33 como aprendiz, agora com a Lixeira no menu); **lixeira** (`t-lixeira`, 93 ok,
   e `t-lixeira-tela`, 12 ok por perfil); **busca** (`t-busca` 11, `t-busca-tela` 9); **servidor caindo** (`t-conexao`, 19, derruba
   e religa o servidor de verdade); **edição ao mesmo tempo** (`t-conflito`, 17); **ajuda** (`t-ajuda`, 45); **listas em partes**
-  (`t-partes`, 18, com a demonstração no tamanho real) e **desempenho** (`t-desempenho`, mede). Um `nav.mjs` reúne o Edge
+  (`t-partes`, 18, com a demonstração no tamanho real) e **desempenho** (`t-desempenho`, mede); **histórico e vivências** (`t-hist`, 57). Um `nav.mjs` reúne o Edge
   headless para os testes de tela; **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
   que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
 - Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
@@ -377,12 +421,14 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 | **Um passa por cima do outro** (4.6.0) | Aviso com nome e hora; grava só os campos que a pessoa mudou |
 | **Aprendiz novo não sabe usar** (4.7.0) | "? Ajuda" em cada tela |
 | **Tela de 30 metros com 535 alunos** (4.8.0) | Listas em partes de 100, turmas que abrem e fecham, impressão sempre completa |
+| **Histórico feito à mão** (4.9.0) | Notas por aluno ou por turma (colar do Excel), resultado sugerido e histórico impresso sozinho |
+| **Vivências numa planilha solta** (4.9.0) | Tela com registro, contato depois, % de efetivação e painel; importa a planilha do Google |
 
 ### 7.2 Próximos passos, na ordem que eu faria
 1. **Piloto de verdade, com dado real, de um módulo só** — sugestão: *Atendimentos* ou *Portão*, por duas semanas.
    Risco baixo, valor visível no primeiro dia, e é o que ganha a Samara. **Sem isso, o resto é só código.**
-2. **Histórico escolar** — maior buraco funcional. Depende de conseguir as notas (SED ou ACADESC): é a pergunta
-   que mais vale a pena responder na escola.
+2. ~~**Histórico escolar**~~ — **feito na 4.9.0**, com digitação por aluno ou por turma e colar do Excel. Falta, se der: importar
+   as notas direto de uma exportação da SED ou do ACADESC (quando soubermos o formato) e conferir o modelo com a Samara.
 3. ~~**Busca global**~~ — **feito na 4.4.0**.
 4. ~~**Conflito entre duas pessoas**~~ — **feito na 4.6.0**.
 5. ~~**Quando o PC servidor cai**~~ — **feito na 4.5.0**.
@@ -392,8 +438,8 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 8. ~~**Ajuda dentro da tela**~~ — **feito na 4.7.0**. Quando a escola tiver os POPs numerados, vale citar o número em cada ajuda.
 9. ~~**Desempenho com 535 alunos**~~ — **feito na 4.8.0**, medido com a demonstração no tamanho real.
 
-Tudo o que dependia só de código no §7.2 está feito. O que falta agora depende da escola: **piloto** (item 1), **notas para o
-histórico** (item 2) e **testar nos 3 PCs** (item 7). Ideias para depois, se o piloto aprovar: busca que acha também dentro das
+Tudo o que dependia só de código no §7.2 está feito. O que falta agora depende da escola: **piloto** (item 1 — Vivências também
+é um bom candidato: é pequeno e hoje vive numa planilha), **conferir o histórico com a Samara** (item 2) e **testar nos 3 PCs** (item 7). Ideias para depois, se o piloto aprovar: busca que acha também dentro das
 observações, e ajuda com prints das telas.
 
 ### 7.3 O que eu recomendo **não** fazer
@@ -429,8 +475,22 @@ observações, e ajuda com prints das telas.
 | Descarte de ex-alunos | sugerido a partir de **5 anos** sem matrícula; nunca automático, sempre escolhido na tela | `lgpd_anos_descarte` |
 | Lixeira (4.3.0) | o excluído fica **30 dias** e depois some de vez; a aprendiz vê só o que ela excluiu | `lixeira_dias` |
 
+### 7.5.1 Padrões escolhidos na 4.9.0 (histórico e vivências)
+| Tema | Padrão adotado | Onde muda |
+|---|---|---|
+| Disciplinas | BNCC / Currículo Paulista. Fund.: LP, Arte, Ed. Física, Inglês, Matemática, Ciências, Geografia, História, Ensino Religioso. EM: as 12 da BNCC + Projeto de Vida | Histórico › Disciplinas e regras |
+| Média para aprovação | **5,0** | `hist_media` |
+| Frequência mínima | **75%** (LDB) | `hist_frequencia` |
+| Carga anual / dias letivos sugeridos | **1000 h** (Fund. e Médio) / **200 dias** | `hist_carga_fund`, `hist_carga_medio`, `hist_dias` |
+| Nota | 0 a 10 com vírgula, ou conceito curto (A, B, MB…) | — |
+| Tipo de histórico | Conclusão se todos os anos do curso estão aprovados; senão transferência/parcial | escolha no documento |
+| % de efetivação da vivência | matrículas ÷ vivências **realizadas** | — |
+
 ### 7.6 Pendências e perguntas para o Kevin
-- Histórico escolar: em qual formato dá para exportar as notas (SED ou ACADESC)?
+- Histórico escolar: **mostrar o documento à Samara** e comparar com o modelo feito à mão (disciplinas, média, carga, quem assina,
+  texto da certificação). Em qual formato dá para exportar as notas (SED ou ACADESC), para importar em vez de digitar?
+- Vivências: confirmar se o "% de efetivação" deve ser sobre as realizadas (como está) ou sobre o total, e se a escola quer
+  sair de vez da planilha do Google (baixar como .xlsx e importar).
 - Modelo da **carta de concessão** da bolsa: ainda não foi enviado.
 - Valor da **Recreação** (está vazio) e as **atividades e valores de 2027**.
 - Regra da **categoria** da carteirinha olímpica (A, B, C).

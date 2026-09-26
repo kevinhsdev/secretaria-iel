@@ -442,6 +442,9 @@ const DOCS = {
         ${tab('Atendimentos', [['Data', (l) => dataBR(l.data)], ['Canal', (l) => l.canal], ['Quem procurou', (l) => titulo(l.pessoa)],
           ['Assunto', (l) => l.assunto], ['Resolvido', (l) => sim(l.resolvido)]], d.atendimentos)}
         ${tab('Documentos emitidos', [['Quando', (l) => dataBR(l.quando)], ['Documento', (l) => l.tipo], ['Emitido por', (l) => l.usuario]], d.documentos_emitidos)}
+        ${tab('Histórico escolar (anos lançados)', [['Ano', (l) => l.ano_letivo], ['Série', (l) => l.serie_chave], ['Escola', (l) => l.escola],
+          ['Notas', (l) => Object.entries(l.notas || {}).map(([k, n]) => `${k}: ${n}`).join(' · ')], ['Frequência', (l) => (l.frequencia != null ? l.frequencia + '%' : '')],
+          ['Resultado', (l) => l.resultado]], (d.historico_escolar || {}).anos || [])}
         ${tab('Boletos entregues', [['Remessa', (l) => l.remessa], ['Entregue em', (l) => dataBR(l.entregue_em)], ['Recebido por', (l) => titulo(l.recebido_por)]], d.boletos_entregues)}
         ${d.foto ? `<h3 class="sec">Foto</h3><div class="grade-dados">${dado('Foto tirada', sim(d.foto.tirada))}${dado('Data', dataBR(d.foto.data_foto))}
           ${dado('Inserida no ACADESC', sim(d.foto.acadesc))}${dado('Inserida na SED', sim(d.foto.sed))}${dado('Inserida no Lanche Card', sim(d.foto.lanche))}</div>` : ''}
@@ -454,6 +457,27 @@ const DOCS = {
         <div class="assinatura">Secretaria Escolar</div>`);
     },
     emissao: (v, d) => ({ tipo: 'Relatório de dados pessoais (LGPD)', alunos: [d.cadastro.id], descricao: v.solicitante || '' }),
+  },
+  historico: {
+    nome: 'Histórico escolar',
+    // Um ou vários alunos (aluno=ID ou ids=1,2,3): uma folha para cada
+    carregar: async () => {
+      const ids = String(P.get('ids') || P.get('aluno') || '').split(',').filter(Boolean).slice(0, 60);
+      const lista = await Promise.all(ids.map((id) => api('GET', '/api/historico/aluno/' + encodeURIComponent(id))));
+      return { alunos: lista.map((h) => ({ ...h.aluno, hist: h })), config: lista[0]?.config || {} };
+    },
+    campos: ({ alunos, config }) => [
+      { id: 'curso', rot: 'Curso', tipo: 'select', opcoes: [['fund', 'Ensino Fundamental'], ['medio', 'Ensino Médio']], valor: P.get('curso') || alunos[0].hist.curso },
+      { id: 'tipo', rot: 'Tipo de histórico', tipo: 'select', valor: 'auto',
+        opcoes: [['auto', 'Automático (conclusão se todos os anos foram aprovados)'], ['conclusao', 'Conclusão do curso'], ['transferencia', 'Transferência / parcial']] },
+      { id: 'data', rot: 'Data', tipo: 'date', valor: hojeIso() },
+      { id: 'secretario', rot: 'Secretário(a) de escola', valor: config.secretario || '', dica: config.secretario ? '' : 'Dá para deixar fixo em Histórico escolar › Disciplinas e regras' },
+      { id: 'diretor', rot: 'Diretor(a) de escola', valor: config.diretor || '' },
+      { id: 'obs', rot: 'Observação a mais (sai em todos)', tipo: 'textarea', valor: '' },
+    ],
+    aviso: 'Confira as notas antes de imprimir: coluna sem lançamento sai com "—". As notas se corrigem na tela Histórico escolar, não aqui.',
+    render: (v, d) => d.alunos.map((a) => folhaHistorico(a, v)).join(''),
+    emissao: (v, d) => ({ tipo: 'Histórico escolar', alunos: d.alunos.map((a) => a.id), descricao: v.curso === 'medio' ? 'Ensino Médio' : 'Ensino Fundamental' }),
   },
   fechamento: {
     nome: 'Relatório de fechamento',
@@ -530,6 +554,87 @@ const DOCS = {
     emissao: () => ({ tipo: 'Relatório de fechamento', alunos: [null] }),
   },
 };
+
+// Uma folha de histórico escolar: identificação, quadro de notas por ano, estudos realizados e certificação
+function folhaHistorico(a, v) {
+  const h = a.hist, cur = h.cursos[v.curso], cf = h.config;
+  const numBR = (n) => String(n).replace('.', ',');
+  const anos = new Map(h.anos.map((x) => [x.serie_chave, x]));
+  const cursados = cur.series.filter((s) => anos.has(s.chave));
+  const aprovado = (x) => !!x && /^Aprovado/.test(x.resultado || '');
+  const concluiu = cur.series.every((s) => aprovado(anos.get(s.chave)));
+  const tipo = v.tipo === 'auto' ? (concluiu ? 'conclusao' : 'transferencia') : v.tipo;
+  const medio = v.curso === 'medio';
+  const nome = a.nome.toUpperCase();
+
+  // Disciplinas agrupadas por área (a área ocupa várias linhas)
+  const grupos = [];
+  for (const comp of cur.componentes) {
+    const g = grupos[grupos.length - 1];
+    if (g && g.area === comp.area) g.itens.push(comp); else grupos.push({ area: comp.area, itens: [comp] });
+  }
+  const cel = (s, f) => { const x = anos.get(s.chave); const val = x ? f(x) : null; return `<td class="c">${val == null || val === '' ? '—' : esc(val)}</td>`; };
+  const linhaTot = (rot, f) => `<tr class="tot"><td colspan="2">${esc(rot)}</td>${cur.series.map((s) => cel(s, f)).join('')}</tr>`;
+  const cargaTotal = cursados.reduce((t, s) => t + (Number(anos.get(s.chave).carga) || 0), 0);
+
+  // Próximo passo do aluno, para a certificação
+  const proxima = (ch) => {
+    const n = +ch.replace(/\D/g, '');
+    if (ch.startsWith('EM')) return n < 3 ? `${n + 1}ª série do Ensino Médio` : 'Ensino Superior';
+    return n < 9 ? `${n + 1}º ano do Ensino Fundamental` : '1ª série do Ensino Médio';
+  };
+  const rotExt = (ch) => (ch.startsWith('EM') ? `${ch.slice(2)}ª série do Ensino Médio` : `${ch.slice(1)}º ano do Ensino Fundamental`);
+  const noNa = (txt) => (/ª série/.test(txt) ? 'na ' : 'no ') + txt; // "na 2ª série", "no 5º ano"
+  const ultimo = [...cursados].reverse().find((s) => anos.get(s.chave).resultado);
+  let certificacao;
+  if (tipo === 'conclusao') {
+    const fim = anos.get(cur.series[cur.series.length - 1].chave) || {};
+    certificacao = `Certificamos que <b>${esc(nome)}</b> concluiu o <b>${esc(cur.nome)}</b>${fim.ano_letivo ? ` no ano letivo de ${esc(fim.ano_letivo)}` : ''},
+      estando apto(a) ao prosseguimento de estudos ${medio ? 'em nível superior' : 'no Ensino Médio'}, nos termos da Lei Federal nº 9.394/96.`;
+  } else if (ultimo) {
+    const x = anos.get(ultimo.chave);
+    const situacao = aprovado(x) ? `tendo sido aprovado(a) ${noNa(rotExt(ultimo.chave))}, com direito a matricular-se ${noNa(proxima(ultimo.chave))}`
+      : x.resultado === 'Retido' ? `devendo cursar novamente ${ultimo.chave.startsWith('EM') ? 'a' : 'o'} ${rotExt(ultimo.chave)}`
+        : x.resultado === 'Cursando' ? `encontrando-se matriculado(a) e frequentando ${ultimo.chave.startsWith('EM') ? 'a' : 'o'} ${rotExt(ultimo.chave)}${x.ano_letivo ? ' em ' + esc(x.ano_letivo) : ''}`
+          : `com a situação "${esc(x.resultado)}" ${noNa(rotExt(ultimo.chave))}`;
+    certificacao = `Certificamos que <b>${esc(nome)}</b> cursou os anos indicados neste histórico, ${situacao}.`;
+  } else certificacao = `Certificamos que os dados acima conferem com os registros desta unidade escolar.`;
+
+  const obs = [h.dados.obs, v.obs].filter((x) => String(x || '').trim());
+  return folha(`${TIMBRE}
+    <h2 class="titulo-doc hist-titulo">HISTÓRICO ESCOLAR — ${esc(cur.nome.toUpperCase())}</h2>
+    <p class="hist-sub">${tipo === 'conclusao' ? 'Conclusão de curso' : 'Transferência / histórico parcial'} · Lei Federal nº 9.394/96 · Código INEP ${esc(h.escola.inep || '')}</p>
+    <table class="doc hist-ident"><tbody>
+      <tr><td colspan="3"><b>Aluno(a):</b> ${esc(nome)}</td></tr>
+      <tr><td><b>R.A.:</b> ${esc(a.ra || '—')}</td><td><b>RG:</b> ${esc(a.rg || '—')}${h.dados.rg_uf ? ' / ' + esc(h.dados.rg_uf) : ''}</td><td><b>Nascimento:</b> ${esc(dataBR(a.dt_nasc) || '—')}</td></tr>
+      <tr><td><b>Naturalidade:</b> ${esc([h.dados.naturalidade, h.dados.uf_nasc].filter(Boolean).join(' / ') || '—')}</td><td><b>Nacionalidade:</b> ${esc(h.dados.nacionalidade || 'Brasileira')}</td>
+        <td><b>Matrícula:</b> ${esc(a.mat || '—')}</td></tr>
+      <tr><td colspan="3"><b>Filiação:</b> ${esc([a.nome_mae, a.nome_pai].filter(Boolean).map(titulo).join(' e ') || '—')}</td></tr>
+    </tbody></table>
+    <table class="doc hist-notas"><thead>
+      <tr><th rowspan="2" style="width:20%">Área de conhecimento</th><th rowspan="2">Componente curricular</th><th colspan="${cur.series.length}">${medio ? 'Séries' : 'Anos'} — notas finais</th></tr>
+      <tr>${cur.series.map((s) => `<th class="c">${esc(s.rotulo)}</th>`).join('')}</tr></thead><tbody>
+      ${grupos.map((g) => g.itens.map((comp, i) => `<tr>${i === 0 ? `<td rowspan="${g.itens.length}" class="area">${esc(g.area || '')}</td>` : ''}<td>${esc(comp.nome)}</td>
+        ${cur.series.map((s) => cel(s, (x) => x.notas[comp.nome])).join('')}</tr>`).join('')).join('')}
+      ${linhaTot('Carga horária anual (h)', (x) => x.carga)}
+      ${linhaTot('Dias letivos', (x) => x.dias_letivos)}
+      ${linhaTot('Frequência (%)', (x) => (x.frequencia == null ? null : numBR(x.frequencia)))}
+      ${linhaTot('Resultado', (x) => x.resultado)}
+    </tbody></table>
+    <p class="hist-legenda">Notas de 0 (zero) a 10 (dez). Média mínima para aprovação: ${esc(numBR(cf.media))}. Frequência mínima: ${esc(cf.frequencia)}% (art. 24, VI, da LDB).
+      ${cargaTotal ? `Carga horária cursada: ${cargaTotal} horas.` : ''}</p>
+    <h3 class="sec">Estudos realizados</h3>
+    <table class="doc hist-estudos"><thead><tr><th>${medio ? 'Série' : 'Ano'}</th><th>Ano letivo</th><th>Estabelecimento de ensino</th><th>Município / UF</th></tr></thead><tbody>
+      ${cursados.length ? cursados.map((s) => { const x = anos.get(s.chave); return `<tr><td>${esc(s.rotulo)}</td><td class="c">${esc(x.ano_letivo || '—')}</td>
+        <td>${esc(x.escola || '—')}</td><td>${esc([x.cidade, x.uf].filter(Boolean).join(' / ') || '—')}</td></tr>`; }).join('')
+        : '<tr><td colspan="4" class="c">Nenhum ano lançado para este curso.</td></tr>'}
+    </tbody></table>
+    ${obs.length ? `<h3 class="sec">Observações</h3><p class="hist-obs">${obs.map(esc).join('<br>')}</p>` : ''}
+    <h3 class="sec">Certificação</h3><p class="hist-obs" style="text-align:justify">${certificacao}</p>
+    <p class="local-data" style="margin-top:10px">Ferraz de Vasconcelos, ${dataExtenso(v.data)}.</p>
+    <div class="hist-assin"><div class="assinatura">${v.secretario ? esc(v.secretario) + '<br>' : ''}Secretário(a) de Escola</div>
+      <div class="assinatura">${v.diretor ? esc(v.diretor) + '<br>' : ''}Diretor(a) de Escola</div></div>`, 'hist-folha');
+}
 
 // Turmas disponíveis numa lista de alunos, na ordem em que o servidor mandou
 function turmasDe(lista) {

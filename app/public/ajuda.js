@@ -100,6 +100,49 @@ const AJUDA = {
     passos: ['Logo depois de atender, clique em "+ Registrar atendimento".', 'Se não resolveu na hora, desmarque "Ficou resolvido" e diga com quem ficou e até quando retornar.', 'Quando resolver, clique em "Resolvido" na linha.'],
     dicas: ['Em um mês, isto vira o retrato do que mais toma o tempo da secretaria (aparece nos Relatórios).'],
   },
+  historico: {
+    nome: 'Histórico escolar',
+    serve: 'Guardar as notas de cada ano do aluno (1º ao 9º ano e 1ª a 3ª série) e montar o histórico escolar sozinho, no papel timbrado, pronto para assinar.',
+    passos: [
+      'Aba "Alunos": mostra quem está com o histórico em dia e quais anos faltam. "Notas" abre os anos do aluno; "🖨️ Histórico" monta o documento.',
+      'Aluno que veio de outra escola: abra "Notas" e copie do histórico que a família trouxe, coluna por coluna (ano, escola, notas, frequência).',
+      'No fim do ano, use "Lançar notas da turma": escolha a turma e digite (ou cole do Excel) a nota final de cada disciplina, a frequência e confira o resultado.',
+      'O resultado ("Aprovado" ou "Retido") aparece sozinho pelas notas e pela frequência. Se o conselho aprovou, troque para "Aprovado pelo Conselho".',
+      'No documento, confira os nomes de quem assina e imprima. O histórico sai "de conclusão" quando todos os anos do curso estão aprovados; senão, sai como transferência.',
+    ],
+    dicas: [
+      'Nota abaixo da média fica vermelha. A média, a frequência mínima e quem assina ficam em "Disciplinas e regras" (administração).',
+      'Para colar do Excel: copie o bloco de notas na mesma ordem das colunas da tela e cole na primeira célula.',
+      'Confira sempre com o diário/SED antes de imprimir: o histórico é documento oficial.',
+    ],
+  },
+  hist: {
+    nome: 'Notas do aluno (histórico)',
+    serve: 'Todos os anos do aluno numa grade, como no histórico de papel: uma coluna por ano, uma linha por disciplina.',
+    passos: [
+      'Confira os dados de cima (R.A., RG, naturalidade): eles saem no cabeçalho do histórico.',
+      '"✨ Preencher o que dá sozinho" coloca o ano letivo provável, a carga horária e o nome da escola. Troque a escola nos anos feitos em outro lugar.',
+      'Digite as notas. Enter desce para a próxima disciplina. O resultado de cada ano aparece sozinho.',
+      'Clique em "Salvar". "🖨️ Gerar histórico" salva e já abre o documento.',
+    ],
+    dicas: ['O × no alto de uma coluna apaga aquele ano inteiro (vai para a Lixeira).', 'Troque entre Ensino Fundamental e Ensino Médio nas abas acima da grade.'],
+  },
+  vivencias: {
+    nome: 'Vivências',
+    serve: 'Controle das crianças que vêm passar um período na escola antes da matrícula: quem agendou, quem veio, se a família foi contatada depois e se matriculou.',
+    passos: [
+      'Família marcou? "+ Agendar vivência" com o nome, o responsável, o telefone, a data e a turma em que a criança vai ficar.',
+      'No dia, clique em "Veio" (ou "Faltou"). Vivência com data que já passou e sem marcação aparece em destaque.',
+      'Depois, ligue para a família e clique em "Contatei": anote o que disseram e se vão matricular.',
+      'Matriculou? Abra a vivência ("Ver") e escolha "Sim" em "Efetivou a matrícula" — a data vem sozinha.',
+      'A aba "Painel do ano" mostra os mesmos quadros da planilha: status, efetivação, como conheceram a escola, por turma e por mês.',
+    ],
+    dicas: [
+      'Os botões de cima ("Sem contato depois da vivência", "Aguardando resposta") filtram a lista de quem precisa de atenção.',
+      'Já usa a planilha do Google? Baixe como Excel (.xlsx) e use "Importar planilha". Depois apague o arquivo baixado.',
+      '% de efetivação = matrículas ÷ vivências realizadas.',
+    ],
+  },
   calendario: {
     nome: 'Calendário da secretaria',
     serve: 'Os lembretes do ano, mês a mês: o que precisa ser feito em cada época (Educacenso, massa de boletos, rematrícula…).',
@@ -139,7 +182,7 @@ const AJUDA = {
 
 function janelaAjuda(rota) {
   const a = AJUDA[rota] || AJUDA[''];
-  const outras = Object.entries(AJUDA).filter(([k]) => k !== 'aluno' && (EU.perfil === 'admin' || !['bolsas', 'config', 'relatorios'].includes(k)));
+  const outras = Object.entries(AJUDA).filter(([k]) => !['aluno', 'hist'].includes(k) && (EU.perfil === 'admin' || !['bolsas', 'config', 'relatorios'].includes(k)));
   modal('Ajuda · ' + a.nome, `<div class="ajuda">
     <p class="ajuda-serve">${esc(a.serve)}</p>
     <h3>Passo a passo</h3><ol>${a.passos.map((p) => `<li>${esc(p)}</li>`).join('')}</ol>

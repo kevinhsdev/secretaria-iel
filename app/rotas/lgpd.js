@@ -45,6 +45,11 @@ module.exports = function lgpd(ctx) {
       avisos_de_saida: todos('SELECT * FROM saida_avisos WHERE aluno_id = ? ORDER BY data DESC LIMIT 200', id),
       atendimentos: todos('SELECT * FROM atendimentos WHERE aluno_id = ? ORDER BY data DESC', id),
       documentos_emitidos: todos('SELECT * FROM emissoes WHERE aluno_id = ? ORDER BY id DESC', id),
+      historico_escolar: {
+        dados: db.prepare('SELECT * FROM hist_alunos WHERE aluno_id = ?').get(id) || null,
+        anos: todos('SELECT * FROM hist_anos WHERE aluno_id = ? ORDER BY ano_letivo', id).map((h) => ({
+          ...h, notas: Object.fromEntries(todos('SELECT componente, nota FROM hist_notas WHERE ano_id = ?', h.id).map((n) => [n.componente, n.nota])) })),
+      },
       na_lixeira: todos('SELECT tipo, rotulo, usuario, excluido_em, dados FROM lixeira WHERE aluno_id = ? ORDER BY id DESC', id)
         .map((l) => ({ ...l, dados: JSON.parse(l.dados) })),
       quem_consultou: todos('SELECT usuario, data, vezes FROM acessos WHERE aluno_id = ? ORDER BY data DESC LIMIT 200', id),
@@ -80,7 +85,7 @@ module.exports = function lgpd(ctx) {
       ja_anonimizados: db.prepare(`SELECT COUNT(*) n FROM alunos WHERE COALESCE(anonimizado,'') <> ''`).get().n,
       total_alunos: db.prepare('SELECT COUNT(*) n FROM alunos').get().n,
       campos_apagados: ['nome', 'nome social', 'CPF', 'NIS', 'RG', 'R.A.', 'endereço completo', 'telefones', 'e-mails',
-        'nome da mãe, do pai e do responsável', 'CPF e RG do responsável', 'quem pode buscar', 'avisos de saída', 'quem procurou nos atendimentos'],
+        'nome da mãe, do pai e do responsável', 'CPF e RG do responsável', 'quem pode buscar', 'avisos de saída', 'quem procurou nos atendimentos', 'naturalidade e observações do histórico escolar'],
       campos_mantidos: ['série e turma', 'ano letivo', 'datas de matrícula', 'ano de nascimento', 'situação da rematrícula', 'assuntos dos atendimentos (sem nomes)'],
     });
   });
@@ -113,6 +118,8 @@ module.exports = function lgpd(ctx) {
         db.prepare('UPDATE atendimentos SET pessoa = NULL, telefone = NULL, detalhe = NULL WHERE aluno_id = ?').run(id);
         db.prepare(`UPDATE bolsas SET nome_aluno = ?, responsavel = NULL, telefone = NULL, endereco = NULL, obs = NULL WHERE aluno_id = ?`).run(apelido, id);
         db.prepare('DELETE FROM acessos WHERE aluno_id = ?').run(id);
+        // Histórico escolar: saem naturalidade e observações; as notas ficam (sem nome, só para a estatística)
+        db.prepare('DELETE FROM hist_alunos WHERE aluno_id = ?').run(id);
         // O descarte é para valer: nada deste aluno pode ficar esperando na lixeira
         db.prepare('DELETE FROM lixeira WHERE aluno_id = ?').run(id);
         n++;

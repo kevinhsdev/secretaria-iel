@@ -19,6 +19,7 @@ const TIPOS_DOC = [
   ['conclusao', '📄 Declaração de conclusão'], ['comparecimento', '📄 Declaração de comparecimento'], ['pagamento', '💲 Declaração de pagamento', true],
   ['termo_saida', '✍️ Autorização de saída'], ['termo_canc_matricula', '✍️ Cancelamento de matrícula'], ['termo_canc_extra', '✍️ Cancelamento de atividade extra'],
   ['termo_canc_bolsa', '✍️ Cancelamento de bolsa'], ['carteirinha', '🪪 Carteirinha olímpica'],
+  ['historico', '🎓 Histórico escolar'],
 ];
 
 // Campo de busca de aluno reaproveitável (retorna o aluno escolhido)

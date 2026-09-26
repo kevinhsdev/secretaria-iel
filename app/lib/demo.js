@@ -240,4 +240,71 @@ function gerarDemoEtapa3(db, ano, transacao) {
   });
 }
 
-module.exports = { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3 };
+// 4.9.0 — Notas fictícias dos anos anteriores (histórico escolar) e vivências fictícias
+function gerarDemoHistorico(db, anoAtual, transacao) {
+  let semente = 20260926;
+  const rnd = () => { semente = (semente * 1103515245 + 12345) % 2147483648; return semente / 2147483648; };
+  const CURSOS = { fund: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'], medio: ['EM1', 'EM2', 'EM3'] };
+  const comps = { fund: db.prepare("SELECT nome FROM hist_componentes WHERE curso = 'fund' AND ativo = 1").all().map((c) => c.nome),
+    medio: db.prepare("SELECT nome FROM hist_componentes WHERE curso = 'medio' AND ativo = 1").all().map((c) => c.nome) };
+  const alunos = db.prepare("SELECT id, serie_chave FROM alunos WHERE demo = 1 AND novo = 0 AND ativo = 1 AND (serie_chave LIKE 'F%' OR serie_chave LIKE 'EM%')").all();
+  const insAno = db.prepare(`INSERT OR IGNORE INTO hist_anos (aluno_id, serie_chave, ano_letivo, escola, cidade, uf, carga, dias_letivos, frequencia, resultado, atualizado_em, atualizado_por)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,'demo')`);
+  const insNota = db.prepare('INSERT OR IGNORE INTO hist_notas (ano_id, componente, nota) VALUES (?,?,?)');
+  const insDados = db.prepare(`INSERT OR IGNORE INTO hist_alunos (aluno_id, naturalidade, uf_nasc, nacionalidade, atualizado_em, atualizado_por) VALUES (?,?,?,?,?,'demo')`);
+  const cidades = ['Ferraz de Vasconcelos', 'Ferraz de Vasconcelos', 'Poá', 'Suzano', 'São Paulo', 'Itaquaquecetuba', 'Mogi das Cruzes'];
+  const agora = new Date().toISOString();
+  transacao(() => {
+    for (const a of alunos) {
+      const curso = a.serie_chave.startsWith('EM') ? 'medio' : 'fund';
+      const series = CURSOS[curso];
+      const idx = series.indexOf(a.serie_chave);
+      insDados.run(a.id, cidades[Math.floor(rnd() * cidades.length)], 'SP', 'Brasileira', agora);
+      // Alguns alunos entraram na escola depois do 1º ano: os primeiros anos foram em outra escola
+      const veioDeFora = rnd() < 0.25 ? Math.floor(rnd() * idx) : -1;
+      for (let i = 0; i < idx; i++) {
+        if (rnd() < 0.12) continue; // de propósito: alguns anos ficam faltando, para a lista ter o que mostrar
+        const fora = i <= veioDeFora;
+        const r = insAno.run(a.id, series[i], anoAtual - (idx - i), fora ? 'E.E. Prof. Exemplo Fictício' : 'Instituto Educacional Luterano',
+          fora ? 'Poá' : 'Ferraz de Vasconcelos', 'SP', 1000, 200, 85 + Math.floor(rnd() * 16), 'Aprovado', agora);
+        const anoId = Number(r.lastInsertRowid);
+        for (const cp of comps[curso]) insNota.run(anoId, cp, String(5 + Math.floor(rnd() * 11) / 2).replace('.', ','));
+      }
+    }
+  });
+}
+
+function gerarDemoVivencias(db, transacao) {
+  const hoje = new Date();
+  const dia = (n) => { const d = new Date(hoje); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
+  const agora = new Date().toISOString();
+  // [criança, responsável, ano escolar, turma da vivência, dias a partir de hoje, período, escola atual, como conheceu, status, efetivou, contatado]
+  const lista = [
+    ['Alice Fictícia Moreira', 'Camila Moreira', 'Pré II', 'Jardim II', -58, 'Tarde', 'Escola Pequeno Mundo (fictícia)', 'Instagram', 'Realizada', 'Sim', true],
+    ['Bento Exemplo Lima', 'Juliana Lima', '4º Ano EF', '5º Ano Fund. I', -44, 'Tarde', 'E.E. Exemplo', 'Indicação de família', 'Realizada', 'Sim', true],
+    ['Caio Demonstração Reis', 'Fernanda Reis', 'Maternal II', 'Jardim I', -37, 'Tarde', 'Creche Fictícia', 'Google / Site', 'Realizada', 'Não', true],
+    ['Duda Teste Rocha', 'Patrícia Rocha', '6º Ano EF', '6º Ano Fund. II', -30, 'Manhã', 'Colégio Exemplo', 'Fachada / Placa', 'Faltou', 'Em análise', false],
+    ['Eva Modelo Santos', 'Renata Santos', '1º Ano EF', '1º Ano Fund. I', -21, 'Tarde', 'Escola Pequeno Mundo (fictícia)', 'Indicação de família', 'Realizada', 'Em análise', true],
+    ['Fábio Amostra Dias', 'Tatiane Dias', '8º Ano EF', '8º Ano Fund. II', -16, 'Manhã', 'E.E. Exemplo', 'Igreja / Comunidade', 'Realizada', 'Em análise', false],
+    ['Gabi Ficção Gomes', 'Vanessa Gomes', 'Pré I', 'Jardim I', -12, 'Tarde', 'Creche Fictícia', 'Instagram', 'Cancelada', 'Não', false],
+    ['Hugo Exemplo Prado', 'Daniela Prado', '2ª Série EM', '2ª Série EM', -9, 'Manhã', 'Colégio Exemplo', 'Ex-aluno', 'Realizada', 'Sim', true],
+    ['Íris Teste Nunes', 'Adriana Nunes', '3º Ano EF', '4º Ano Fund. I', -6, 'Tarde', 'E.E. Exemplo', 'Evento da escola', 'Realizada', 'Em análise', false],
+    ['João Demonstração Paz', 'Priscila Paz', 'Maternal I', 'Maternal', -3, 'Tarde', '', 'Panfleto', 'Agendada', 'Em análise', false],
+    ['Kaique Modelo Luz', 'Camila Luz', '5º Ano EF', '6º Ano Fund. II', 0, 'Manhã', 'Colégio Exemplo', 'Facebook', 'Agendada', 'Em análise', false],
+    ['Lara Amostra Cruz', 'Juliana Cruz', 'Pré II', '1º Ano Fund. I', 2, 'Tarde', 'Escola Pequeno Mundo (fictícia)', 'Indicação de família', 'Agendada', 'Em análise', false],
+    ['Mateus Ficção Vale', 'Renata Vale', '7º Ano EF', '7º Ano Fund. II', 5, 'Manhã', 'E.E. Exemplo', 'Google / Site', 'Remarcada', 'Em análise', false],
+    ['Nina Exemplo Sol', 'Fernanda Sol', 'Berçário', 'Maternal', 9, 'Integral', 'Creche Fictícia', 'Outro', 'Agendada', 'Em análise', false],
+  ];
+  const ins = db.prepare(`INSERT INTO vivencias (aluno, responsavel, telefone, ano_escolar, classe, data, periodo, escola_atual, como_conheceu, status, efetivou,
+    data_matricula, contato_em, contato_por, contato_obs, obs, criado_em, criado_por, atualizado_em, atualizado_por, demo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`);
+  transacao(() => {
+    lista.forEach(([aluno, resp, anoEsc, classe, d, per, escola, como, status, efet, cont], i) => {
+      ins.run(aluno, resp, `(11) 9${String(8000 + i * 37).padStart(4, '0')}-${String(1000 + i * 71).slice(0, 4)}`, anoEsc, classe, dia(d), per, escola || null, como, status, efet,
+        efet === 'Sim' ? dia(d + 4) : null, cont ? dia(d + 2) : null, cont ? 'kevin' : null,
+        cont ? (efet === 'Sim' ? 'Gostaram muito, vão matricular.' : efet === 'Não' ? 'Acharam longe de casa.' : 'Vão pensar e retornam.') : null,
+        'Vivência fictícia da demonstração.', agora, 'demo', agora, 'demo');
+    });
+  });
+}
+
+module.exports = { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3, gerarDemoHistorico, gerarDemoVivencias };

@@ -6,7 +6,7 @@ const TIPOS = {
   atendimento: 'Atendimento', aviso_saida: 'Aviso de saída', autorizado: 'Pessoa autorizada a buscar',
   tarefa: 'Tarefa do dia', lembrete: 'Lembrete do calendário', interessado: 'Interessado (SIG)', modelo: 'Modelo de mensagem',
   remessa: 'Remessa de boletos', bolsa: 'Processo de bolsa', inscricao: 'Inscrição em atividade extra', evento: 'Evento',
-  feriado: 'Feriado',
+  feriado: 'Feriado', hist_ano: 'Ano do histórico escolar', vivencia: 'Vivência',
 };
 // Só a administração vê e restaura estes (são de telas que a aprendiz não acessa)
 const SO_ADMIN = new Set(['bolsa']);

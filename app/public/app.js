@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.8.0';
+const VERSAO = '4.9.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -334,6 +334,8 @@ const ICONES = {
   config: '<path d="M4 20.6v-6.2M4 10.4V3.4M12 20.6v-8.2M12 8.4v-5M20 20.6v-4.2M20 12.4v-9"/><path d="M1.6 14.4h4.8M9.6 8.4h4.8M17.6 16.4h4.8"/>',
   sair: '<path d="M9.4 20.6H6a1.8 1.8 0 0 1-1.8-1.8V5.2A1.8 1.8 0 0 1 6 3.4h3.4"/><path d="m16 16.6 4.6-4.6L16 7.4"/><path d="M20.6 12H9.4"/>',
   relatorios: '<path d="M14 3.2H7.4a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.2a2 2 0 0 0 2-2V8z"/><path d="M14 3.2V8h4.6"/><path d="M9 17v-3.4"/><path d="M12 17v-6"/><path d="M15 17v-2"/>',
+  historico: '<path d="M3.4 5.4c2.9-1.1 5.8-.9 8.6.9v13.4c-2.8-1.8-5.7-2-8.6-.9z"/><path d="M20.6 5.4c-2.9-1.1-5.8-.9-8.6.9v13.4c2.8-1.8 5.7-2 8.6-.9z"/>',
+  vivencias: '<path d="M10 8.6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M4.4 20.8v-3.2a5.6 5.6 0 0 1 11.2 0v3.2"/><path d="M19 4.4v4.4M16.8 6.6h4.4"/>',
   lua: '<path d="M20.4 14.2A8.6 8.6 0 1 1 9.8 3.6a6.7 6.7 0 0 0 10.6 10.6z"/>',
   sol: '<path d="M12 17.2a5.2 5.2 0 1 0 0-10.4 5.2 5.2 0 0 0 0 10.4z"/><path d="M12 1.8v2.4M12 19.8v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/>',
   compacto: '<path d="M4 6.4h16M4 12h16M4 17.6h16"/>',
@@ -393,8 +395,10 @@ const MENU = [
   { rota: 'rematricula', ic: 'rematricula', nome: 'Rematrícula' },
   { rota: 'pendencias', ic: 'pendencias', nome: 'Pendências', badge: 'pend' },
   { rota: 'interessados', ic: 'interessados', nome: 'Interessados (SIG)' },
+  { rota: 'vivencias', ic: 'vivencias', nome: 'Vivências' },
   { sep: 'Secretaria' },
   { rota: 'documentos', ic: 'documentos', nome: 'Documentos' },
+  { rota: 'historico', ic: 'historico', nome: 'Histórico escolar' },
   { rota: 'extras', ic: 'extras', nome: 'Atividades extras' },
   { rota: 'bolsas', ic: 'bolsas', nome: 'Bolsas (CEBAS)', admin: true },
   { rota: 'boletos', ic: 'boletos', nome: 'Boletos' },
@@ -458,7 +462,7 @@ function configurarBusca() {
   const inp = $('#busca'), res = $('#res');
   let sel = -1, espera, pedido = 0;
   // Busca global: procura em tudo (alunos, atendimentos, avisos, quem busca, SIG, documentos, bolsas) e agrupa por tipo
-  const ICONE_GRUPO = { aluno: 'alunos', autorizado: 'portao', aviso: 'portao', atendimento: 'atendimentos', interessado: 'interessados', documento: 'documentos', bolsa: 'bolsas' };
+  const ICONE_GRUPO = { aluno: 'alunos', autorizado: 'portao', aviso: 'portao', atendimento: 'atendimentos', interessado: 'interessados', documento: 'documentos', bolsa: 'bolsas', vivencia: 'vivencias' };
   const mostrar = async () => {
     const texto = inp.value.trim();
     if (norm(texto).length < 2) { res.hidden = true; return; }
@@ -490,7 +494,7 @@ async function rotear() {
   const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
   const [rota, arg] = caminho.split('/');
   const qTela = new URLSearchParams(consulta || '').get('q');
-  $$('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === (rota === 'aluno' ? 'alunos' : rota)));
+  $$('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === ({ aluno: 'alunos', hist: 'historico' }[rota] || rota)));
   const c = $('#conteudo');
   // Esqueleto cinza no lugar de "Carregando…": a tela não "pula" quando o conteúdo chega
   c.innerHTML = `<div class="carregando"><div class="bloco" style="width:220px;height:26px"></div><div class="bloco" style="width:340px;height:14px;margin-top:8px"></div>
@@ -735,6 +739,7 @@ TELAS.aluno = async (c, id) => {
       <a class="btn pri" href="/api/alunos/${a.id}/contrato" id="btnContrato">📄 Gerar contrato ${ano}</a>
       <button class="btn zap" id="btnZap">💬 WhatsApp</button>
       <button class="btn" id="btnPasta">📁 Abrir pasta</button>
+      ${/^(F\d|EM\d)$/.test(a.serie_chave || '') ? `<a class="btn" href="#/hist/${a.id}">🎓 Notas do histórico</a>` : ''}
       <button class="btn" id="btnEditar">✏️ Editar</button>
     </div>
   </div>

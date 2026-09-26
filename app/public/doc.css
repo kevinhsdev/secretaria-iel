@@ -95,3 +95,22 @@ table.doc tr.fds td { background: #f0f0f0; color: #555; }
 .duas-colunas table.doc { margin-top: 2px; }
 .duas-colunas table.doc td { border: none; border-bottom: 1px solid #ddd; padding: 2px 3px; }
 .duas-colunas .sec { margin-top: 10px; }
+
+/* Histórico escolar: letra menor para caber os 9 anos numa folha */
+.folha.hist-folha { font-size: 9.5pt; line-height: 1.35; padding: 12mm 14mm 14mm; }
+.hist-folha .timbre { margin-bottom: 8px; }
+.hist-titulo { font-size: 13pt; margin: 8px 0 2px; }
+.hist-sub { text-align: center; font-size: 8.5pt; margin: 0 0 8px; }
+table.doc.hist-ident { font-size: 9pt; margin: 4px 0 8px; }
+table.doc.hist-ident td { border-color: #999; }
+table.doc.hist-notas { font-size: 8.5pt; margin: 0 0 4px; }
+table.doc.hist-notas th, table.doc.hist-notas td { padding: 2px 4px; }
+table.doc.hist-notas .c, table.doc.hist-estudos .c { text-align: center; }
+table.doc.hist-notas td.area { font-size: 8pt; vertical-align: middle; background: #f6f8fb; }
+table.doc.hist-notas tr.tot td { background: #eef2f7; font-weight: 600; font-size: 8pt; }
+table.doc.hist-estudos { font-size: 8.5pt; margin: 2px 0 6px; }
+.hist-legenda { font-size: 7.5pt; margin: 0 0 4px; color: #333; }
+.hist-obs { font-size: 9pt; margin: 2px 0 6px; }
+.hist-folha .sec { font-size: 9pt; margin: 8px 0 4px; }
+.hist-assin { display: flex; justify-content: space-around; gap: 10mm; }
+.hist-assin .assinatura { margin: 30px 0 0; width: 70mm; font-size: 9pt; }

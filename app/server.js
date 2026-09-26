@@ -12,7 +12,7 @@ const { lerPlanilha, serialParaIso } = require('./lib/planilha');
 const S = require('./lib/series');
 const { gerarContrato } = require('./lib/contrato');
 const prontuario = require('./lib/prontuario');
-const { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3 } = require('./lib/demo');
+const { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3, gerarDemoHistorico, gerarDemoVivencias } = require('./lib/demo');
 
 inicializar();
 
@@ -632,7 +632,8 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
     'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
     'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
     'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone',
-    'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte', 'lixeira_dias'];
+    'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte', 'lixeira_dias',
+    'hist_media', 'hist_frequencia', 'hist_carga_fund', 'hist_carga_medio', 'hist_dias', 'hist_secretario', 'hist_diretor'];
   for (const k of permitidas) if (b[k] !== undefined) db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(k, String(b[k]));
   prontuario.limparCache();
   registrar(u.login, 'alterou configurações', b);
@@ -708,6 +709,8 @@ rota('POST', '/api/admin/demo', async (req, res, { u, url }) => {
   const n = gerarDemo(db, +cfg().ano_matricula, transacao, { real: url.searchParams.get('tamanho') === 'real' });
   gerarDemoEtapa2(db, +cfg().cebas_ano, transacao);
   gerarDemoEtapa3(db, +cfg().ano_matricula, transacao);
+  gerarDemoHistorico(db, +cfg().ano_matricula - 1, transacao);
+  gerarDemoVivencias(db, transacao);
   registrar(u.login, 'carregou dados de demonstração', { alunos: n });
   json(res, 200, { alunos: n });
 });
@@ -724,6 +727,7 @@ rota('DELETE', '/api/admin/demo', async (req, res, { u }) => {
     db.prepare('DELETE FROM tarefas_dia WHERE demo = 1').run();
     db.prepare("DELETE FROM rotina_feito WHERE usuario = 'demo'").run();
     db.prepare("DELETE FROM calendario_feito WHERE usuario = 'demo'").run();
+    db.prepare('DELETE FROM vivencias WHERE demo = 1').run();
     db.prepare('DELETE FROM lixeira WHERE demo = 1').run();
   });
   registrar(u.login, 'apagou dados de demonstração', '');
@@ -749,6 +753,8 @@ require('./rotas/relatorios')(ctx);
 require('./rotas/atualizacao')(ctx);
 require('./rotas/lixeira')(ctx);
 require('./rotas/busca')(ctx);
+require('./rotas/historico')(ctx);
+require('./rotas/vivencias')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {
@@ -760,6 +766,14 @@ if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepa
   && !db.prepare('SELECT 1 FROM saida_autorizados LIMIT 1').get()) {
   gerarDemoEtapa3(db, +cfg().ano_matricula, transacao);
   registrar('sistema', 'completou a demonstração com boletos, fotos, saída e atendimentos', '');
+}
+
+// E para quem já tinha a demonstração antes da 4.9.0: notas do histórico e vivências fictícias
+if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM hist_anos LIMIT 1').get()
+  && !db.prepare('SELECT 1 FROM vivencias LIMIT 1').get()) {
+  gerarDemoHistorico(db, +cfg().ano_matricula - 1, transacao);
+  gerarDemoVivencias(db, transacao);
+  registrar('sistema', 'completou a demonstração com históricos e vivências', '');
 }
 
 // ───────────────────────── servidor ─────────────────────────
