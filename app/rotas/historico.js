@@ -139,11 +139,14 @@ module.exports = function historico(ctx) {
       if (Object.values(linha).some((v) => v != null)) notas[comp] = linha;
     }
     const ano = inteiro(t.ano_letivo);
-    db.prepare(`INSERT INTO hist_transf (aluno_id, serie_chave, ano_letivo, periodo, turma, turno, faltas, dias_letivos, notas_json, atualizado_em, atualizado_por)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(aluno_id) DO UPDATE SET serie_chave = excluded.serie_chave, ano_letivo = excluded.ano_letivo,
+    // Até qual bimestre o aluno ficou (os seguintes saem riscados no papel)
+    const bim = inteiro(t.bimestres) || 4;
+    if (!(bim >= 1 && bim <= 4)) falha(400, 'Bimestre inválido: escolha de 1 a 4');
+    db.prepare(`INSERT INTO hist_transf (aluno_id, serie_chave, ano_letivo, bimestres, periodo, turma, turno, faltas, dias_letivos, notas_json, atualizado_em, atualizado_por)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(aluno_id) DO UPDATE SET serie_chave = excluded.serie_chave, ano_letivo = excluded.ano_letivo, bimestres = excluded.bimestres,
       periodo = excluded.periodo, turma = excluded.turma, turno = excluded.turno, faltas = excluded.faltas, dias_letivos = excluded.dias_letivos,
       notas_json = excluded.notas_json, atualizado_em = excluded.atualizado_em, atualizado_por = excluded.atualizado_por`)
-      .run(aluno.id, t.serie_chave, ano, texto(t.periodo), texto(t.turma), texto(t.turno), texto(t.faltas), texto(t.dias_letivos),
+      .run(aluno.id, t.serie_chave, ano, bim, texto(t.periodo), texto(t.turma), texto(t.turno), texto(t.faltas), texto(t.dias_letivos),
         JSON.stringify(notas), agoraIso(), u.login);
   }
 
@@ -242,9 +245,11 @@ module.exports = function historico(ctx) {
       if (ka.length) db.prepare(`UPDATE alunos SET ${ka.map((k) => k + ' = ?').join(', ')}, atualizado_em = ?, atualizado_por = ? WHERE id = ?`)
         .run(...ka.map((k) => String(b[k] ?? '').trim() || null), agoraIso(), u.login, a.id);
       for (const x of anos) if (gravarAno(a.id, x, u)) mudou.push(rotuloSerie(x.serie_chave));
-      if (b.transf_json !== undefined) { gravarTransf(a, b.transf_json ? ler('transf_json') : null, u); mudou.push('transferência'); }
+      if (b.transf_json) { gravarTransf(a, ler('transf_json'), u); mudou.push('transferência'); }
       mudou.push(...ks, ...ka);
     });
+    // Desmarcou a transferência: vai para a lixeira (a lixeira abre a própria transação, por isso fica fora da de cima)
+    if (b.transf_json === '') { gravarTransf(a, null, u); mudou.push('transferência retirada'); }
     registrar(u.login, 'atualizou o histórico escolar', { aluno_id: a.id, nome: a.nome, campos: mudou });
     json(res, 200, { ok: true });
   });

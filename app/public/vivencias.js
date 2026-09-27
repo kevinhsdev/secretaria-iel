@@ -20,10 +20,13 @@ function whatsDe(tel) {
 TELAS.vivencias = async (c, ano) => {
   const d = await api('GET', '/api/vivencias' + (ano ? '?ano=' + encodeURIComponent(ano) : ''));
   const p = d.painel, h = hojeIso();
-  c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Vivências</h1>
-      <p class="sub">Crianças que vêm passar um período na escola antes da matrícula: quem agendou, quem veio, se a família foi contatada e se matriculou.</p></div>
-    <div class="acoes"><button class="btn peq" id="vAnt" aria-label="Ano anterior">←</button><b>${d.ano}</b><button class="btn peq" id="vProx" aria-label="Ano seguinte">→</button>
-      <button class="btn" id="vImp">📥 Importar planilha</button><button class="btn ama" id="vNova">＋ Agendar vivência</button></div></div>
+  c.innerHTML = `<h1>Vivências</h1>
+    <p class="sub" style="margin-bottom:12px">Crianças que vêm passar um período na escola antes da matrícula: quem agendou, quem veio, se a família foi contatada e se matriculou.</p>
+    <div class="acoes" style="justify-content:space-between;margin-bottom:14px">
+      <div class="acoes"><button class="btn peq" id="vAnt" aria-label="Ano anterior">←</button><b style="font-size:16px;min-width:44px;text-align:center">${d.ano}</b>
+        <button class="btn peq" id="vProx" aria-label="Ano seguinte">→</button></div>
+      <div class="acoes"><button class="btn" id="vImp">📥 Importar planilha</button><button class="btn ama" id="vNova">＋ Agendar vivência</button></div>
+    </div>
   <div class="grade g4">
     <div class="cartao kpi destaque"><div class="rot">Total de vivências</div><div class="val">${p.total}</div><div class="det">${p.a_realizar} a realizar${p.hoje ? ` · <b>${p.hoje} hoje</b>` : ''}</div></div>
     <div class="cartao kpi"><div class="rot">Realizadas</div><div class="val">${p.realizadas}</div><div class="det">${p.ausencias} faltas ou cancelamentos</div></div>

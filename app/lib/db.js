@@ -216,10 +216,10 @@ for (const [tabela, cols] of [['alunos', ['atualizado_por']], ['interessados', [
 }
 
 // 4.10.0: o histórico segue os modelos Word da escola (carga por disciplina no Médio, subtotais no Fundamental, RG completo)
-for (const [tabela, cols] of [['hist_notas', ['carga']], ['hist_anos', ['carga_bnc', 'carga_pd']],
+for (const [tabela, cols] of [['hist_notas', ['carga']], ['hist_anos', ['carga_bnc', 'carga_pd']], ['hist_transf', ['bimestres']],
   ['hist_alunos', ['rg_expedicao', 'rg_orgao', 'fund_ano', 'fund_escola', 'fund_cidade', 'fund_uf']]]) {
   const tem = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
-  for (const c of cols) if (!tem.has(c)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${c} ${c === 'carga' || c.startsWith('carga_') ? 'INTEGER' : 'TEXT'}`);
+  for (const c of cols) if (!tem.has(c)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${c} ${c === 'carga' || c === 'bimestres' || c.startsWith('carga_') ? 'INTEGER' : 'TEXT'}`);
 }
 
 function hashSenha(senha) {

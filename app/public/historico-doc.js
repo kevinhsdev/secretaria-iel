@@ -55,7 +55,7 @@ function folhasHistorico(a, v) {
   const concluiu = cur.series.every((s) => aprovado(anos.get(s.chave)));
   const tipo = v.tipo !== 'auto' ? v.tipo : transf ? 'transferencia' : concluiu ? 'conclusao' : 'declaracao';
   const nome = a.nome.toUpperCase();
-  const rgTxt = [a.rg, dd.rg_uf].filter(Boolean).join(medio ? ' ' : '/');
+  const rgTxt = a.rg ? a.rg + (dd.rg_uf ? (medio ? ' ' : '/') + dd.rg_uf : '') : ''; // sem RG não sai só o estado
 
   // Grupos de disciplinas (Base Nacional Comum / Parte Diversificada…), na ordem da matriz
   const grupos = [];
@@ -142,25 +142,35 @@ function folhasHistorico(a, v) {
 
   const folha1 = folha(`${cabecalhoHistorico(medio)}
     <div class="h-titulo">HISTÓRICO ESCOLAR<small>${esc(cur.nome)}</small></div>
-    ${ident}${notas}${estudos}`, 'h-folha');
+    ${ident}${notas}${estudos}`, medio ? 'h-folha h-folha-medio' : 'h-folha');
 
   // ── Folha 2 ──
   const ensino = medio ? 'Ensino Médio' : transf ? `Fundamental ${+transf.serie_chave.slice(1) <= 5 ? 'I' : 'II'}` : '';
   const fundI = !medio && transf && +transf.serie_chave.slice(1) <= 5;
   // Disciplinas da página 2: as que têm nota na transferência; sem transferência, a base comum e as da parte diversificada do último ano
   const ultimo = [...cursadas].reverse()[0];
-  const compsT = transf ? cur.componentes.filter((c) => transf.notas[c.nome])
-    : cur.componentes.filter((c) => c.area === grupos[0]?.area || anos.get(ultimo?.chave)?.notas?.[c.nome]);
+  // (sem transferência a tabela sai em branco e riscada; limita a parte diversificada para caber na folha)
+  const base = (c) => c.area === grupos[0]?.area;
+  let compsT = transf ? cur.componentes.filter((c) => transf.notas[c.nome]) : [];
+  if (!compsT.length) {
+    const pdComNota = cur.componentes.filter((c) => !base(c) && anos.get(ultimo?.chave)?.notas?.[c.nome]).slice(0, 4);
+    compsT = cur.componentes.filter((c) => base(c) || pdComNota.includes(c));
+  }
   const gruposT = [];
   for (const c of compsT) {
-    const base = c.area === grupos[0]?.area;
     const g = gruposT[gruposT.length - 1];
-    if (g && g.base === base) g.itens.push(c); else gruposT.push({ base, itens: [c] });
+    if (g && g.base === base(c)) g.itens.push(c); else gruposT.push({ base: base(c), itens: [c] });
   }
+  // Bimestres que o aluno não cursou saem riscados (e, do 1º ao 5º ano, também as colunas de faltas e aulas dadas)
+  const bim = transf ? Math.min(4, Math.max(1, Number(transf.bimestres) || 4)) : 0;
+  const risco = (n) => `<td colspan="${n}" rowspan="${compsT.length}" class="h-risco"></td>`;
   const linhasT = gruposT.map((g, gi) => g.itens.map((c, i) => {
     const x = transf?.notas?.[c.nome] || {};
-    const cel = transf ? ['b1', 'b2', 'b3', 'b4'].map((k) => `<td class="c b">${esc(x[k] ?? '')}</td>`).join('') + `<td class="c b">${esc(x.faltas ?? '')}</td><td class="c b">${esc(x.aulas ?? '')}</td>`
-      : gi === 0 && i === 0 ? `<td colspan="6" rowspan="${compsT.length}" class="h-risco"></td>` : '';
+    const primeira = gi === 0 && i === 0;
+    const cel = !transf ? (primeira ? risco(6) : '')
+      : ['b1', 'b2', 'b3', 'b4'].slice(0, bim).map((k) => `<td class="c b">${esc(notaImpressa(x[k]).replace(/^-$/, ''))}</td>`).join('')
+        + (fundI ? (primeira ? risco(4 - bim + 2) : '')
+          : (primeira && bim < 4 ? risco(4 - bim) : '') + `<td class="c b">${esc(x.faltas ?? '')}</td><td class="c b">${esc(x.aulas ?? '')}</td>`);
     return `<tr>${i === 0 ? `<td class="h-area2" rowspan="${g.itens.length}">${g.base ? 'BASE<br>COMUM' : 'PARTE<br>DIVERSIFICADA'}</td>` : ''}<td class="h-comp b">${esc(c.nome.toUpperCase())}</td>${cel}</tr>`;
   }).join('')).join('');
   const media = Number(cf.media) || 7;

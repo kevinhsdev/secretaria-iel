@@ -118,14 +118,17 @@ const AJUDA = {
   },
   hist: {
     nome: 'Notas do aluno (histórico)',
-    serve: 'Todos os anos do aluno numa grade, como no histórico de papel: uma coluna por ano, uma linha por disciplina.',
+    serve: 'Todos os anos do aluno numa grade, como no histórico de papel: uma coluna por ano, uma linha por disciplina. Sai igual ao modelo da escola, em duas folhas.',
     passos: [
-      'Confira os dados de cima (R.A., RG, naturalidade): eles saem no cabeçalho do histórico.',
-      '"✨ Preencher o que dá sozinho" coloca o ano letivo provável, a carga horária e o nome da escola. Troque a escola nos anos feitos em outro lugar.',
-      'Digite as notas. Enter desce para a próxima disciplina. O resultado de cada ano aparece sozinho.',
+      'Confira a identificação (local de nascimento, RG com data de expedição e órgão): sai no cabeçalho do histórico.',
+      '"✨ Preencher o que dá sozinho" coloca o ano letivo provável, a escola e a carga total. Troque a escola nos anos feitos em outro lugar.',
+      'Digite as notas (Enter desce). No Ensino Médio, ao lado de cada nota vai a carga horária da disciplina naquele ano. Embaixo ficam os totais de carga.',
+      'A "Situação" (Aprovado, Retido…) não sai no papel: serve para o sistema saber se sai CERTIFICADO de conclusão ou DECLARAÇÃO.',
+      'Aluno saindo no meio do ano: marque "Este aluno está saindo no meio do ano", escolha até qual bimestre ele ficou (ex.: até o 3º) e digite as notas de cada bimestre. Os bimestres seguintes saem riscados.',
       'Clique em "Salvar". "🖨️ Gerar histórico" salva e já abre o documento.',
     ],
-    dicas: ['O × no alto de uma coluna apaga aquele ano inteiro (vai para a Lixeira).', 'Troque entre Ensino Fundamental e Ensino Médio nas abas acima da grade.'],
+    dicas: ['O × no alto de uma coluna apaga aquele ano inteiro (vai para a Lixeira).', 'Troque entre Ensino Fundamental e Ensino Médio nas abas acima da grade. No Médio aparecem também os estudos do Ensino Fundamental.',
+      'Do 1º ao 5º ano, faltas e dias letivos da transferência são um total só; do 6º ano em diante, vão por disciplina.'],
   },
   vivencias: {
     nome: 'Vivências',

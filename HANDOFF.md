@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/09/2026**, versão **4.9.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
+> Última atualização: **27/09/2026**, versão **4.10.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
 
 ---
 
@@ -262,6 +262,37 @@ com quantos agendaram, quantos realizaram, o dia, o ano e se foi contatado". A e
   34 atendimentos) e ganha as tabelas novas. No navegador: as 24 telas/abas abrem sem erro; colar do Excel, resultado automático,
   "Preencher sozinho" + Salvar, documento de 1 aluno e de uma turma (cabe numa folha A4).
 
+### Histórico igual aos modelos da escola (versão 4.10.0, 27/09/2026)
+O Kevin mandou os modelos Word ("HISTORICO FUNDAMENTAL I e II.doc", "HISTÓRICO ENSINO MÉDIO.docx" e
+"HISTORICO ESCOLAR-TRANSFÊRENCIA BIMESTRE.doc", na pasta `Desktop\Nova pasta` do PC de casa — **têm dados reais, nunca
+copiar para o repositório**). O histórico da 4.9.0 foi refeito para sair igual a eles:
+- **Documento** (`public/historico-doc.js`, carregado antes de `doc.js`; estilos `.h-*` em `doc.css`): **duas folhas por aluno**.
+  - Folha 1: cabeçalho próprio (Vila Romanópolis, CRIAÇÃO: PROCESSO 2154/93; o do Médio não tem Diretoria/Criação), identificação
+    com local de nascimento e RG com data de expedição/órgão/estado (Médio: RG no alto), **sem filiação** (CEE 04/95), quadro
+    "Base Nacional Comum" / "Parte Diversificada e Eletivas" (Médio: "Itinerário Formativo e Eletivas" e **carga por disciplina**
+    em colunas ao lado das notas), totais de carga (BNC, PD, total; no Médio o total vazio vira a soma das cargas), estudos
+    realizados com as linhas que sobram **riscadas em diagonal** (Médio: também "Estudos realizados no Ensino Fundamental").
+  - Folha 2: "Transferência durante o período letivo" (notas por bimestre; do 6º ano em diante faltas e aulas dadas por
+    disciplina; 1º ao 5º ano faltas e dias letivos no total), observações, definição operacional (média da config por extenso),
+    "não contém emenda nem rasura", **CERTIFICADO** (conclusão) ou **DECLARAÇÃO** (terminou um ano ou transfere-se), data e as
+    assinaturas (Carina Buller no meio, Samara Pereira da Silva à direita — `hist_diretor`, `hist_secretario`) e o quadro da
+    Resolução 25/81. Sem transferência, a tabela de bimestres sai em branco e riscada.
+  - Transferência no meio do ano: a coluna do ano sai com **TRANSFERE-SE** em pé e a escola "… - Transfere-se" nos estudos.
+- **Banco**: `hist_notas.carga`, `hist_anos.carga_bnc/carga_pd`, `hist_alunos.rg_expedicao/rg_orgao/fund_*` e a tabela
+  `hist_transf` (uma por aluno: série, ano, **até qual bimestre** (`bimestres`), período, turma, turno, faltas, dias, notas em JSON).
+  Matriz de disciplinas = a dos modelos (52); **média 7,0**; carga sugerida 1000 (Fund.) / 1600 (Médio). Banco da 4.9.0 é
+  convertido ao abrir (`hist_matriz` na config marca a conversão). "-" digitado vale como vazio, igual ao modelo.
+- **Tela** (`#/hist/<id>`): identificação do cabeçalho; no Médio, nota + carga lado a lado em cada série e os estudos do
+  Fundamental (sugeridos pelo 9º ano lançado); linhas de totais; "Situação" (não sai no papel, decide certificado × declaração);
+  cartão **Transferência durante o ano letivo** com "até qual bimestre ficou" (os seguintes ficam bloqueados e saem riscados).
+  Desmarcar a transferência manda o registro para a Lixeira (tipo `hist_transf`; fora da transação principal, porque a lixeira abre a sua).
+  "Lançar notas da turma": totais de carga no alto e, no Médio, uma linha de carga por disciplina que vale para a turma toda.
+- Vivências: o botão amarelo "Agendar vivência" saiu de baixo do título e foi para uma barra própria, à direita do ano.
+- Testes: `t-hist` (57) e `t-hist2` (18: matriz dos modelos, média 7, nota + carga no Médio, "-", RG completo, conclusão do
+  Fundamental, transferência até o 3º bimestre, bimestre 5 recusado, desmarcar → lixeira → restaurar, turma do Médio com carga).
+  Migração 4.9.0 → 4.10.0 conferida (22 → 52 disciplinas, média 5 → 7, 161 alunos e 399 anos intactos). No navegador: 24 telas
+  sem erro; as folhas de Fundamental, Médio e transferência cabem no A4 (1123 px).
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -301,7 +332,7 @@ SecretariaIEL/
    ├─ rotas/lixeira.js        → listar, restaurar, apagar de vez e limpeza automática da lixeira (4.3.0)
    ├─ lib/lixeira.js          → excluir guardando a fotografia das linhas, restaurar e limpar (4.3.0)
    ├─ rotas/busca.js          → busca global em todos os tipos de registro (4.4.0)
-   ├─ rotas/historico.js      → histórico escolar: notas por aluno e por turma, disciplinas (4.9.0)
+   ├─ rotas/historico.js      → histórico escolar: notas e cargas por aluno e por turma, transferência, disciplinas (4.9.0/4.10.0)
    ├─ rotas/vivencias.js      → vivências: registro, painel, contato e importação da planilha (4.9.0)
    ├─ lib/atualizacao.js      → conversa com o Git; nada aqui lança erro, tudo volta explicado (Etapa 4)
    ├─ lib/versao.js           → a constante VERSAO, repetida em public/app.js (Etapa 4)
@@ -316,7 +347,7 @@ SecretariaIEL/
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
    └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js, lixeira.js, ajuda.js,
-                                historico.js, vivencias.js (4.9.0),
+                                historico.js, historico-doc.js (o papel do histórico), vivencias.js (4.9.0/4.10.0),
                                 tema.js (claro/escuro antes de desenhar), doc.html/doc.css/doc.js
 ```
 
@@ -383,7 +414,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
   **página inicial** (`t-inicio`, 36 ok como admin e 33 como aprendiz, agora com a Lixeira no menu); **lixeira** (`t-lixeira`, 93 ok,
   e `t-lixeira-tela`, 12 ok por perfil); **busca** (`t-busca` 11, `t-busca-tela` 9); **servidor caindo** (`t-conexao`, 19, derruba
   e religa o servidor de verdade); **edição ao mesmo tempo** (`t-conflito`, 17); **ajuda** (`t-ajuda`, 45); **listas em partes**
-  (`t-partes`, 18, com a demonstração no tamanho real) e **desempenho** (`t-desempenho`, mede); **histórico e vivências** (`t-hist`, 57). Um `nav.mjs` reúne o Edge
+  (`t-partes`, 18, com a demonstração no tamanho real) e **desempenho** (`t-desempenho`, mede); **histórico e vivências** (`t-hist`, 57, e `t-hist2`, 18). Um `nav.mjs` reúne o Edge
   headless para os testes de tela; **todas as telas** (`t-rotas`, abre as 30 telas/abas e acusa 404); e os scripts de **print das telas** no Edge headless,
   que também acusam erro de JavaScript. Vale recriá-los no próximo chat.
 - Para copiar o banco a fim de testar, copie só os **arquivos** da pasta de dados (hoje existe também a subpasta `backups`).
@@ -478,17 +509,18 @@ observações, e ajuda com prints das telas.
 ### 7.5.1 Padrões escolhidos na 4.9.0 (histórico e vivências)
 | Tema | Padrão adotado | Onde muda |
 |---|---|---|
-| Disciplinas | BNCC / Currículo Paulista. Fund.: LP, Arte, Ed. Física, Inglês, Matemática, Ciências, Geografia, História, Ensino Religioso. EM: as 12 da BNCC + Projeto de Vida | Histórico › Disciplinas e regras |
-| Média para aprovação | **5,0** | `hist_media` |
+| Disciplinas | As dos modelos Word da escola (Fund.: 10 da Base Nacional Comum + 13 da Parte Diversificada; Médio: 12 + 17 do Itinerário Formativo) | Histórico › Disciplinas e regras |
+| Média para aprovação | **7,0** (modelo da escola; era 5,0 na 4.9.0) | `hist_media` |
 | Frequência mínima | **75%** (LDB) | `hist_frequencia` |
-| Carga anual / dias letivos sugeridos | **1000 h** (Fund. e Médio) / **200 dias** | `hist_carga_fund`, `hist_carga_medio`, `hist_dias` |
+| Carga anual sugerida | **1000 h** (Fund.) / **1600 h** (Médio) | `hist_carga_fund`, `hist_carga_medio` |
+| Quem assina | Carina Buller (meio) e Samara Pereira da Silva (direita) | `hist_diretor`, `hist_secretario` |
 | Nota | 0 a 10 com vírgula, ou conceito curto (A, B, MB…) | — |
 | Tipo de histórico | Conclusão se todos os anos do curso estão aprovados; senão transferência/parcial | escolha no documento |
 | % de efetivação da vivência | matrículas ÷ vivências **realizadas** | — |
 
 ### 7.6 Pendências e perguntas para o Kevin
-- Histórico escolar: **mostrar o documento à Samara** e comparar com o modelo feito à mão (disciplinas, média, carga, quem assina,
-  texto da certificação). Em qual formato dá para exportar as notas (SED ou ACADESC), para importar em vez de digitar?
+- Histórico escolar: já segue os modelos Word (4.10.0). **Mostrar à Samara** mesmo assim — nos modelos o fundo da página é azul
+  (deixamos branco: parece ser só a cor do Word) e a Samara assina ora "Pereira Silva", ora "Pereira da Silva". Em qual formato dá para exportar as notas (SED ou ACADESC), para importar em vez de digitar?
 - Vivências: confirmar se o "% de efetivação" deve ser sobre as realizadas (como está) ou sobre o total, e se a escola quer
   sair de vez da planilha do Google (baixar como .xlsx e importar).
 - Modelo da **carta de concessão** da bolsa: ainda não foi enviado.

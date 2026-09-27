@@ -140,3 +140,9 @@ td.h-risco { background: linear-gradient(to top right, transparent calc(50% - .6
 .h-assina > div:not(.h-data) { flex: 1; max-width: 58mm; text-align: center; }
 .h-assina > div span { display: block; border-top: 1px solid #000; margin-bottom: 1mm; }
 .h-receptora td { font-size: 7.5pt; height: 5mm; vertical-align: top; }
+/* O Médio tem mais disciplinas (e a coluna de carga): letra e linhas um pouco menores para caber na folha */
+.h-folha-medio .h-cab img { width: 22mm; height: 22mm; }
+.h-folha-medio .h-titulo { margin: 1mm 0 2mm; }
+.h-folha-medio .h-notas td { height: 3.6mm; padding-top: 0; padding-bottom: 0; }
+.h-folha-medio .h-notas { font-size: 8pt; }
+.h-folha-medio .h-estudos td { height: 4.4mm; font-size: 9pt; }

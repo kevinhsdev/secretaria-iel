@@ -370,3 +370,5 @@ details.turma-grupo > summary:hover { background: var(--azul-fundo); }
 .progresso { display: inline-flex; align-items: center; gap: 8px; }
 .progresso .trilho { width: 90px; height: 8px; background: var(--cinza-claro); border-radius: 4px; overflow: hidden; display: inline-block; }
 .progresso .trilho i { display: block; height: 100%; background: var(--verde); }
+.grade-notas input:disabled { background: var(--cinza-claro); opacity: .45; cursor: not-allowed; }
+.grade-notas input.ch { width: 56px; color: var(--texto-2); }

@@ -245,30 +245,54 @@ function gerarDemoHistorico(db, anoAtual, transacao) {
   let semente = 20260926;
   const rnd = () => { semente = (semente * 1103515245 + 12345) % 2147483648; return semente / 2147483648; };
   const CURSOS = { fund: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'], medio: ['EM1', 'EM2', 'EM3'] };
-  const comps = { fund: db.prepare("SELECT nome FROM hist_componentes WHERE curso = 'fund' AND ativo = 1").all().map((c) => c.nome),
-    medio: db.prepare("SELECT nome FROM hist_componentes WHERE curso = 'medio' AND ativo = 1").all().map((c) => c.nome) };
-  const alunos = db.prepare("SELECT id, serie_chave FROM alunos WHERE demo = 1 AND novo = 0 AND ativo = 1 AND (serie_chave LIKE 'F%' OR serie_chave LIKE 'EM%')").all();
-  const insAno = db.prepare(`INSERT OR IGNORE INTO hist_anos (aluno_id, serie_chave, ano_letivo, escola, cidade, uf, carga, dias_letivos, frequencia, resultado, atualizado_em, atualizado_por)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,'demo')`);
-  const insNota = db.prepare('INSERT OR IGNORE INTO hist_notas (ano_id, componente, nota) VALUES (?,?,?)');
-  const insDados = db.prepare(`INSERT OR IGNORE INTO hist_alunos (aluno_id, naturalidade, uf_nasc, nacionalidade, atualizado_em, atualizado_por) VALUES (?,?,?,?,?,'demo')`);
+  const comps = { fund: db.prepare("SELECT nome FROM hist_componentes WHERE curso = 'fund' AND ativo = 1 ORDER BY ordem").all().map((c) => c.nome),
+    medio: db.prepare("SELECT nome FROM hist_componentes WHERE curso = 'medio' AND ativo = 1 ORDER BY ordem").all().map((c) => c.nome) };
+  // Em que anos cada disciplina existe (como no histórico preenchido da escola). O que não está aqui existe em todos os anos.
+  const quando = {
+    'Língua Inglesa': [6, 7, 8, 9], 'Ciências Físicas': [8, 9], 'Ciências Químicas': [9], 'Ensino Religioso': [1, 2, 3, 4, 5, 6, 7, 8],
+    'Educação Tecnológica - Robótica': [1, 2, 3, 4, 5], 'Inglês': [1, 2, 3, 4, 5], 'Espanhol': [6, 7, 8, 9], 'Música': [1, 2, 3, 4, 5, 6],
+    'Projeto de Vida': [9], 'Redação': [8], 'Xadrez': [9], 'Adolescer': [], 'Leitura': [], 'Mídias Digitais': [], 'Geometria': [], 'Teatro': [],
+  };
+  const cargaMedio = { 'Língua Portuguesa e Literatura Bras.': 160, 'Matemática': 160, 'História': 120, 'Sociologia': 40, 'Filosofia': 40, 'Arte': 40, 'Eletivas': 240 };
+  const alunos = db.prepare("SELECT id, serie_chave, turma, turno FROM alunos WHERE demo = 1 AND novo = 0 AND ativo = 1 AND (serie_chave LIKE 'F%' OR serie_chave LIKE 'EM%')").all();
+  const insAno = db.prepare(`INSERT OR IGNORE INTO hist_anos (aluno_id, serie_chave, ano_letivo, escola, cidade, uf, carga, resultado, atualizado_em, atualizado_por)
+    VALUES (?,?,?,?,?,?,?,?,?,'demo')`);
+  const insNota = db.prepare('INSERT OR IGNORE INTO hist_notas (ano_id, componente, nota, carga) VALUES (?,?,?,?)');
+  const insDados = db.prepare(`INSERT OR IGNORE INTO hist_alunos (aluno_id, naturalidade, uf_nasc, nacionalidade, rg_orgao, rg_uf, atualizado_em, atualizado_por)
+    VALUES (?,?,?,?,?,?,?,'demo')`);
   const cidades = ['Ferraz de Vasconcelos', 'Ferraz de Vasconcelos', 'Poá', 'Suzano', 'São Paulo', 'Itaquaquecetuba', 'Mogi das Cruzes'];
+  const nota = () => String(6.5 + Math.floor(rnd() * 8) / 2).replace('.', ','); // 6,5 a 10
   const agora = new Date().toISOString();
+  let transferido = false;
   transacao(() => {
     for (const a of alunos) {
       const curso = a.serie_chave.startsWith('EM') ? 'medio' : 'fund';
       const series = CURSOS[curso];
       const idx = series.indexOf(a.serie_chave);
-      insDados.run(a.id, cidades[Math.floor(rnd() * cidades.length)], 'SP', 'Brasileira', agora);
+      insDados.run(a.id, cidades[Math.floor(rnd() * cidades.length)], 'SP', 'Brasileira', 'SSP', 'SP', agora);
       // Alguns alunos entraram na escola depois do 1º ano: os primeiros anos foram em outra escola
       const veioDeFora = rnd() < 0.25 ? Math.floor(rnd() * idx) : -1;
       for (let i = 0; i < idx; i++) {
         if (rnd() < 0.12) continue; // de propósito: alguns anos ficam faltando, para a lista ter o que mostrar
-        const fora = i <= veioDeFora;
+        const fora = i <= veioDeFora, n = i + 1;
         const r = insAno.run(a.id, series[i], anoAtual - (idx - i), fora ? 'E.E. Prof. Exemplo Fictício' : 'Instituto Educacional Luterano',
-          fora ? 'Poá' : 'Ferraz de Vasconcelos', 'SP', 1000, 200, 85 + Math.floor(rnd() * 16), 'Aprovado', agora);
+          fora ? 'Poá' : 'Ferraz de Vasconcelos', 'SP', curso === 'medio' ? 1600 : n <= 5 ? 1000 : 1200, 'Aprovado', agora);
         const anoId = Number(r.lastInsertRowid);
-        for (const cp of comps[curso]) insNota.run(anoId, cp, String(5 + Math.floor(rnd() * 11) / 2).replace('.', ','));
+        for (const cp of comps[curso]) {
+          if (curso === 'fund') { if (!quando[cp] || quando[cp].includes(n)) insNota.run(anoId, cp, nota(), null); continue; }
+          // Médio: aprofundamentos só na 3ª série; o resto nas três, com a carga de cada disciplina
+          if (/^Aprof/.test(cp) !== (n === 3)) continue;
+          insNota.run(anoId, cp, nota(), cargaMedio[cp] || (/^Aprof/.test(cp) ? 40 : 80));
+        }
+      }
+      // Um aluno do 1º ao 5º ano de exemplo saindo no meio do ano (2ª folha do histórico preenchida)
+      if (!transferido && curso === 'fund' && idx >= 1 && idx <= 4) {
+        transferido = true;
+        const notas = {};
+        for (const cp of comps.fund) if (!quando[cp] || quando[cp].includes(idx + 1)) notas[cp] = { b1: nota(), b2: nota(), b3: nota(), b4: null, faltas: null, aulas: null };
+        db.prepare(`INSERT OR IGNORE INTO hist_transf (aluno_id, serie_chave, ano_letivo, bimestres, periodo, turma, turno, faltas, dias_letivos, notas_json, atualizado_em, atualizado_por)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,'demo')`).run(a.id, a.serie_chave, anoAtual, 3, `03/02 a 30 de setembro de ${anoAtual}`, `${a.serie_chave.slice(1)}º ${a.turma || 'A'}`,
+          'Tarde', '04', '150', JSON.stringify(notas), agora);
       }
     }
   });
