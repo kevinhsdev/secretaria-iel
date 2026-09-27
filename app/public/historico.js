@@ -17,6 +17,15 @@ function sugerirResultado(notas, cf) {
   return { resultado: 'Aprovado', motivo: '' };
 }
 
+// Média do ano: a mesma regra do servidor (só com os 4 bimestres numéricos; arredonda para 0,5 ou para uma casa decimal)
+function mediaDoAno(b, cf) {
+  const ns = ['b1', 'b2', 'b3', 'b4'].map((k) => notaNum(b?.[k]));
+  if (ns.some((n) => n == null)) return null;
+  const passo = cf.arredonda || 0.5;
+  const r = Math.round(ns.reduce((s, n) => s + n, 0) / 4 / passo + 1e-9) * passo;
+  return numBR(Number(r.toFixed(2)));
+}
+
 // Grade que se comporta como planilha: Enter desce uma linha e colar um bloco do Excel espalha pelas células.
 // Cada campo tem data-r (linha) e data-c (coluna).
 function comoPlanilha(raiz) {
@@ -67,7 +76,7 @@ function atualizarResultado(notasEls, resEl, sugEl, cf) {
   sugEl.hidden = !diverge;
 }
 
-let histTurmaEscolhida = '';
+let histTurmaEscolhida = '', histBimEscolhido = '';
 
 TELAS.historico = async (c, aba = 'alunos') => {
   const ABAS = { alunos: 'Alunos', turma: 'Lançar notas da turma', ...(EU.perfil === 'admin' ? { disciplinas: 'Disciplinas e regras' } : {}) };
@@ -121,8 +130,11 @@ async function abaHistTurma(el) {
   const lista = await api('GET', '/api/historico');
   if (!lista.turmas.length) { el.innerHTML = `<div class="cartao">${vazio('historico', 'Nenhuma turma do Fundamental ou do Médio', 'Importe os alunos do ACADESC em Configurações.')}</div>`; return; }
   if (!lista.turmas.some((t) => t.rotulo === histTurmaEscolhida)) histTurmaEscolhida = lista.turmas[0].rotulo;
+  if (!histBimEscolhido) histBimEscolhido = String(bimestreAtual());
   el.innerHTML = `<div class="cartao"><div class="filtros">
       <label class="dado">Turma <select id="ht">${lista.turmas.map((t) => `<option ${t.rotulo === histTurmaEscolhida ? 'selected' : ''}>${esc(t.rotulo)}</option>`).join('')}</select></label>
+      <label class="dado">O que lançar <select id="hb">${[1, 2, 3, 4].map((n) => `<option value="${n}" ${histBimEscolhido === String(n) ? 'selected' : ''}>Notas do ${n}º bimestre</option>`).join('')}
+        <option value="final" ${histBimEscolhido === 'final' ? 'selected' : ''}>Nota final do ano (anos antigos)</option></select></label>
       <label class="dado">Ano letivo <input type="number" id="ha" style="width:90px"></label>
       <span id="cargasTurma" class="acoes"></span>
     </div><div id="dicaTurma"></div><div class="tabela-wrap" id="gradeTurma"></div>
@@ -133,29 +145,47 @@ async function abaHistTurma(el) {
   const carregar = tentar(async () => {
     const t = lista.turmas.find((x) => x.rotulo === $('#ht', el).value);
     histTurmaEscolhida = t.rotulo;
+    const modo = $('#hb', el).value, bim = modo === 'final' ? null : +modo;
     d = await api('GET', `/api/historico/turma?serie=${encodeURIComponent(t.serie)}&turma=${encodeURIComponent(t.turma)}`);
     const medio = d.curso === 'medio';
     const ja = d.alunos.find((a) => a.ano)?.ano || {};
     $('#ha', el).value = ja.ano_letivo || d.ano_letivo;
     // Totais de carga do ano (os mesmos para a turma inteira), como no rodapé do quadro de notas do modelo
     const campoCarga = (id, rot, v, ph) => `<label class="dado">${rot} <input type="number" id="${id}" value="${esc(v ?? '')}" placeholder="${esc(ph ?? '')}" style="width:80px"></label>`;
-    $('#cargasTurma', el).innerHTML = (medio ? '' : campoCarga('hcb', 'Carga Base Nacional', ja.carga_bnc) )
+    $('#cargasTurma', el).innerHTML = (medio ? '' : campoCarga('hcb', 'Carga Base Nacional', ja.carga_bnc))
       + campoCarga('hcp', 'Carga Parte Diversificada', ja.carga_pd) + campoCarga('hct', 'Carga total', ja.carga, d.config.carga[d.curso]);
-    $('#dicaTurma', el).innerHTML = `<div class="dica">Nota final de cada disciplina (0 a 10, ou conceito; "-" ou vazio quando a turma não teve a disciplina).
-      <b>Enter</b> desce para o próximo aluno. Para trazer do Excel ou da SED: copie o bloco das notas (mesma ordem das colunas) e cole na primeira célula.
-      A situação vem sugerida pelas notas (média ${numBR(d.config.media)}) e não sai no papel — serve para o sistema saber se o aluno concluiu.
-      ${medio ? 'No Médio, a primeira linha é a carga horária de cada disciplina no ano (vale para a turma toda).' : ''}</div>`;
+    $('#dicaTurma', el).innerHTML = `<div class="dica">${bim
+      ? `Você está lançando as notas do <b>${bim}º bimestre</b> de ${esc(d.rotulo)}. Quando os <b>4 bimestres</b> estiverem lançados, o sistema calcula sozinho
+        a <b>média do ano</b> (arredondada para ${d.config.arredonda === 0.5 ? '0,5' : 'uma casa decimal'}) e a coloca no histórico, na coluna do ${esc(d.rotulo.replace(/ [A-Z]$/, ''))}.
+        A coluna "Média do ano" mostra a média quando já dá para calcular.`
+      : 'Nota final de cada disciplina, para anos antigos ou quando só existe a nota final. A situação vem sugerida pelas notas e não sai no papel.'}
+      "-" ou vazio quando a turma não tem a disciplina. <b>Enter</b> desce para o próximo aluno; para trazer do Excel ou da SED, copie o bloco das notas
+      (mesma ordem das colunas) e cole na primeira célula.${medio ? ' No Médio, a primeira linha é a carga horária de cada disciplina no ano (vale para a turma toda).' : ''}</div>`;
     const comps = d.componentes;
+    const valor = (a, comp) => (bim ? a.ano?.bims?.[comp]?.['b' + bim] : a.ano?.notas?.[comp]) ?? '';
     const cab = comps.map((x) => `<th title="${esc(x.area || '')}" style="white-space:normal;max-width:78px;font-size:10.5px">${esc(x.nome)}</th>`).join('');
-    grade.innerHTML = d.alunos.length ? `<table class="grade-notas"><thead><tr><th class="comp">Aluno</th>${cab}<th>Situação</th></tr></thead><tbody>
+    grade.innerHTML = d.alunos.length ? `<table class="grade-notas"><thead><tr><th class="comp">Aluno</th>${cab}<th>${bim ? 'Média do ano' : 'Situação'}</th></tr></thead><tbody>
       ${medio ? `<tr class="info"><td class="aluno-nome"><b>Carga horária (h)</b></td>${comps.map((x) => `<td><input data-carga="${esc(x.nome)}" value="${esc(d.cargas[x.nome] ?? '')}" aria-label="Carga de ${esc(x.nome)}"></td>`).join('')}<td></td></tr>` : ''}
       ${d.alunos.map((a, i) => `<tr data-aluno="${a.id}"><td class="aluno-nome"><b>${esc(titulo(a.nome))}</b><br><small class="dado">Mat. ${esc(a.mat || '—')}</small></td>
-        ${comps.map((x, j) => `<td><input data-r="${i}" data-c="${j}" data-comp="${esc(x.nome)}" value="${esc(a.ano?.notas?.[x.nome] ?? '')}" aria-label="${esc(x.nome)} de ${esc(a.nome)}"></td>`).join('')}
-        <td><select data-r="${i}" data-c="${comps.length}" data-res data-auto="${a.ano?.resultado ? '0' : '1'}"><option value=""></option>
-          ${d.resultados.map((x) => `<option ${a.ano?.resultado === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select><small class="sug" hidden></small></td></tr>`).join('')}
+        ${comps.map((x, j) => `<td><input data-r="${i}" data-c="${j}" data-comp="${esc(x.nome)}" value="${esc(valor(a, x.nome))}" aria-label="${esc(x.nome)} de ${esc(a.nome)}"></td>`).join('')}
+        ${bim ? '<td class="dado" data-medias></td>' : `<td><select data-r="${i}" data-c="${comps.length}" data-res data-auto="${a.ano?.resultado ? '0' : '1'}"><option value=""></option>
+          ${d.resultados.map((x) => `<option ${a.ano?.resultado === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select><small class="sug" hidden></small></td>`}</tr>`).join('')}
       </tbody></table>` : vazio('alunos', 'Turma sem alunos', 'Nenhum aluno ativo nesta turma.');
     $$('tr[data-aluno]', grade).forEach((tr) => {
-      const upd = () => atualizarResultado($$('[data-comp]', tr), $('[data-res]', tr), $('.sug', tr), d.config);
+      const a = d.alunos.find((x) => x.id === +tr.dataset.aluno);
+      const upd = () => {
+        if (!bim) return atualizarResultado($$('[data-comp]', tr), $('[data-res]', tr), $('.sug', tr), d.config);
+        // Nota baixa em vermelho e quantas médias do ano já dá para calcular com o que está na tela
+        let prontas = 0, abaixo = 0;
+        for (const inp of $$('[data-comp]', tr)) {
+          const n = notaNum(inp.value);
+          inp.classList.toggle('baixa', n != null && n < d.config.media);
+          const b = { ...(a.ano?.bims?.[inp.dataset.comp] || {}), ['b' + bim]: inp.value };
+          const m = mediaDoAno(b, d.config);
+          if (m != null) { prontas++; if (notaNum(m) < d.config.media) abaixo++; }
+        }
+        $('[data-medias]', tr).innerHTML = prontas ? `${prontas} calculada${prontas > 1 ? 's' : ''}${abaixo ? `<br><span style="color:var(--vermelho)">${abaixo} abaixo de ${numBR(d.config.media)}</span>` : ''}` : 'falta bimestre';
+      };
       tr.addEventListener('input', (e) => { sujo = true; if (e.target.matches('[data-res]')) e.target.dataset.auto = '0'; upd(); });
       tr.addEventListener('change', (e) => { if (e.target.matches('[data-res]')) { e.target.dataset.auto = e.target.value ? '0' : '1'; sujo = true; upd(); } });
       upd();
@@ -163,24 +193,27 @@ async function abaHistTurma(el) {
     $$('[data-carga], #cargasTurma input', el).forEach((i) => i.addEventListener('input', () => { sujo = true; }));
     sujo = false;
   });
-  $('#ht', el).onchange = async () => {
-    if (sujo && !(await confirmar('Há notas digitadas nesta turma que ainda não foram salvas. Trocar de turma e perder o que foi digitado?', 'Trocar mesmo assim'))) {
-      $('#ht', el).value = histTurmaEscolhida; return;
-    }
+  const trocar = async (sel, voltar) => {
+    if (sujo && !(await confirmar('Há notas digitadas que ainda não foram salvas. Trocar e perder o que foi digitado?', 'Trocar mesmo assim'))) { voltar(); return; }
+    histBimEscolhido = $('#hb', el).value;
     carregar();
   };
+  $('#ht', el).onchange = () => trocar($('#ht', el), () => { $('#ht', el).value = histTurmaEscolhida; });
+  $('#hb', el).onchange = () => trocar($('#hb', el), () => { $('#hb', el).value = histBimEscolhido; });
   $('#ha', el).oninput = () => { sujo = true; };
   $('#htSalvar', el).onclick = tentar(async () => {
     if (!d) return;
+    const modo = $('#hb', el).value;
     const alunos = $$('tr[data-aluno]', grade).map((tr) => ({
-      aluno_id: +tr.dataset.aluno, resultado: $('[data-res]', tr).value,
+      aluno_id: +tr.dataset.aluno, resultado: $('[data-res]', tr)?.value,
       notas: Object.fromEntries($$('[data-comp]', tr).map((i) => [i.dataset.comp, i.value])),
     }));
     const val = (id) => ($('#' + id, el) ? $('#' + id, el).value : undefined);
     const cargas = d.curso === 'medio' ? Object.fromEntries($$('[data-carga]', grade).map((i) => [i.dataset.carga, i.value])) : undefined;
-    const r = await api('PUT', '/api/historico/turma', { serie: d.serie, ano_letivo: val('ha'), carga_bnc: val('hcb'), carga_pd: val('hcp'), carga: val('hct'), cargas, alunos });
+    const r = await api('PUT', '/api/historico/turma', { serie: d.serie, bimestre: modo === 'final' ? undefined : +modo, ano_letivo: val('ha'),
+      carga_bnc: val('hcb'), carga_pd: val('hcp'), carga: val('hct'), cargas, alunos });
     sujo = false;
-    toast(`Notas salvas: ${plural(r.alunos, 'aluno', 'alunos')} de ${d.rotulo}`);
+    toast(`${modo === 'final' ? 'Notas finais' : `Notas do ${modo}º bimestre`} salvas: ${plural(r.alunos, 'aluno', 'alunos')} de ${d.rotulo}`);
     carregar();
   });
   $('#htImp', el).onclick = () => {
@@ -209,6 +242,8 @@ async function abaHistDisciplinas(el) {
     <div class="cartao" style="margin-top:14px"><h2>Regras e assinaturas</h2>
       <form id="regras"><div class="campos">
         <div class="campo"><label>Média para aprovação</label><input id="r_media" value="${esc(numBR(cf.hist_media))}"></div>
+        <div class="campo"><label>Média do ano (4 bimestres) arredonda para</label><select id="r_arr"><option value="0.5" ${cf.hist_arredonda !== '0.1' ? 'selected' : ''}>0,5 mais próximo (7,25 → 7,5)</option>
+          <option value="0.1" ${cf.hist_arredonda === '0.1' ? 'selected' : ''}>uma casa decimal (7,25 → 7,3)</option></select></div>
         <div class="campo"><label>Carga horária anual — Fundamental (h)</label><input id="r_cf" type="number" value="${esc(cf.hist_carga_fund)}"></div>
         <div class="campo"><label>Carga horária anual — Médio (h)</label><input id="r_cm" type="number" value="${esc(cf.hist_carga_medio)}"></div>
         <div class="campo"><label>Assina no meio (Diretor)</label><input id="r_dir" value="${esc(cf.hist_diretor)}"></div>
@@ -240,7 +275,7 @@ async function abaHistDisciplinas(el) {
     e.preventDefault();
     const media = Number($('#r_media', el).value.replace(',', '.'));
     if (!(media >= 0 && media <= 10)) throw new Error('A média precisa ser um número de 0 a 10');
-    await api('PUT', '/api/admin/config', { hist_media: String(media), hist_carga_fund: $('#r_cf', el).value, hist_carga_medio: $('#r_cm', el).value,
+    await api('PUT', '/api/admin/config', { hist_media: String(media), hist_arredonda: $('#r_arr', el).value, hist_carga_fund: $('#r_cf', el).value, hist_carga_medio: $('#r_cm', el).value,
       hist_secretario: $('#r_sec', el).value.trim(), hist_diretor: $('#r_dir', el).value.trim() });
     toast('Regras salvas');
   });
@@ -272,14 +307,18 @@ TELAS.hist = async (c, id) => {
       o.notas = {};
       for (const comp of d.cursos[k].componentes) o.notas[comp.nome] = ler(s.chave, 'n:' + comp.nome);
       if (k === 'medio') { o.cargas = {}; for (const comp of d.cursos[k].componentes) o.cargas[comp.nome] = ler(s.chave, 'h:' + comp.nome); }
-      const tem = [...Object.entries(o).filter(([key]) => !['serie_chave', 'notas', 'cargas'].includes(key)).map(([, v]) => v),
-        ...Object.values(o.notas), ...Object.values(o.cargas || {})].some(Boolean);
+      // Notas de cada bimestre do ano (quadro "Notas do ano por bimestre")
+      o.bims = {};
+      for (const comp of d.cursos[k].componentes) o.bims[comp.nome] = Object.fromEntries(BIMS.map((b) => [b, ler(s.chave, `b:${comp.nome}|${b}`)]));
+      const tem = [...Object.entries(o).filter(([key]) => !['serie_chave', 'notas', 'cargas', 'bims'].includes(key)).map(([, v]) => v),
+        ...Object.values(o.notas), ...Object.values(o.cargas || {}), ...Object.values(o.bims).flatMap((x) => Object.values(x))].some(Boolean);
       if (tem || doBanco.has(s.chave)) saida.push(o);
     }
     return saida;
   }
   const doBancoTxt = (ch, f) => {
     const x = doBanco.get(ch); if (!x) return '';
+    if (f.startsWith('b:')) { const [comp, b] = [f.slice(2, f.lastIndexOf('|')), f.slice(f.lastIndexOf('|') + 1)]; return String(x.bims?.[comp]?.[b] ?? ''); }
     const v = f.startsWith('n:') ? x.notas[f.slice(2)] : f.startsWith('h:') ? x.cargas?.[f.slice(2)] : x[f];
     return String(v ?? '');
   };
@@ -360,6 +399,17 @@ TELAS.hist = async (c, id) => {
     <p class="dado" style="margin-top:6px">O RG corrigido aqui fica corrigido também na ficha do aluno. A filiação não sai no histórico (deliberação CEE 04/95).</p></div>
 
     <div class="cartao" style="margin-top:14px">
+      <h2 style="margin-bottom:6px">Notas do ano por bimestre</h2>
+      <p class="dado" style="margin:0 0 10px">Lance aqui as notas de cada bimestre do ano. Quando os <b>4 bimestres</b> estiverem lançados, a <b>média do ano</b> é calculada
+        sozinha (arredondada para ${cf.arredonda === 0.5 ? '0,5' : 'uma casa decimal'}) e vai para a coluna daquele ano no histórico, logo abaixo.
+        Se o aluno sair no meio do ano, estas notas saem sozinhas na folha de transferência.</p>
+      <div class="acoes" style="margin-bottom:10px"><label class="dado">Série <select id="b_serie">${SERIES_HIST.map(([k, r]) => `<option value="${k}" ${(/^(F\d|EM\d)$/.test(a.serie_chave || '') ? a.serie_chave : 'F1') === k ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+        <span class="dado" id="b_ano"></span></div>
+      <div class="tabela-wrap" id="b_grade"></div>
+    </div>
+
+    <div class="cartao" style="margin-top:14px">
+      <h2 style="margin-bottom:6px">Notas finais de cada ano (as colunas do histórico)</h2>
       <div class="abas" style="margin-bottom:10px">${CURSOS_K.map((k) => `<button type="button" data-cur="${k}" class="${d.curso === k ? 'on' : ''}">${esc(d.cursos[k].nome)}</button>`).join('')}</div>
       <div class="dica" style="margin-top:0">Uma coluna por ano. Digite a nota final de cada disciplina (0 a 10 ou conceito; "-" ou vazio quando o aluno não teve a disciplina naquele ano).
         Nota abaixo de ${numBR(cf.media)} fica vermelha. <b>Enter</b> desce; colar um bloco do Excel espalha pelas células.
@@ -388,6 +438,7 @@ TELAS.hist = async (c, id) => {
           <div class="campo" data-fundI><label for="t_dias">Dias letivos no período (1º ao 5º ano)</label><input id="t_dias" value="${esc(t0?.dias_letivos || '')}"></div>
         </div>
         <p class="dado" style="margin:10px 0 6px">Digite a nota de cada bimestre que o aluno cursou. Os bimestres depois do escolhido ficam bloqueados e saem riscados no papel.
+          Em cinza, as notas já lançadas em "Notas do ano por bimestre": se deixar em branco, são elas que saem no papel.
           Do 6º ano em diante, cada disciplina tem também as faltas e as aulas dadas.</p>
         <div class="tabela-wrap" id="t_grade"></div>
       </div>
@@ -413,6 +464,46 @@ TELAS.hist = async (c, id) => {
   grades.addEventListener('change', (e) => { const el = e.target.closest('[data-res]'); if (el) { el.dataset.auto = el.value ? '0' : '1'; atualizarColuna(el.dataset.s); } });
   for (const k of CURSOS_K) for (const s of d.cursos[k].series) atualizarColuna(s.chave);
 
+  // ── Notas do ano por bimestre: disciplinas × 1º a 4º bimestre + média do ano (calculada) ──
+  const valoresB = new Map();
+  for (const k of CURSOS_K) for (const s of d.cursos[k].series) for (const comp of d.cursos[k].componentes) for (const b of BIMS) {
+    valoresB.set(`${s.chave}|${comp.nome}|${b}`, doBancoTxt(s.chave, `b:${comp.nome}|${b}`));
+  }
+  const bGrade = $('#b_grade', c);
+  const desenharBims = () => {
+    const serie = $('#b_serie', c).value, curso = cursoDaSerie(serie);
+    const comps = d.cursos[curso].componentes;
+    const ano = doBanco.get(serie)?.ano_letivo || d.cursos[curso].series.find((s) => s.chave === serie)?.ano_provavel;
+    $('#b_ano', c).textContent = ano ? 'ano letivo de ' + ano : '';
+    bGrade.innerHTML = `<table class="grade-notas"><thead><tr><th class="comp">Disciplina</th>${BIMS.map((b, i) => `<th>${i + 1}º bim</th>`).join('')}<th>Média do ano</th></tr></thead><tbody>
+      ${comps.map((comp, i) => `<tr><td class="comp">${esc(comp.nome)}</td>${BIMS.map((b, j) => `<td><input data-r="${i}" data-c="${j}" data-b="${esc(comp.nome)}|${b}"
+        value="${esc(valoresB.get(`${serie}|${comp.nome}|${b}`) || '')}" aria-label="${j + 1}º bimestre de ${esc(comp.nome)}"></td>`).join('')}
+        <td class="c b" data-media="${esc(comp.nome)}"></td></tr>`).join('')}</tbody></table>`;
+    comps.forEach((comp) => atualizarMedia(serie, comp.nome, false));
+  };
+  // Recalcula a média de uma disciplina; se os 4 bimestres estão lançados, põe a média na coluna do ano, lá embaixo
+  function atualizarMedia(serie, comp, levarParaOAno) {
+    const b = Object.fromEntries(BIMS.map((k) => [k, valoresB.get(`${serie}|${comp}|${k}`)]));
+    const m = mediaDoAno(b, cf);
+    const cel = $(`[data-media="${CSS.escape(comp)}"]`, bGrade);
+    if (cel) { cel.textContent = m ?? '—'; cel.style.color = m != null && notaNum(m) < cf.media ? 'var(--vermelho)' : ''; }
+    $$('[data-b]', bGrade).forEach((inp) => { const n = notaNum(inp.value); inp.classList.toggle('baixa', n != null && n < cf.media); });
+    if (levarParaOAno && m != null) {
+      const alvo = $(`[data-s="${serie}"][data-f="n:${CSS.escape(comp)}"]`, grades);
+      if (alvo && alvo.value !== m) { alvo.value = m; alvo.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+  }
+  bGrade.addEventListener('input', (e) => {
+    const inp = e.target.closest('[data-b]');
+    if (!inp) return;
+    const serie = $('#b_serie', c).value, [comp, b] = [inp.dataset.b.slice(0, inp.dataset.b.lastIndexOf('|')), inp.dataset.b.slice(inp.dataset.b.lastIndexOf('|') + 1)];
+    valoresB.set(`${serie}|${comp}|${b}`, inp.value.trim());
+    atualizarMedia(serie, comp, true);
+  });
+  comoPlanilha(bGrade);
+  $('#b_serie', c).onchange = desenharBims;
+  desenharBims();
+
   // ── Grade da transferência: disciplinas da série escolhida × 4 bimestres + faltas e aulas dadas ──
   const valoresT = new Map(Object.entries(t0?.notas || {}).flatMap(([comp, x]) => [...BIMS, 'faltas', 'aulas'].map((k) => [comp + '|' + k, String(x?.[k] ?? '')])));
   const tGrade = $('#t_grade', c);
@@ -425,7 +516,7 @@ TELAS.hist = async (c, id) => {
     const cols = [...BIMS.map((k, i) => [k, `${i + 1}º Bim`, i + 1 > bim]), ...(fundI ? [] : [['faltas', 'Faltas', false], ['aulas', 'Aulas dadas', false]])];
     tGrade.innerHTML = `<table class="grade-notas"><thead><tr><th class="comp">Disciplina</th>${cols.map(([, r, off]) => `<th class="${off ? 'dado' : ''}">${r}</th>`).join('')}</tr></thead><tbody>
       ${comps.map((comp, i) => `<tr><td class="comp">${esc(comp.nome)}</td>${cols.map(([k, r, off], j) => `<td><input data-r="${i}" data-c="${j}" data-t="${esc(comp.nome)}|${k}"
-        value="${esc(valoresT.get(comp.nome + '|' + k) || '')}" ${off ? 'disabled title="O aluno não chegou a este bimestre"' : ''} aria-label="${esc(r)} de ${esc(comp.nome)}"></td>`).join('')}</tr>`).join('')}
+        value="${esc(valoresT.get(comp.nome + '|' + k) || '')}" placeholder="${esc(BIMS.includes(k) ? valoresB.get(`${serie}|${comp.nome}|${k}`) || '' : '')}" ${off ? 'disabled title="O aluno não chegou a este bimestre"' : ''} aria-label="${esc(r)} de ${esc(comp.nome)}"></td>`).join('')}</tr>`).join('')}
     </tbody></table>`;
   };
   comoPlanilha(tGrade);
@@ -458,7 +549,7 @@ TELAS.hist = async (c, id) => {
       rg: v('h_rg'), rg_expedicao: v('h_rg_exp'), rg_orgao: v('h_rg_org').toUpperCase(), rg_uf: v('h_rg_uf').toUpperCase(), naturalidade: v('h_nat'),
       uf_nasc: v('h_uf').toUpperCase(), nacionalidade: v('h_nac'), fund_ano: v('h_fano'), fund_escola: v('h_fesc'), fund_cidade: v('h_fcid'),
       fund_uf: v('h_fuf').toUpperCase(), obs: v('h_obs'),
-      anos_json: JSON.stringify(montarAnos((ch, f) => m.get(ch + '|' + f) ?? '')), transf_json: lerTransf(),
+      anos_json: JSON.stringify(montarAnos((ch, f) => (f.startsWith('b:') ? valoresB.get(ch + '|' + f.slice(2)) ?? '' : m.get(ch + '|' + f) ?? ''))), transf_json: lerTransf(),
     };
   };
   const salvar = async () => !(await salvarComVersao('/api/historico/aluno/' + a.id, lerTela(), original)).nada;

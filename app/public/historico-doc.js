@@ -151,7 +151,9 @@ function folhasHistorico(a, v) {
   const ultimo = [...cursadas].reverse()[0];
   // (sem transferência a tabela sai em branco e riscada; limita a parte diversificada para caber na folha)
   const base = (c) => c.area === grupos[0]?.area;
-  let compsT = transf ? cur.componentes.filter((c) => transf.notas[c.nome]) : [];
+  // Notas dos bimestres: as digitadas na transferência ou, se não houver, as lançadas durante o ano (notas por bimestre)
+  const bimsDe = (c) => { const x = transf?.notas?.[c.nome]; if (x && Object.values(x).some((v) => v != null && v !== '')) return x; return anos.get(transf?.serie_chave)?.bims?.[c.nome] || null; };
+  let compsT = transf ? cur.componentes.filter((c) => bimsDe(c)) : [];
   if (!compsT.length) {
     const pdComNota = cur.componentes.filter((c) => !base(c) && anos.get(ultimo?.chave)?.notas?.[c.nome]).slice(0, 4);
     compsT = cur.componentes.filter((c) => base(c) || pdComNota.includes(c));
@@ -165,7 +167,7 @@ function folhasHistorico(a, v) {
   const bim = transf ? Math.min(4, Math.max(1, Number(transf.bimestres) || 4)) : 0;
   const risco = (n) => `<td colspan="${n}" rowspan="${compsT.length}" class="h-risco"></td>`;
   const linhasT = gruposT.map((g, gi) => g.itens.map((c, i) => {
-    const x = transf?.notas?.[c.nome] || {};
+    const x = (transf && bimsDe(c)) || {};
     const primeira = gi === 0 && i === 0;
     const cel = !transf ? (primeira ? risco(6) : '')
       : ['b1', 'b2', 'b3', 'b4'].slice(0, bim).map((k) => `<td class="c b">${esc(notaImpressa(x[k]).replace(/^-$/, ''))}</td>`).join('')

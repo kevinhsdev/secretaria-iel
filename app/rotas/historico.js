@@ -13,6 +13,7 @@ module.exports = function historico(ctx) {
     medio: { nome: 'Ensino Médio', series: ['EM1', 'EM2', 'EM3'] },
   };
   const RESULTADOS = ['Aprovado', 'Aprovado pelo Conselho', 'Retido', 'Cursando', 'Transferido'];
+  const BIMS = ['b1', 'b2', 'b3', 'b4'];
   const ESCOLA = { escola: 'Instituto Educacional Luterano', cidade: 'Ferraz de Vasconcelos', uf: 'SP' };
   const cursoDe = (chave) => (CURSOS.fund.series.includes(chave) ? 'fund' : CURSOS.medio.series.includes(chave) ? 'medio' : null);
   const rotuloSerie = (chave) => (chave.startsWith('EM') ? `${chave.slice(2)}ª série` : `${chave.slice(1)}º ano`);
@@ -51,12 +52,27 @@ module.exports = function historico(ctx) {
 
   function anosDoAluno(alunoId) {
     const anos = db.prepare('SELECT * FROM hist_anos WHERE aluno_id = ?').all(alunoId);
-    const notas = db.prepare('SELECT componente, nota, carga FROM hist_notas WHERE ano_id = ?');
-    return anos.map((a) => {
-      const ns = notas.all(a.id);
-      return { ...a, notas: Object.fromEntries(ns.filter((n) => n.nota != null).map((n) => [n.componente, n.nota])),
-        cargas: Object.fromEntries(ns.filter((n) => n.carga != null).map((n) => [n.componente, n.carga])) };
-    }).sort((a, b) => ordemSerie(a.serie_chave) - ordemSerie(b.serie_chave));
+    const notas = db.prepare('SELECT componente, nota, carga, b1, b2, b3, b4 FROM hist_notas WHERE ano_id = ?');
+    return anos.map((a) => ({ ...a, ...notasDoAno(notas.all(a.id)) })).sort((a, b) => ordemSerie(a.serie_chave) - ordemSerie(b.serie_chave));
+  }
+  // Linhas de hist_notas → { notas: nota final, cargas, bims: notas de cada bimestre }
+  function notasDoAno(ns) {
+    return {
+      notas: Object.fromEntries(ns.filter((n) => n.nota != null).map((n) => [n.componente, n.nota])),
+      cargas: Object.fromEntries(ns.filter((n) => n.carga != null).map((n) => [n.componente, n.carga])),
+      bims: Object.fromEntries(ns.filter((n) => BIMS.some((k) => n[k] != null)).map((n) => [n.componente, Object.fromEntries(BIMS.map((k) => [k, n[k]]))])),
+    };
+  }
+
+  // Nota final do ano = média dos 4 bimestres, arredondada como a escola faz (0,5 mais próximo, ou uma casa decimal).
+  // Só calcula com os 4 bimestres lançados e todos numéricos; senão devolve null (o ano ainda está em andamento).
+  function mediaDoAno(b, c = cfg()) {
+    const ns = BIMS.map((k) => numero(b[k]));
+    if (ns.some((n) => n == null)) return null;
+    const m = ns.reduce((s, n) => s + n, 0) / 4;
+    const passo = Number(c.hist_arredonda) || 0.5;
+    const r = Math.round(m / passo + 1e-9) * passo;
+    return String(Number(r.toFixed(2))).replace('.', ',');
   }
 
   function transfDoAluno(alunoId) {
@@ -91,6 +107,13 @@ module.exports = function historico(ctx) {
       if (v != null && !(v >= 0 && v <= 2000)) falha(400, `Carga horária "${ch}" em ${comp} (${rotuloSerie(chave)}) não parece certa.`);
       cargas[comp] = v;
     }
+    // Notas de cada bimestre do ano: { "Matemática": { b2: "7,5" } } — só os bimestres que vieram no pedido
+    const bims = {};
+    for (const [comp, x] of Object.entries(a.bims || {})) {
+      if (!comps.has(comp) || !x) continue;
+      bims[comp] = {};
+      for (const k of BIMS) if (x[k] !== undefined) bims[comp][k] = normalizarNota(x[k], `${comp} (${k[1]}º bimestre)`);
+    }
     const freq = vazioTxt(a.frequencia) ? null : Number(String(a.frequencia).replace(',', '.'));
     if (freq != null && !(freq >= 0 && freq <= 100)) falha(400, `Frequência do ${rotuloSerie(chave)} precisa estar entre 0 e 100%.`);
     if (a.resultado && !RESULTADOS.includes(a.resultado)) falha(400, 'Resultado inválido: ' + a.resultado);
@@ -102,21 +125,39 @@ module.exports = function historico(ctx) {
       if (numericos.includes(k) && reg[k] != null && !(reg[k] >= 0 && reg[k] <= 9999)) falha(400, `Valor "${a[k]}" não parece certo (${rotuloSerie(chave)}).`);
     }
     if (reg.ano_letivo != null && (reg.ano_letivo < 1950 || reg.ano_letivo > anoAtual() + 1)) falha(400, `Ano letivo ${reg.ano_letivo} do ${rotuloSerie(chave)} não parece certo.`);
-    const vazio = !Object.values(reg).some((v) => v != null) && ![...Object.values(notas), ...Object.values(cargas)].some((v) => v != null);
+    const vazio = !Object.values(reg).some((v) => v != null) && ![...Object.values(notas), ...Object.values(cargas),
+      ...Object.values(bims).flatMap((x) => Object.values(x))].some((v) => v != null);
     let ex = db.prepare('SELECT id FROM hist_anos WHERE aluno_id = ? AND serie_chave = ?').get(alunoId, chave);
     if (!ex && vazio) return false;
     if (!ex) ex = { id: Number(db.prepare('INSERT INTO hist_anos (aluno_id, serie_chave) VALUES (?, ?)').run(alunoId, chave).lastInsertRowid) };
     const ks = Object.keys(reg);
     db.prepare(`UPDATE hist_anos SET ${[...ks.map((k) => k + ' = ?'), 'atualizado_em = ?', 'atualizado_por = ?'].join(', ')} WHERE id = ?`)
       .run(...ks.map((k) => reg[k]), agoraIso(), u.login, ex.id);
-    const antes = db.prepare('SELECT nota, carga FROM hist_notas WHERE ano_id = ? AND componente = ?');
-    const grava = db.prepare(`INSERT INTO hist_notas (ano_id, componente, nota, carga) VALUES (?,?,?,?)
-      ON CONFLICT(ano_id, componente) DO UPDATE SET nota = excluded.nota, carga = excluded.carga`);
-    for (const comp of new Set([...Object.keys(notas), ...Object.keys(cargas)])) {
+    const antes = db.prepare('SELECT nota, carga, b1, b2, b3, b4 FROM hist_notas WHERE ano_id = ? AND componente = ?');
+    const grava = db.prepare(`INSERT INTO hist_notas (ano_id, componente, nota, carga, b1, b2, b3, b4) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(ano_id, componente) DO UPDATE SET nota = excluded.nota, carga = excluded.carga,
+        b1 = excluded.b1, b2 = excluded.b2, b3 = excluded.b3, b4 = excluded.b4`);
+    const c = cfg();
+    for (const comp of new Set([...Object.keys(notas), ...Object.keys(cargas), ...Object.keys(bims)])) {
       const x = antes.get(ex.id, comp) || {};
-      const nota = comp in notas ? notas[comp] : x.nota ?? null, carga = comp in cargas ? cargas[comp] : x.carga ?? null;
-      if (nota == null && carga == null) db.prepare('DELETE FROM hist_notas WHERE ano_id = ? AND componente = ?').run(ex.id, comp);
-      else grava.run(ex.id, comp, nota, carga);
+      const b = Object.fromEntries(BIMS.map((k) => [k, bims[comp] && k in bims[comp] ? bims[comp][k] : x[k] ?? null]));
+      let nota = comp in notas ? notas[comp] : x.nota ?? null;
+      // Com os 4 bimestres lançados, a nota final do ano é a média (é ela que vai para a coluna do ano no histórico)
+      const media = mediaDoAno(b, c);
+      if (media != null && (comp in bims || !(comp in notas))) nota = media;
+      const carga = comp in cargas ? cargas[comp] : x.carga ?? null;
+      if (nota == null && carga == null && BIMS.every((k) => b[k] == null)) db.prepare('DELETE FROM hist_notas WHERE ano_id = ? AND componente = ?').run(ex.id, comp);
+      else grava.run(ex.id, comp, nota, carga, b.b1, b.b2, b.b3, b.b4);
+    }
+    // Ano fechado pelos bimestres e ninguém escolheu a situação: o sistema preenche com a sugestão (Aprovado/Retido)
+    if (Object.keys(bims).length && reg.resultado === undefined) {
+      const linhas = db.prepare('SELECT componente, nota, b1, b2, b3, b4 FROM hist_notas WHERE ano_id = ?').all(ex.id);
+      const fechado = linhas.length && linhas.every((l) => BIMS.every((k) => l[k] == null) || l.nota != null);
+      const atual = db.prepare('SELECT resultado FROM hist_anos WHERE id = ?').get(ex.id).resultado;
+      if (fechado && (!atual || atual === 'Cursando')) {
+        const s = sugerirResultado(Object.fromEntries(linhas.filter((l) => l.nota != null).map((l) => [l.componente, l.nota])), null, c);
+        if (s) db.prepare('UPDATE hist_anos SET resultado = ? WHERE id = ?').run(s.resultado, ex.id);
+      }
     }
     return true;
   }
@@ -157,7 +198,7 @@ module.exports = function historico(ctx) {
   }
 
   const configHist = (c) => ({
-    media: Number(c.hist_media) || 7, frequencia: Number(c.hist_frequencia) || 75,
+    media: Number(c.hist_media) || 7, arredonda: Number(c.hist_arredonda) || 0.5, frequencia: Number(c.hist_frequencia) || 75,
     carga: { fund: Number(c.hist_carga_fund) || null, medio: Number(c.hist_carga_medio) || null }, dias: Number(c.hist_dias) || null,
     secretario: c.hist_secretario || '', diretor: c.hist_diretor || '',
   });
@@ -272,13 +313,10 @@ module.exports = function historico(ctx) {
     const alunos = db.prepare(`SELECT id, mat, nome, novo FROM alunos WHERE ativo = 1 AND serie_chave = ? AND COALESCE(turma,'') = ? ORDER BY nome`).all(serie, turma);
     const anos = new Map(db.prepare(`SELECT * FROM hist_anos WHERE serie_chave = ? AND aluno_id IN (${alunos.map(() => '?').join(',') || 'NULL'})`)
       .all(serie, ...alunos.map((a) => a.id)).map((h) => [h.aluno_id, h]));
-    const notas = db.prepare('SELECT componente, nota, carga FROM hist_notas WHERE ano_id = ?');
+    const notas = db.prepare('SELECT componente, nota, carga, b1, b2, b3, b4 FROM hist_notas WHERE ano_id = ?');
     const lista = alunos.map((a) => {
       const h = anos.get(a.id);
-      const ns = h ? notas.all(h.id) : [];
-      return { id: a.id, mat: a.mat, nome: a.nome, novo: !!a.novo,
-        ano: h ? { ...h, notas: Object.fromEntries(ns.filter((n) => n.nota != null).map((n) => [n.componente, n.nota])),
-          cargas: Object.fromEntries(ns.filter((n) => n.carga != null).map((n) => [n.componente, n.carga])) } : null };
+      return { id: a.id, mat: a.mat, nome: a.nome, novo: !!a.novo, ano: h ? { ...h, ...notasDoAno(notas.all(h.id)) } : null };
     });
     // Carga de cada disciplina da turma: a que já foi lançada para algum aluno
     const cargas = {};
@@ -294,6 +332,10 @@ module.exports = function historico(ctx) {
     const serie = b.serie;
     if (!cursoDe(serie)) falha(400, 'Série inválida');
     const linhas = Array.isArray(b.alunos) ? b.alunos : [];
+    // bimestre 1 a 4: as notas digitadas são daquele bimestre (a nota final sai sozinha quando os 4 estiverem lançados).
+    // Sem bimestre: são as notas finais do ano (para anos antigos ou quando a escola só tem a nota final).
+    const bim = b.bimestre ? Number(b.bimestre) : null;
+    if (bim != null && !(bim >= 1 && bim <= 4)) falha(400, 'Bimestre inválido: escolha de 1 a 4');
     let n = 0;
     transacao(() => {
       for (const l of linhas) {
@@ -303,15 +345,16 @@ module.exports = function historico(ctx) {
         const temAlgo = Object.values(l.notas || {}).some((v) => !vazioTxt(v)) || l.frequencia || l.resultado;
         if (!ex && !temAlgo) continue;
         // Lançado pela turma = cursado aqui na escola; a carga de cada disciplina é a mesma para a turma inteira
+        const porBim = bim ? Object.fromEntries(Object.entries(l.notas || {}).map(([comp, v]) => [comp, { ['b' + bim]: v }])) : undefined;
         const ok = gravarAno(a.id, {
-          serie_chave: serie, notas: l.notas, frequencia: l.frequencia, resultado: l.resultado, cargas: b.cargas,
+          serie_chave: serie, notas: bim ? undefined : l.notas, bims: porBim, frequencia: l.frequencia, resultado: bim ? undefined : l.resultado, cargas: b.cargas,
           ano_letivo: b.ano_letivo, carga: b.carga, carga_bnc: b.carga_bnc, carga_pd: b.carga_pd, dias_letivos: b.dias_letivos,
           ...(ex && ex.escola ? {} : ESCOLA),
         }, u);
         if (ok) { tocar(a.id, u); n++; }
       }
     });
-    registrar(u.login, 'lançou notas da turma no histórico', { serie, ano: b.ano_letivo, alunos: n });
+    registrar(u.login, 'lançou notas da turma no histórico', { serie, ano: b.ano_letivo, bimestre: bim || 'nota final', alunos: n });
     json(res, 200, { ok: true, alunos: n });
   });
 

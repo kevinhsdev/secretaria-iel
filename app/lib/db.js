@@ -216,7 +216,7 @@ for (const [tabela, cols] of [['alunos', ['atualizado_por']], ['interessados', [
 }
 
 // 4.10.0: o histórico segue os modelos Word da escola (carga por disciplina no Médio, subtotais no Fundamental, RG completo)
-for (const [tabela, cols] of [['hist_notas', ['carga']], ['hist_anos', ['carga_bnc', 'carga_pd']], ['hist_transf', ['bimestres']],
+for (const [tabela, cols] of [['hist_notas', ['carga', 'b1', 'b2', 'b3', 'b4']], ['hist_anos', ['carga_bnc', 'carga_pd']], ['hist_transf', ['bimestres']],
   ['hist_alunos', ['rg_expedicao', 'rg_orgao', 'fund_ano', 'fund_escola', 'fund_cidade', 'fund_uf']]]) {
   const tem = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
   for (const c of cols) if (!tem.has(c)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${c} ${c === 'carga' || c === 'bimestres' || c.startsWith('carga_') ? 'INTEGER' : 'TEXT'}`);
@@ -280,6 +280,7 @@ const cfgPadrao = {
   hist_dias: '200',                 // dias letivos sugeridos
   hist_secretario: 'Samara Pereira da Silva', // assina à direita no histórico
   hist_diretor: 'Carina Buller',    // assina no meio ("O Diretor do Instituto…")
+  hist_arredonda: '0.5',            // média do ano: arredonda para 0,5 mais próximo ('0.1' = uma casa decimal)
   hist_matriz: '2',                 // versão da matriz curricular semeada (2 = modelos Word da escola)
 };
 

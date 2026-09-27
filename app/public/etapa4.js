@@ -340,8 +340,6 @@ TELAS.relatorios = async (c, ano) => {
 
   <h2 class="titulo-secao">Financeiro e bolsas</h2>
   <div class="grade g4">
-    <div class="cartao kpi"><div class="rot">Boletos ${d.boletos.ano}</div><div class="val">${d.boletos.conferidos}<small style="font-size:14px;color:var(--texto-2)"> / ${d.boletos.matriculados}</small></div>
-      <div class="det">conferidos · ${d.boletos.lancados} já lançados no ACADESC</div></div>
     <div class="cartao kpi"><div class="rot">Atividades extras</div><div class="val">${d.extras.inscricoes_ativas}</div>
       <div class="det">inscrições ativas · ${d.extras.canceladas} canceladas</div></div>
     <div class="cartao kpi"><div class="rot">Receita mensal das extras</div><div class="val" style="font-size:22px">${moedaBR(d.extras.receita_mensal)}</div><div class="det">soma das parcelas ativas</div></div>

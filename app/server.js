@@ -633,7 +633,7 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
     'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
     'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone',
     'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte', 'lixeira_dias',
-    'hist_media', 'hist_frequencia', 'hist_carga_fund', 'hist_carga_medio', 'hist_dias', 'hist_secretario', 'hist_diretor'];
+    'hist_media', 'hist_arredonda', 'hist_frequencia', 'hist_carga_fund', 'hist_carga_medio', 'hist_dias', 'hist_secretario', 'hist_diretor'];
   for (const k of permitidas) if (b[k] !== undefined) db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(k, String(b[k]));
   prontuario.limparCache();
   registrar(u.login, 'alterou configurações', b);

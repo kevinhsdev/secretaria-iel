@@ -525,8 +525,6 @@ const DOCS = {
           ])}
           ${bloco('Financeiro', [
             linha('Alunos com boleto em ' + d.boletos.ano, d.boletos.matriculados),
-            linha('Descontos conferidos', d.boletos.conferidos, pc(d.boletos.conferidos, d.boletos.matriculados)),
-            linha('Já lançados no ACADESC', d.boletos.lancados),
             linha('Inscrições em atividades extras', d.extras.inscricoes_ativas, 'R$ ' + moeda(d.extras.receita_mensal) + '/mês'),
             linha('Inscrições canceladas', d.extras.canceladas),
           ])}

@@ -78,9 +78,9 @@ const AJUDA = {
   },
   boletos: {
     nome: 'Boletos',
-    serve: 'Conferir os descontos antes da massa de boletos e registrar a entrega dos boletos em papel.',
-    passos: ['Conferência (POP 5.3): para cada aluno, veja o desconto esperado (filho de funcionário, bolsa ou atividade extra) e compare com o do ACADESC.', 'Marque "conferido" e depois "lançado" quando corrigir no ACADESC.', 'Entrega: crie uma remessa, marque quem recebeu e imprima a folha de assinatura por turma.'],
-    dicas: ['Os descontos não somam: vale o maior.', 'Bolsa só ofertada aparece com aviso "confirme antes de lançar".'],
+    serve: 'Registrar a entrega dos boletos em papel: quem recebeu, quando e como.',
+    passos: ['Crie uma remessa (por exemplo, "Boletos 2027 — massa anual").', 'Escolha a turma e marque quem recebeu (dá para marcar a turma toda).', 'Imprima a folha de assinatura por turma.'],
+    dicas: ['Cada entrega fica registrada com a data e quem retirou.'],
   },
   fotos: {
     nome: 'Mutirão de fotos',
@@ -106,7 +106,7 @@ const AJUDA = {
     passos: [
       'Aba "Alunos": mostra quem está com o histórico em dia e quais anos faltam. "Notas" abre os anos do aluno; "🖨️ Histórico" monta o documento.',
       'Aluno que veio de outra escola: abra "Notas" e copie do histórico que a família trouxe, coluna por coluna (ano, escola, notas, frequência).',
-      'No fim do ano, use "Lançar notas da turma": escolha a turma e digite (ou cole do Excel) a nota final de cada disciplina, a frequência e confira o resultado.',
+      'A cada bimestre, use "Lançar notas da turma": escolha a turma e o bimestre e digite (ou cole do Excel) as notas. Com os 4 bimestres lançados, a média do ano é calculada sozinha e vai para o histórico.',
       'O resultado ("Aprovado" ou "Retido") aparece sozinho pelas notas e pela frequência. Se o conselho aprovou, troque para "Aprovado pelo Conselho".',
       'No documento, confira os nomes de quem assina e imprima. O histórico sai "de conclusão" quando todos os anos do curso estão aprovados; senão, sai como transferência.',
     ],
@@ -122,7 +122,8 @@ const AJUDA = {
     passos: [
       'Confira a identificação (local de nascimento, RG com data de expedição e órgão): sai no cabeçalho do histórico.',
       '"✨ Preencher o que dá sozinho" coloca o ano letivo provável, a escola e a carga total. Troque a escola nos anos feitos em outro lugar.',
-      'Digite as notas (Enter desce). No Ensino Médio, ao lado de cada nota vai a carga horária da disciplina naquele ano. Embaixo ficam os totais de carga.',
+      'Notas do ano por bimestre: escolha a série e digite o 1º, 2º, 3º e 4º bimestre. A média do ano aparece sozinha e vai para a coluna daquele ano, logo abaixo.',
+      'Anos antigos (ou de outra escola): digite direto a nota final na coluna do ano (Enter desce). No Ensino Médio, ao lado de cada nota vai a carga horária. Embaixo ficam os totais de carga.',
       'A "Situação" (Aprovado, Retido…) não sai no papel: serve para o sistema saber se sai CERTIFICADO de conclusão ou DECLARAÇÃO.',
       'Aluno saindo no meio do ano: marque "Este aluno está saindo no meio do ano", escolha até qual bimestre ele ficou (ex.: até o 3º) e digite as notas de cada bimestre. Os bimestres seguintes saem riscados.',
       'Clique em "Salvar". "🖨️ Gerar histórico" salva e já abre o documento.',

@@ -285,6 +285,16 @@ function gerarDemoHistorico(db, anoAtual, transacao) {
           insNota.run(anoId, cp, nota(), cargaMedio[cp] || (/^Aprof/.test(cp) ? 40 : 80));
         }
       }
+      // Ano atual em andamento: notas do 1º ao 3º bimestre (a média do ano sai quando o 4º for lançado)
+      {
+        const r = insAno.run(a.id, a.serie_chave, anoAtual, 'Instituto Educacional Luterano', 'Ferraz de Vasconcelos', 'SP',
+          curso === 'medio' ? 1600 : idx + 1 <= 5 ? 1000 : 1200, 'Cursando', agora);
+        const anoId = Number(r.lastInsertRowid), n = idx + 1;
+        if (anoId) for (const cp of comps[curso]) {
+          if (curso === 'fund' ? quando[cp] && !quando[cp].includes(n) : /^Aprof/.test(cp) !== (n === 3)) continue;
+          db.prepare('INSERT OR IGNORE INTO hist_notas (ano_id, componente, b1, b2, b3) VALUES (?,?,?,?,?)').run(anoId, cp, nota(), nota(), nota());
+        }
+      }
       // Um aluno do 1º ao 5º ano de exemplo saindo no meio do ano (2ª folha do histórico preenchida)
       if (!transferido && curso === 'fund' && idx >= 1 && idx <= 4) {
         transferido = true;

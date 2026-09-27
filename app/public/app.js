@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.10.0';
+const VERSAO = '4.11.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -1027,7 +1027,6 @@ TELAS.config = async (c, aba = 'geral') => {
       <div class="campo"><label>Aviso de saída só por telefone</label><select id="c_saida_aviso_telefone">
         <option value="0" ${cfg.saida_aviso_telefone !== '1' ? 'selected' : ''}>Não aceitar (regra do termo)</option>
         <option value="1" ${cfg.saida_aviso_telefone === '1' ? 'selected' : ''}>Aceitar sem avisar</option></select></div></div>
-    <p class="dado">Na conferência dos boletos os descontos não somam: vale o maior entre a isenção de funcionário e a bolsa CEBAS.</p>
     <h3 style="margin-top:18px">Aparência (vale só neste computador)</h3>
     <label class="chk"><input type="checkbox" id="c_compacto"> Modo compacto: linhas mais juntas, cabe mais aluno na tela</label>
     <p class="dado">O claro/escuro fica no botão da barra lateral, embaixo.</p>

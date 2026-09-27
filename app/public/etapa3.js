@@ -64,7 +64,6 @@ TELAS.hoje = async (c, data) => {
             <small>${i.dia ? 'até ' + dataBR(i.limite) : 'durante ' + esc(i.mes_nome)} · ${esc(nomePessoa(i.responsavel))}</small></span></li>`).join('')}</ul>`
           : '<p class="vazio">Nada pendente neste mês 🎉</p>'}</div>
       <div class="cartao" style="margin-top:14px"><h2>Para não esquecer</h2>
-        <p class="dado">Boletos ${h.boletos.ano} a conferir: <b>${h.boletos.pendentes}</b> · <a href="#/boletos">conferir descontos</a></p>
         <p class="dado">Alunos sem foto nos 3 sistemas: <b>${h.fotos.faltando}</b> · <a href="#/fotos">abrir o mutirão</a></p></div>
     </div>
   </div>`;
@@ -136,81 +135,11 @@ async function janelaCronograma() {
 }
 
 // ───────────── Boletos ─────────────
-TELAS.boletos = async (c, aba = 'conferencia') => {
-  const ABAS = { conferencia: 'Conferência de descontos', entrega: 'Entrega dos boletos' };
-  c.innerHTML = `<h1>Boletos</h1><p class="sub">Conferir os descontos antes da massa de boletos e registrar a entrega dos boletos físicos.</p>
-    <div class="abas">${Object.entries(ABAS).map(([k, v]) => `<button data-aba="${k}" class="${aba === k ? 'on' : ''}">${v}</button>`).join('')}</div><div id="aba"><p class="sub">Carregando…</p></div>`;
-  $$('[data-aba]').forEach((b) => (b.onclick = () => (location.hash = '#/boletos/' + b.dataset.aba)));
-  if (aba === 'conferencia') await abaConferencia($('#aba'));
-  else await abaEntrega($('#aba'));
+// Só a entrega dos boletos em papel (a conferência de descontos saiu na 4.11.0, a pedido da secretaria)
+TELAS.boletos = async (c) => {
+  c.innerHTML = `<h1>Boletos entregues</h1><p class="sub">Registro de quem recebeu os boletos em papel, turma por turma.</p><div id="aba"><p class="sub">Carregando…</p></div>`;
+  await abaEntrega($('#aba'));
 };
-
-async function abaConferencia(el) {
-  const d = await api('GET', '/api/boletos/conferencia');
-  const r = d.resumo;
-  const turmas = [...new Set(d.linhas.map((l) => l.turma_rotulo))].sort();
-  el.innerHTML = `<div class="dica">Cruzamento automático de <b>filhos de funcionários</b> (isentos ${d.desconto_funcionario}%), <b>bolsas CEBAS</b> concedidas ou ofertadas e <b>atividades extras</b>.
-    Os descontos <b>não somam</b>: vale o maior. Confira aluno por aluno e marque, para depois lançar a massa de boletos no ACADESC (vencimento dia ${esc(d.dia_venc)}).</div>
-  <div class="grade g4">
-    <div class="cartao kpi destaque"><div class="rot">Alunos com boleto em ${d.ano}</div><div class="val">${r.total}</div><div class="det">${r.conferidos} conferidos · ${r.lancados} já lançados</div></div>
-    <div class="cartao kpi"><div class="rot">Com desconto</div><div class="val">${r.com_desconto}</div><div class="det">${r.isentos} filhos de funcionário · ${r.bolsistas} bolsistas</div></div>
-    <div class="cartao kpi"><div class="rot">Atividades extras</div><div class="val">${r.com_extras}</div><div class="det">${r.a_confirmar_extras} a confirmar do ano anterior</div></div>
-    <div class="cartao kpi ${r.divergencias ? 'alerta' : ''}"><div class="rot">Pontos de atenção</div><div class="val">${r.com_alerta}</div><div class="det">${r.divergencias} divergem do ACADESC</div></div>
-  </div>
-  <div class="cartao" style="margin-top:14px">
-    <div class="filtros">
-      <select id="fv"><option value="">Todos os alunos</option><option value="desconto">Só com desconto</option><option value="extras">Só com atividade extra</option>
-        <option value="alerta">Só com ponto de atenção</option><option value="pendente">Ainda não conferidos</option><option value="conferido">Já conferidos</option></select>
-      <select id="ft"><option value="">Todas as turmas</option>${turmas.map((t) => `<option>${esc(t)}</option>`).join('')}</select>
-      <input id="fq" placeholder="Buscar aluno, matrícula ou responsável…" style="flex:1;min-width:200px">
-      <button class="btn peq" id="marcar">✔️ Marcar filtrados como conferidos</button>
-      <button class="btn peq" id="imp">🖨️ Lista de conferência</button>
-    </div>
-    <div class="tabela-wrap"><table><thead><tr><th>Aluno</th><th>Turma → ${d.ano}</th><th>Desconto esperado</th><th>Atividades extras</th><th>% no ACADESC</th><th>Conferido</th><th>Lançado</th><th>Observação</th></tr></thead>
-      <tbody id="tb"></tbody></table></div>
-  </div>`;
-  let filtrados = [];
-  const desenhar = () => {
-    const fv = $('#fv').value, ft = $('#ft').value, q = norm($('#fq').value);
-    filtrados = d.linhas.filter((l) => (!ft || l.turma_rotulo === ft) && (!q || norm([l.nome, l.mat, l.responsavel].join(' ')).includes(q))
-      && (fv === '' || (fv === 'desconto' && l.desconto_esperado > 0) || (fv === 'extras' && (l.extras.length || l.extras_anterior.length))
-        || (fv === 'alerta' && l.alertas.length) || (fv === 'pendente' && !l.conferido) || (fv === 'conferido' && l.conferido)));
-    emPartes($('#tb'), filtrados.map((l) => `<tr data-a="${l.aluno_id}" class="${l.divergencia ? 'linha-alerta' : ''}">
-      <td><a href="#/aluno/${l.aluno_id}"><b>${esc(titulo(l.nome))}</b></a>${l.filho_funcionario ? ' <span class="tag t-func">func.</span>' : ''}
-        <br><small class="dado">Mat. ${esc(l.mat || '—')} · ${esc(titulo(l.responsavel))}</small></td>
-      <td>${esc(l.turma_rotulo)}<br><small class="dado">→ ${esc(l.destino)}</small></td>
-      <td><b>${pct(l.desconto_esperado)}</b><br><small class="dado">${esc(l.origem)}</small></td>
-      <td>${l.extras.length ? l.extras.map((x) => `${esc(x.atividade)} <span class="dado">${x.valor_parcela == null ? '(sem valor)' : moedaBR(x.valor_parcela)}${x.desconto_folha ? ' · folha' : ''}</span>`).join('<br>')
-        : l.extras_anterior.length ? `<span class="dado">em ${d.ano - 1}: ${esc(l.extras_anterior.join(', '))}</span>` : '<span class="dado">—</span>'}
-        ${l.alertas.length ? `<br><small style="color:var(--laranja)">⚠️ ${esc(l.alertas.join(' '))}</small>` : ''}</td>
-      <td><input type="number" data-k="desconto_acadesc" value="${l.desconto_acadesc ?? ''}" min="0" max="100" style="width:70px" placeholder="%"></td>
-      <td style="text-align:center"><input type="checkbox" data-k="conferido" ${l.conferido ? 'checked' : ''}></td>
-      <td style="text-align:center"><input type="checkbox" data-k="lancado" ${l.lancado ? 'checked' : ''}></td>
-      <td><input data-k="obs" value="${esc(l.obs)}" placeholder="—" style="width:150px">${l.atualizado_por ? `<br><small class="dado">${esc(nomePessoa(l.atualizado_por))}</small>` : ''}</td></tr>`),
-    { colunas: 8, vazio: '<tr><td colspan="8" class="vazio">Nenhum aluno com esses filtros.</td></tr>', ligar: ligarConferencia });
-  };
-  const ligarConferencia = (tb) => {
-    $$('[data-k]', tb).forEach((i) => (i.onchange = tentar(async () => {
-      const id = i.closest('tr').dataset.a;
-      const v = i.type === 'checkbox' ? i.checked : i.value;
-      await api('PUT', '/api/boletos/conferencia/' + id, { [i.dataset.k]: v, ano: d.ano });
-      const l = d.linhas.find((x) => x.aluno_id === +id);
-      l[i.dataset.k] = i.type === 'checkbox' ? v : v === '' ? null : Number(v);
-      toast('Salvo');
-      if (i.dataset.k === 'desconto_acadesc') rotear();
-    })));
-  };
-  ['fv', 'ft', 'fq'].forEach((id) => ($('#' + id).oninput = desenhar));
-  $('#marcar').onclick = tentar(async () => {
-    const alvo = filtrados.filter((l) => !l.conferido);
-    if (!alvo.length) return toast('Todos os alunos filtrados já estão conferidos');
-    if (!(await confirmar(`Marcar ${alvo.length} aluno(s) como conferidos?`, 'Marcar'))) return;
-    await api('POST', '/api/boletos/conferencia/lote', { alunos: alvo.map((l) => l.aluno_id), conferido: true, ano: d.ano });
-    toast(`${alvo.length} marcados`); rotear();
-  });
-  $('#imp').onclick = () => abrirDoc({ tipo: 'conferencia_boletos', ano: d.ano, turma: $('#ft').value, filtro: $('#fv').value });
-  desenhar();
-}
 
 async function abaEntrega(el) {
   const remessas = await api('GET', '/api/remessas');
