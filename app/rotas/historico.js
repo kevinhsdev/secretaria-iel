@@ -1,6 +1,8 @@
-// 4.9.0 — Histórico escolar: as notas de cada ano, digitadas por aluno ou pela turma inteira, e o histórico pronto para imprimir.
-// Cada ano cursado é uma coluna do histórico (hist_anos) com as notas das disciplinas (hist_notas).
+// 4.9.0/4.10.0 — Histórico escolar no formato dos modelos Word da escola ("HISTORICO FUNDAMENTAL I e II",
+// "HISTÓRICO ENSINO MÉDIO" e "HISTORICO ESCOLAR-TRANSFERÊNCIA BIMESTRE").
+// Cada ano cursado é uma coluna do histórico (hist_anos) com as notas — e, no Médio, a carga — de cada disciplina (hist_notas).
 // As linhas (disciplinas) vêm da matriz curricular (hist_componentes), que a administração ajusta.
+// Quem sai no meio do ano tem a página 2 preenchida: notas por bimestre, faltas e aulas dadas (hist_transf).
 'use strict';
 
 module.exports = function historico(ctx) {
@@ -16,13 +18,16 @@ module.exports = function historico(ctx) {
   const rotuloSerie = (chave) => (chave.startsWith('EM') ? `${chave.slice(2)}ª série` : `${chave.slice(1)}º ano`);
   const anoAtual = () => +cfg().ano_matricula - 1; // o ano letivo em andamento (a matrícula aberta é a do ano seguinte)
   const ordemSerie = (chave) => S.SERIES.findIndex((s) => s.chave === chave);
+  const vazioTxt = (v) => v == null || /^\s*[-–—]?\s*$/.test(String(v)); // "-" é como o modelo da escola marca "não teve"
+  const texto = (v) => (vazioTxt(v) ? null : String(v).trim());
+  const inteiro = (v) => (vazioTxt(v) ? null : Math.round(Number(String(v).replace(',', '.'))));
 
   const componentes = (curso, todos) => db.prepare(`SELECT * FROM hist_componentes WHERE curso = ? ${todos ? '' : 'AND ativo = 1'} ORDER BY ordem, id`).all(curso);
 
-  // Nota digitada: número de 0 a 10 (vírgula ou ponto) ou um conceito curto (A, B, MB, S…). Vazio apaga.
+  // Nota digitada: número de 0 a 10 (vírgula ou ponto) ou um conceito curto (A, B, MB, S…). Vazio ou "-" apaga.
   function normalizarNota(v, comp) {
-    const t = String(v ?? '').trim();
-    if (!t) return null;
+    if (vazioTxt(v)) return null;
+    const t = String(v).trim();
     if (/^\d{1,2}([.,]\d{1,2})?$/.test(t)) {
       const n = Number(t.replace(',', '.'));
       if (n > 10) falha(400, `Nota ${t} em ${comp}: as notas vão de 0 a 10.`);
@@ -33,9 +38,9 @@ module.exports = function historico(ctx) {
   }
   const numero = (nota) => (nota != null && /^\d/.test(nota) ? Number(String(nota).replace(',', '.')) : null);
 
-  // O "automático": olha as notas e a frequência e diz qual deve ser o resultado
+  // O "automático": olha as notas (e a frequência, se houver) e diz qual deve ser o resultado
   function sugerirResultado(notas, frequencia, c = cfg()) {
-    const media = Number(c.hist_media) || 5, minFreq = Number(c.hist_frequencia) || 75;
+    const media = Number(c.hist_media) || 7, minFreq = Number(c.hist_frequencia) || 75;
     const valores = Object.entries(notas || {}).filter(([, n]) => n != null && n !== '');
     if (!valores.length) return null;
     const abaixo = valores.filter(([, n]) => numero(n) != null && numero(n) < media).map(([k]) => k);
@@ -46,9 +51,20 @@ module.exports = function historico(ctx) {
 
   function anosDoAluno(alunoId) {
     const anos = db.prepare('SELECT * FROM hist_anos WHERE aluno_id = ?').all(alunoId);
-    const notas = db.prepare('SELECT componente, nota FROM hist_notas WHERE ano_id = ?');
-    return anos.map((a) => ({ ...a, notas: Object.fromEntries(notas.all(a.id).map((n) => [n.componente, n.nota])) }))
-      .sort((a, b) => ordemSerie(a.serie_chave) - ordemSerie(b.serie_chave));
+    const notas = db.prepare('SELECT componente, nota, carga FROM hist_notas WHERE ano_id = ?');
+    return anos.map((a) => {
+      const ns = notas.all(a.id);
+      return { ...a, notas: Object.fromEntries(ns.filter((n) => n.nota != null).map((n) => [n.componente, n.nota])),
+        cargas: Object.fromEntries(ns.filter((n) => n.carga != null).map((n) => [n.componente, n.carga])) };
+    }).sort((a, b) => ordemSerie(a.serie_chave) - ordemSerie(b.serie_chave));
+  }
+
+  function transfDoAluno(alunoId) {
+    const t = db.prepare('SELECT * FROM hist_transf WHERE aluno_id = ?').get(alunoId);
+    if (!t) return null;
+    let notas = {};
+    try { notas = JSON.parse(t.notas_json || '{}') || {}; } catch { /* registro estragado: volta vazio */ }
+    return { ...t, notas };
   }
 
   // Em que ano o aluno provavelmente cursou cada série (conta para trás a partir da série de hoje)
@@ -64,36 +80,71 @@ module.exports = function historico(ctx) {
     const chave = a.serie_chave;
     if (!cursoDe(chave)) falha(400, 'Série inválida para o histórico: ' + chave);
     const comps = new Set(componentes(cursoDe(chave), true).map((c) => c.nome));
-    const notas = {};
+    const notas = {}, cargas = {};
     for (const [comp, n] of Object.entries(a.notas || {})) {
-      if (!comps.has(comp)) continue; // disciplina que não existe (ou foi renomeada) não entra
-      notas[comp] = normalizarNota(n, comp);
+      if (comps.has(comp)) notas[comp] = normalizarNota(n, comp); // disciplina que não existe (ou foi renomeada) não entra
     }
-    const freq = a.frequencia === '' || a.frequencia == null ? null : Number(String(a.frequencia).replace(',', '.'));
+    // Carga horária de cada disciplina no ano (coluna "Carga Horária" do histórico do Ensino Médio)
+    for (const [comp, ch] of Object.entries(a.cargas || {})) {
+      if (!comps.has(comp)) continue;
+      const v = inteiro(ch);
+      if (v != null && !(v >= 0 && v <= 2000)) falha(400, `Carga horária "${ch}" em ${comp} (${rotuloSerie(chave)}) não parece certa.`);
+      cargas[comp] = v;
+    }
+    const freq = vazioTxt(a.frequencia) ? null : Number(String(a.frequencia).replace(',', '.'));
     if (freq != null && !(freq >= 0 && freq <= 100)) falha(400, `Frequência do ${rotuloSerie(chave)} precisa estar entre 0 e 100%.`);
     if (a.resultado && !RESULTADOS.includes(a.resultado)) falha(400, 'Resultado inválido: ' + a.resultado);
-    const inteiro = (v) => (v === '' || v == null ? null : Math.round(Number(v)) || null);
-    const campos = {
-      ano_letivo: a.ano_letivo, escola: a.escola, cidade: a.cidade, uf: a.uf, carga: a.carga, dias_letivos: a.dias_letivos, frequencia: a.frequencia, resultado: a.resultado,
-    };
+    const numericos = ['ano_letivo', 'carga', 'carga_bnc', 'carga_pd', 'dias_letivos'];
     const reg = {};
-    for (const [k, v] of Object.entries(campos)) {
-      if (v === undefined) continue;
-      reg[k] = ['ano_letivo', 'carga', 'dias_letivos'].includes(k) ? inteiro(v) : k === 'frequencia' ? freq : (String(v).trim() || null);
+    for (const k of [...numericos, 'escola', 'cidade', 'uf', 'frequencia', 'resultado']) {
+      if (a[k] === undefined) continue;
+      reg[k] = numericos.includes(k) ? inteiro(a[k]) : k === 'frequencia' ? freq : texto(a[k]);
+      if (numericos.includes(k) && reg[k] != null && !(reg[k] >= 0 && reg[k] <= 9999)) falha(400, `Valor "${a[k]}" não parece certo (${rotuloSerie(chave)}).`);
     }
     if (reg.ano_letivo != null && (reg.ano_letivo < 1950 || reg.ano_letivo > anoAtual() + 1)) falha(400, `Ano letivo ${reg.ano_letivo} do ${rotuloSerie(chave)} não parece certo.`);
-    const vazio = !Object.values(reg).some((v) => v != null) && !Object.values(notas).some((v) => v != null);
+    const vazio = !Object.values(reg).some((v) => v != null) && ![...Object.values(notas), ...Object.values(cargas)].some((v) => v != null);
     let ex = db.prepare('SELECT id FROM hist_anos WHERE aluno_id = ? AND serie_chave = ?').get(alunoId, chave);
     if (!ex && vazio) return false;
     if (!ex) ex = { id: Number(db.prepare('INSERT INTO hist_anos (aluno_id, serie_chave) VALUES (?, ?)').run(alunoId, chave).lastInsertRowid) };
     const ks = Object.keys(reg);
     db.prepare(`UPDATE hist_anos SET ${[...ks.map((k) => k + ' = ?'), 'atualizado_em = ?', 'atualizado_por = ?'].join(', ')} WHERE id = ?`)
       .run(...ks.map((k) => reg[k]), agoraIso(), u.login, ex.id);
-    for (const [comp, n] of Object.entries(notas)) {
-      if (n == null) db.prepare('DELETE FROM hist_notas WHERE ano_id = ? AND componente = ?').run(ex.id, comp);
-      else db.prepare('INSERT INTO hist_notas (ano_id, componente, nota) VALUES (?,?,?) ON CONFLICT(ano_id, componente) DO UPDATE SET nota = excluded.nota').run(ex.id, comp, n);
+    const antes = db.prepare('SELECT nota, carga FROM hist_notas WHERE ano_id = ? AND componente = ?');
+    const grava = db.prepare(`INSERT INTO hist_notas (ano_id, componente, nota, carga) VALUES (?,?,?,?)
+      ON CONFLICT(ano_id, componente) DO UPDATE SET nota = excluded.nota, carga = excluded.carga`);
+    for (const comp of new Set([...Object.keys(notas), ...Object.keys(cargas)])) {
+      const x = antes.get(ex.id, comp) || {};
+      const nota = comp in notas ? notas[comp] : x.nota ?? null, carga = comp in cargas ? cargas[comp] : x.carga ?? null;
+      if (nota == null && carga == null) db.prepare('DELETE FROM hist_notas WHERE ano_id = ? AND componente = ?').run(ex.id, comp);
+      else grava.run(ex.id, comp, nota, carga);
     }
     return true;
+  }
+
+  // Página 2: quem sai no meio do ano. Vazio = o aluno não está saindo (o registro vai para a lixeira).
+  function gravarTransf(aluno, t, u) {
+    const atual = db.prepare('SELECT 1 FROM hist_transf WHERE aluno_id = ?').get(aluno.id);
+    if (!t) {
+      if (atual) L.excluir({ tipo: 'hist_transf', rotulo: 'Transferência no meio do ano — ' + aluno.nome, usuario: u.login, aluno_id: aluno.id,
+        tabela: 'hist_transf', onde: 'aluno_id = ?', params: [aluno.id] });
+      return;
+    }
+    if (!cursoDe(t.serie_chave)) falha(400, 'Escolha a série que o aluno está deixando');
+    const comps = new Set(componentes(cursoDe(t.serie_chave), true).map((c) => c.nome));
+    const notas = {};
+    for (const [comp, x] of Object.entries(t.notas || {})) {
+      if (!comps.has(comp)) continue;
+      const linha = { b1: normalizarNota(x.b1, comp), b2: normalizarNota(x.b2, comp), b3: normalizarNota(x.b3, comp), b4: normalizarNota(x.b4, comp),
+        faltas: inteiro(x.faltas), aulas: inteiro(x.aulas) };
+      if (Object.values(linha).some((v) => v != null)) notas[comp] = linha;
+    }
+    const ano = inteiro(t.ano_letivo);
+    db.prepare(`INSERT INTO hist_transf (aluno_id, serie_chave, ano_letivo, periodo, turma, turno, faltas, dias_letivos, notas_json, atualizado_em, atualizado_por)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(aluno_id) DO UPDATE SET serie_chave = excluded.serie_chave, ano_letivo = excluded.ano_letivo,
+      periodo = excluded.periodo, turma = excluded.turma, turno = excluded.turno, faltas = excluded.faltas, dias_letivos = excluded.dias_letivos,
+      notas_json = excluded.notas_json, atualizado_em = excluded.atualizado_em, atualizado_por = excluded.atualizado_por`)
+      .run(aluno.id, t.serie_chave, ano, texto(t.periodo), texto(t.turma), texto(t.turno), texto(t.faltas), texto(t.dias_letivos),
+        JSON.stringify(notas), agoraIso(), u.login);
   }
 
   // Marca a ficha do histórico como alterada agora (é o que o aviso de "duas pessoas editando" compara)
@@ -103,7 +154,7 @@ module.exports = function historico(ctx) {
   }
 
   const configHist = (c) => ({
-    media: Number(c.hist_media) || 5, frequencia: Number(c.hist_frequencia) || 75,
+    media: Number(c.hist_media) || 7, frequencia: Number(c.hist_frequencia) || 75,
     carga: { fund: Number(c.hist_carga_fund) || null, medio: Number(c.hist_carga_medio) || null }, dias: Number(c.hist_dias) || null,
     secretario: c.hist_secretario || '', diretor: c.hist_diretor || '',
   });
@@ -114,7 +165,7 @@ module.exports = function historico(ctx) {
       WHERE ativo = 1 AND serie_chave IN (${[...CURSOS.fund.series, ...CURSOS.medio.series].map(() => '?').join(',')}) ORDER BY nome`)
       .all(...CURSOS.fund.series, ...CURSOS.medio.series);
     const feitos = new Map();
-    for (const r of db.prepare(`SELECT h.aluno_id, h.serie_chave, h.resultado, (SELECT COUNT(*) FROM hist_notas n WHERE n.ano_id = h.id) notas FROM hist_anos h`).all()) {
+    for (const r of db.prepare(`SELECT h.aluno_id, h.serie_chave, h.resultado, (SELECT COUNT(*) FROM hist_notas n WHERE n.ano_id = h.id AND n.nota IS NOT NULL) notas FROM hist_anos h`).all()) {
       if (!feitos.has(r.aluno_id)) feitos.set(r.aluno_id, new Map());
       feitos.get(r.aluno_id).set(r.serie_chave, r);
     }
@@ -156,25 +207,33 @@ module.exports = function historico(ctx) {
         series: cur.series.map((ch) => ({ chave: ch, rotulo: rotuloSerie(ch), ano_provavel: anoProvavel(a, ch) })),
       };
     }
+    // "Estudos realizados no Ensino Fundamental" do histórico do Médio: o 9º ano lançado aqui, ou o que foi digitado à mão
+    const f9 = anos.find((x) => x.serie_chave === 'F9');
+    const fundConclusao = {
+      ano: dados.fund_ano || (f9 && f9.ano_letivo ? String(f9.ano_letivo) : ''), escola: dados.fund_escola || f9?.escola || '',
+      cidade: dados.fund_cidade || f9?.cidade || '', uf: dados.fund_uf || f9?.uf || '',
+    };
     json(res, 200, {
       aluno: { id: a.id, mat: a.mat, nome: a.nome, dt_nasc: a.dt_nasc, ra: a.ra, rg: a.rg, cpf: a.cpf, nome_mae: a.nome_mae, nome_pai: a.nome_pai,
-        serie_chave: a.serie_chave, novo: !!a.novo, turma_rotulo: turmaRotulo(a), cidade: a.cidade, uf: a.uf },
+        serie_chave: a.serie_chave, turma: a.turma, turno: a.turno, novo: !!a.novo, turma_rotulo: turmaRotulo(a), cidade: a.cidade, uf: a.uf },
       dados, curso: cursoDe(a.serie_chave) || 'fund', cursos, anos: anos.map((x) => ({ ...x, sugestao: sugerirResultado(x.notas, x.frequencia, c) })),
+      transf: transfDoAluno(a.id), fund_conclusao: fundConclusao,
       resultados: RESULTADOS, escola: { ...ESCOLA, inep: c.inep }, config: configHist(c), ano_atual: anoAtual(),
       atualizado_em: dados.atualizado_em || null, atualizado_por: dados.atualizado_por || null,
     });
   });
 
+  const CAMPOS_DADOS = ['naturalidade', 'uf_nasc', 'nacionalidade', 'rg_uf', 'rg_expedicao', 'rg_orgao', 'fund_ano', 'fund_escola', 'fund_cidade', 'fund_uf', 'obs'];
   rota('PUT', '/api/historico/aluno/:id', async (req, res, { u, p }) => {
     const b = await corpoJson(req);
     const a = db.prepare('SELECT id, nome, ra, rg FROM alunos WHERE id = ?').get(+p.id) || falha(404, 'Aluno não encontrado');
     const atual = db.prepare('SELECT * FROM hist_alunos WHERE aluno_id = ?').get(a.id) || {};
     conferirVersao(atual, b, u);
-    let anos = [];
-    if (b.anos_json !== undefined) { try { anos = JSON.parse(b.anos_json) || []; } catch { falha(400, 'Notas em formato inválido'); } }
+    const ler = (campo) => { try { return JSON.parse(b[campo]); } catch { return falha(400, 'Dados do histórico em formato inválido'); } };
+    const anos = b.anos_json !== undefined ? ler('anos_json') || [] : [];
     const mudou = [];
     transacao(() => {
-      const ks = ['naturalidade', 'uf_nasc', 'nacionalidade', 'rg_uf', 'obs'].filter((k) => b[k] !== undefined);
+      const ks = CAMPOS_DADOS.filter((k) => b[k] !== undefined);
       tocar(a.id, u);
       if (ks.length) db.prepare(`UPDATE hist_alunos SET ${ks.map((k) => k + ' = ?').join(', ')} WHERE aluno_id = ?`)
         .run(...ks.map((k) => (String(b[k] ?? '').trim() || null)), a.id);
@@ -183,6 +242,7 @@ module.exports = function historico(ctx) {
       if (ka.length) db.prepare(`UPDATE alunos SET ${ka.map((k) => k + ' = ?').join(', ')}, atualizado_em = ?, atualizado_por = ? WHERE id = ?`)
         .run(...ka.map((k) => String(b[k] ?? '').trim() || null), agoraIso(), u.login, a.id);
       for (const x of anos) if (gravarAno(a.id, x, u)) mudou.push(rotuloSerie(x.serie_chave));
+      if (b.transf_json !== undefined) { gravarTransf(a, b.transf_json ? ler('transf_json') : null, u); mudou.push('transferência'); }
       mudou.push(...ks, ...ka);
     });
     registrar(u.login, 'atualizou o histórico escolar', { aluno_id: a.id, nome: a.nome, campos: mudou });
@@ -207,15 +267,20 @@ module.exports = function historico(ctx) {
     const alunos = db.prepare(`SELECT id, mat, nome, novo FROM alunos WHERE ativo = 1 AND serie_chave = ? AND COALESCE(turma,'') = ? ORDER BY nome`).all(serie, turma);
     const anos = new Map(db.prepare(`SELECT * FROM hist_anos WHERE serie_chave = ? AND aluno_id IN (${alunos.map(() => '?').join(',') || 'NULL'})`)
       .all(serie, ...alunos.map((a) => a.id)).map((h) => [h.aluno_id, h]));
-    const notas = db.prepare('SELECT componente, nota FROM hist_notas WHERE ano_id = ?');
+    const notas = db.prepare('SELECT componente, nota, carga FROM hist_notas WHERE ano_id = ?');
+    const lista = alunos.map((a) => {
+      const h = anos.get(a.id);
+      const ns = h ? notas.all(h.id) : [];
+      return { id: a.id, mat: a.mat, nome: a.nome, novo: !!a.novo,
+        ano: h ? { ...h, notas: Object.fromEntries(ns.filter((n) => n.nota != null).map((n) => [n.componente, n.nota])),
+          cargas: Object.fromEntries(ns.filter((n) => n.carga != null).map((n) => [n.componente, n.carga])) } : null };
+    });
+    // Carga de cada disciplina da turma: a que já foi lançada para algum aluno
+    const cargas = {};
+    for (const l of lista) for (const [k, v] of Object.entries(l.ano?.cargas || {})) if (cargas[k] == null) cargas[k] = v;
     json(res, 200, {
       serie, turma, rotulo: `${S.porChave(serie).rotulo}${turma ? ' ' + turma : ''}`, curso, ano_letivo: anoAtual(),
-      componentes: componentes(curso), resultados: RESULTADOS, config: configHist(c),
-      alunos: alunos.map((a) => {
-        const h = anos.get(a.id);
-        return { id: a.id, mat: a.mat, nome: a.nome, novo: !!a.novo,
-          ano: h ? { ...h, notas: Object.fromEntries(notas.all(h.id).map((n) => [n.componente, n.nota])) } : null };
-      }),
+      componentes: componentes(curso), resultados: RESULTADOS, config: configHist(c), cargas, alunos: lista,
     });
   });
 
@@ -230,12 +295,13 @@ module.exports = function historico(ctx) {
         const a = db.prepare('SELECT id FROM alunos WHERE id = ?').get(+l.aluno_id);
         if (!a) continue;
         const ex = db.prepare('SELECT escola FROM hist_anos WHERE aluno_id = ? AND serie_chave = ?').get(a.id, serie);
-        const temAlgo = Object.values(l.notas || {}).some((v) => String(v ?? '').trim()) || l.frequencia || l.resultado;
+        const temAlgo = Object.values(l.notas || {}).some((v) => !vazioTxt(v)) || l.frequencia || l.resultado;
         if (!ex && !temAlgo) continue;
-        // Lançado pela turma = cursado aqui na escola
+        // Lançado pela turma = cursado aqui na escola; a carga de cada disciplina é a mesma para a turma inteira
         const ok = gravarAno(a.id, {
-          serie_chave: serie, notas: l.notas, frequencia: l.frequencia, resultado: l.resultado,
-          ano_letivo: b.ano_letivo, carga: b.carga, dias_letivos: b.dias_letivos, ...(ex && ex.escola ? {} : ESCOLA),
+          serie_chave: serie, notas: l.notas, frequencia: l.frequencia, resultado: l.resultado, cargas: b.cargas,
+          ano_letivo: b.ano_letivo, carga: b.carga, carga_bnc: b.carga_bnc, carga_pd: b.carga_pd, dias_letivos: b.dias_letivos,
+          ...(ex && ex.escola ? {} : ESCOLA),
         }, u);
         if (ok) { tocar(a.id, u); n++; }
       }

@@ -181,6 +181,12 @@ CREATE TABLE IF NOT EXISTS hist_notas (
   ano_id INTEGER NOT NULL REFERENCES hist_anos(id) ON DELETE CASCADE, componente TEXT NOT NULL, nota TEXT,
   PRIMARY KEY (ano_id, componente)
 );
+-- 4.10.0: transferência no meio do ano (página 2 do histórico): notas por bimestre do ano que o aluno não terminou.
+-- notas_json: { "Língua Portuguesa": { "b1": "9,0", "b2": "", "b3": "", "b4": "", "faltas": "", "aulas": "" }, ... }
+CREATE TABLE IF NOT EXISTS hist_transf (
+  aluno_id INTEGER PRIMARY KEY REFERENCES alunos(id) ON DELETE CASCADE, serie_chave TEXT NOT NULL, ano_letivo INTEGER,
+  periodo TEXT, turma TEXT, turno TEXT, faltas TEXT, dias_letivos TEXT, notas_json TEXT, atualizado_em TEXT, atualizado_por TEXT
+);
 -- ── 4.9.0: vivências (a criança passa um dia na escola antes de decidir a matrícula) ──
 CREATE TABLE IF NOT EXISTS vivencias (
   id INTEGER PRIMARY KEY, aluno TEXT NOT NULL, responsavel TEXT, telefone TEXT, ano_escolar TEXT, classe TEXT,
@@ -207,6 +213,13 @@ if (!colunasAluno.has('anonimizado')) db.exec('ALTER TABLE alunos ADD COLUMN ano
 for (const [tabela, cols] of [['alunos', ['atualizado_por']], ['interessados', ['atualizado_em', 'atualizado_por']], ['atendimentos', ['atualizado_em', 'atualizado_por']]]) {
   const tem = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
   for (const c of cols) if (!tem.has(c)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${c} TEXT`);
+}
+
+// 4.10.0: o histórico segue os modelos Word da escola (carga por disciplina no Médio, subtotais no Fundamental, RG completo)
+for (const [tabela, cols] of [['hist_notas', ['carga']], ['hist_anos', ['carga_bnc', 'carga_pd']],
+  ['hist_alunos', ['rg_expedicao', 'rg_orgao', 'fund_ano', 'fund_escola', 'fund_cidade', 'fund_uf']]]) {
+  const tem = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
+  for (const c of cols) if (!tem.has(c)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${c} ${c === 'carga' || c.startsWith('carga_') ? 'INTEGER' : 'TEXT'}`);
 }
 
 function hashSenha(senha) {
@@ -260,19 +273,22 @@ const cfgPadrao = {
   lgpd_anos_descarte: '5',          // depois de quantos anos um ex-aluno pode ser anonimizado
   lixeira_dias: '30',               // quantos dias o que foi excluído fica na lixeira antes de sumir de vez
   // 4.9.0 — histórico escolar
-  hist_media: '5',                  // nota mínima para aprovação (abaixo disso o app avisa)
+  hist_media: '7',                  // média para aprovação (modelo da escola: "igual ou superior a 7,0")
   hist_frequencia: '75',            // frequência mínima (%) exigida pela LDB
   hist_carga_fund: '1000',          // carga horária anual sugerida no Ensino Fundamental
-  hist_carga_medio: '1000',         // carga horária anual sugerida no Ensino Médio
+  hist_carga_medio: '1600',         // carga horária anual sugerida no Ensino Médio
   hist_dias: '200',                 // dias letivos sugeridos
-  hist_secretario: '',              // nome de quem assina como secretário(a) de escola
-  hist_diretor: '',                 // nome de quem assina como diretor(a)
+  hist_secretario: 'Samara Pereira da Silva', // assina à direita no histórico
+  hist_diretor: 'Carina Buller',    // assina no meio ("O Diretor do Instituto…")
+  hist_matriz: '2',                 // versão da matriz curricular semeada (2 = modelos Word da escola)
 };
 
 // Nunca sai do servidor para a tela (nem para o admin): só se diz se está definida ou não.
 const CHAVES_SECRETAS = ['backup_senha'];
 
 function inicializar() {
+  // Banco da 4.9.0: já tinha disciplinas, mas ainda não a marca da matriz nova (é lido antes de gravar os padrões abaixo)
+  const antes49 = !!db.prepare('SELECT 1 FROM hist_componentes LIMIT 1').get() && !db.prepare("SELECT 1 FROM config WHERE chave = 'hist_matriz'").get();
   if (!db.prepare('SELECT 1 FROM usuarios LIMIT 1').get()) {
     const ins = db.prepare('INSERT INTO usuarios (login, nome, perfil, senha_hash) VALUES (?, ?, ?, ?)');
     ins.run('samara', 'Samara', 'admin', hashSenha('luterano'));
@@ -387,20 +403,27 @@ function inicializar() {
     ].forEach((c, i) => ins.run(...c, i + 1));
   }
 
-  // 4.9.0 — matriz curricular do histórico (BNCC / Currículo Paulista). A administração ajusta em Histórico escolar › Disciplinas.
+  // Matriz curricular do histórico, igual aos modelos Word da escola (HISTORICO FUNDAMENTAL I e II / HISTÓRICO ENSINO MÉDIO).
+  // A administração ajusta em Histórico escolar › Disciplinas e regras. Quem veio da 4.9.0 (matriz genérica da BNCC) troca por esta.
+  if (antes49) {
+    db.exec('DELETE FROM hist_componentes');
+    const c = (k, v) => db.prepare('UPDATE config SET valor = ? WHERE chave = ? AND valor = ?').run(v[1], k, v[0]);
+    c('hist_media', ['5', '7']); c('hist_carga_medio', ['1000', '1600']); c('hist_diretor', ['', 'Carina Buller']); c('hist_secretario', ['', 'Samara Pereira da Silva']);
+  }
   if (!db.prepare('SELECT 1 FROM hist_componentes LIMIT 1').get()) {
     const ins = db.prepare('INSERT INTO hist_componentes (curso, area, nome, ordem) VALUES (?,?,?,?)');
+    const BNC = 'Base Nacional Comum', PD = 'Parte Diversificada e Eletivas', IF = 'Itinerário Formativo e Eletivas';
     [
-      ['fund', 'Linguagens', 'Língua Portuguesa'], ['fund', 'Linguagens', 'Arte'], ['fund', 'Linguagens', 'Educação Física'],
-      ['fund', 'Linguagens', 'Língua Inglesa'], ['fund', 'Matemática', 'Matemática'], ['fund', 'Ciências da Natureza', 'Ciências'],
-      ['fund', 'Ciências Humanas', 'Geografia'], ['fund', 'Ciências Humanas', 'História'], ['fund', 'Ensino Religioso', 'Ensino Religioso'],
-      ['medio', 'Linguagens e suas Tecnologias', 'Língua Portuguesa'], ['medio', 'Linguagens e suas Tecnologias', 'Língua Inglesa'],
-      ['medio', 'Linguagens e suas Tecnologias', 'Arte'], ['medio', 'Linguagens e suas Tecnologias', 'Educação Física'],
-      ['medio', 'Matemática e suas Tecnologias', 'Matemática'], ['medio', 'Ciências da Natureza e suas Tecnologias', 'Biologia'],
-      ['medio', 'Ciências da Natureza e suas Tecnologias', 'Física'], ['medio', 'Ciências da Natureza e suas Tecnologias', 'Química'],
-      ['medio', 'Ciências Humanas e Sociais Aplicadas', 'História'], ['medio', 'Ciências Humanas e Sociais Aplicadas', 'Geografia'],
-      ['medio', 'Ciências Humanas e Sociais Aplicadas', 'Filosofia'], ['medio', 'Ciências Humanas e Sociais Aplicadas', 'Sociologia'],
-      ['medio', 'Itinerário formativo', 'Projeto de Vida'],
+      ...['Língua Portuguesa', 'Língua Inglesa', 'História', 'Geografia', 'Matemática', 'Ciências Naturais e Biológicas', 'Ciências Físicas',
+        'Ciências Químicas', 'Educação Física', 'Arte'].map((n) => ['fund', BNC, n]),
+      ...['Adolescer', 'Ensino Religioso', 'Educação Tecnológica - Robótica', 'Inglês', 'Espanhol', 'Leitura', 'Música', 'Mídias Digitais',
+        'Geometria', 'Projeto de Vida', 'Redação', 'Teatro', 'Xadrez'].map((n) => ['fund', PD, n]),
+      ...['Língua Portuguesa e Literatura Bras.', 'Língua Est. Moderna - Inglês', 'História', 'Geografia', 'Química', 'Física', 'Matemática',
+        'Biologia', 'Sociologia', 'Filosofia', 'Educação Física', 'Arte'].map((n) => ['medio', BNC, n]),
+      ...['Aprof. de Ciências Biológicas', 'Aprof. de Ciências Físicas', 'Aprof. de Ciências Química', 'Aprof. em Matemática',
+        'Aprof. de Linguagens Gramática', 'Aprof. de Linguagens Literatura', 'Aprof. de Linguagens Inglês', 'Aprof. de Humanas História',
+        'Aprof. de Humanas Filosofia', 'Aprof. de Humanas Sociologia', 'Aprof. de Humanas Geografia', 'Espanhol', 'Projeto de Vida', 'Redação',
+        'Eletivas', 'Práticas de Estudos', 'Tecnologia'].map((n) => ['medio', IF, n]),
     ].forEach((c, i) => ins.run(...c, i + 1));
   }
 

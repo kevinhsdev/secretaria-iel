@@ -47,6 +47,7 @@ module.exports = function lgpd(ctx) {
       documentos_emitidos: todos('SELECT * FROM emissoes WHERE aluno_id = ? ORDER BY id DESC', id),
       historico_escolar: {
         dados: db.prepare('SELECT * FROM hist_alunos WHERE aluno_id = ?').get(id) || null,
+        transferencia: db.prepare('SELECT * FROM hist_transf WHERE aluno_id = ?').get(id) || null,
         anos: todos('SELECT * FROM hist_anos WHERE aluno_id = ? ORDER BY ano_letivo', id).map((h) => ({
           ...h, notas: Object.fromEntries(todos('SELECT componente, nota FROM hist_notas WHERE ano_id = ?', h.id).map((n) => [n.componente, n.nota])) })),
       },
