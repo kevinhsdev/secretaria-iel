@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **27/09/2026**, versão **4.11.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
+> Última atualização: **28/09/2026**, versão **4.12.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
 
 ---
 
@@ -312,7 +312,7 @@ copiar para o repositório**). O histórico da 4.9.0 foi refeito para sair igual
 - Armadilha que mordeu: ao editar arquivo com `String.replace` num script, **`$` no texto novo vira `# HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **27/09/2026**, versão **4.11.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
+> Última atualização: **28/09/2026**, versão **4.12.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
 
 ---
 
@@ -608,6 +608,22 @@ copiar para o repositório**). O histórico da 4.9.0 foi refeito para sair igual
   somem dentro de template literal — use a ferramenta de edição de arquivo ou `split/join` em vez de `replace`.
 - Testes: `t-hist` 57, `t-hist2` 18, `t-hist3` 12 (bimestres 1–3 sem nota final, 4º → média 0,5, uma casa decimal, ano fechado
   com Aprovado sozinho, bimestre acima de 10 e bimestre 5 recusados). No navegador: 25 telas sem erro; média ao vivo e salvamento.
+
+### Tela do aluno só com os bimestres (versão 4.12.0, 28/09/2026)
+O Kevin achou inútil a grade de anos (1º ano, 2º ano…) na tela de notas do aluno e pediu para deixar só os bimestres e o que
+o documento precisa. A tela `#/hist/<id>` agora tem: **Identificação**, um quadro **"Notas do ano por bimestre"** e a **Transferência**.
+- No quadro: seletor de série (✓ = já tem notas; "(atual)" = série do aluno), os dados daquele ano (ano letivo, escola, cidade, UF,
+  cargas — BNC/PD/total no Fund.; PD/total no Médio — e a situação, que não sai no papel), e a grade disciplina × 1º–4º bimestre +
+  **Nota final do ano** (+ carga por disciplina no Médio). Com os 4 bimestres, a nota final é a média e fica **travada**; sem eles,
+  pode ser digitada (anos antigos/outra escola). No Médio aparece também onde o aluno concluiu o Fundamental.
+- **Preenchimento sozinho** ao abrir uma série já cursada: ano letivo provável, carga total da config, escola IEL (só veterano) e
+  "Cursando" no ano atual. A situação vira Aprovado/Retido sozinha quando nenhuma disciplina está com bimestre pela metade
+  (a não ser que alguém tenha escolhido outra à mão). Saiu o botão "Preencher o que dá sozinho".
+- Estado da tela num `Map` só (`V`, chaves `série|campo`, `b:disciplina|b1` etc.), comparado com o banco por `montarAnos`;
+  o servidor e o documento não mudaram. "Apagar esta série do histórico" usa `DELETE /api/historico/ano/:id` (lixeira).
+- Testes: `t-hist` 57, `t-hist2` 18, `t-hist3` 12 continuam passando; no navegador: 4º bimestre → nota final travada e situação
+  Aprovado, salvar, série antiga com nota final digitada, documento com a média na coluna do 7º ano; 24 telas sem erro.
+- Armadilha: dentro de parágrafo com a classe `dado`, `<b>` vira bloco (`.dado b { display:block }`) — não usar `dado` em texto corrido com negrito.
 
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
