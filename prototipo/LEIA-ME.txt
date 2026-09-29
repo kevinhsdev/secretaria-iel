@@ -1,0 +1,24 @@
+SECRETARIA IEL 2.0 — PROTÓTIPO DO VISUAL NOVO
+==============================================
+
+O que é: uma demonstração de como o app ficaria com um visual novo.
+NÃO é o app. Nada do que se faz aqui grava no banco da secretaria.
+Todos os alunos são FICTÍCIOS (os mesmos da "Carregar demonstração").
+
+Como abrir:
+  Dê dois cliques em  index.html  (abre no navegador, não precisa do servidor nem de internet).
+  Na tela de entrada, qualquer senha serve.
+
+O que tem:
+  - As 20 telas do app, com a ficha do aluno, a busca (tecla /), a ajuda (tecla ?),
+    o bloqueio de tela e o modo escuro.
+  - Documentos: são os MESMOS do app (mesmo timbre, mesmo modelo de histórico).
+    O documento.html usa os arquivos do app (app/public/doc.js, doc.css e historico-doc.js),
+    então esta pasta precisa ficar ao lado da pasta "app", como está.
+
+Arquivos:
+  index.html      o protótipo
+  documento.html  a página de documentos do app, com os dados fictícios
+  dados-demo.js   os dados fictícios (fazem o papel do servidor)
+
+Sem internet, as letras do protótipo aparecem com a fonte do Windows (o resto funciona igual).
