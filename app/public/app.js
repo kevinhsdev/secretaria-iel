@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.4.1';
+const VERSAO = '5.4.2';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -617,6 +617,7 @@ async function iniciar() {
   <div class="app">
     <nav class="trilho" aria-label="Menu principal">
       <a class="logo" href="#/" title="${NOME_APP} · Secretaria IEL — Instituto Educacional Luterano"><img src="logo.png" alt="Instituto Educacional Luterano"></a>
+      <span class="marca-app" aria-hidden="true"><em>${esc(NOME_APP.slice(0, 1))}</em>${esc(NOME_APP.slice(1))}</span>
       <div class="grupos">${gruposVisiveis().map((g) => `<a href="#/${g.telas[0].rota}" data-grupo="${g.id}">${icone(g.ic)}${esc(g.nome)}<span class="ponto" hidden></span></a>`).join('')}</div>
       <div class="trilho-pe">
         <button id="tema" class="icone-btn"></button>

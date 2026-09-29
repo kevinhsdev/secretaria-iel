@@ -10,7 +10,7 @@
   color-scheme: light;
   /* Marca */
   --azul: #0e3d7a; --azul-2: #1446a0; --azul-claro: #8fb0e6; --azul-fundo: #e3ebfa;
-  --amarelo: #f5c21b; --amarelo-claro: #fff4cc;
+  --amarelo: #f5c21b; --amarelo-claro: #fff4cc; --amarelo-marca: #dba400;
   --titulo: #0b1b33;                 /* números grandes e títulos */
   --pri: #0e3d7a; --pri-2: #1446a0;  /* botão principal */
   /* Superfícies e texto (o fundo puxa de leve para o azul) */
@@ -51,7 +51,7 @@
 :root[data-tema="escuro"] {
   color-scheme: dark;
   --azul: #2a5bc4; --azul-2: #7fa8ff; --azul-claro: #5f7fb8; --azul-fundo: #16284a;
-  --amarelo: #f7cd3f; --amarelo-claro: #3a2f0c;
+  --amarelo: #f7cd3f; --amarelo-claro: #3a2f0c; --amarelo-marca: #f7cd3f;
   --titulo: #e9eff9;
   --pri: #2a5bc4; --pri-2: #3a6bd4;
   --texto: #e9eff9; --texto-2: #8c9ab3; --borda: #1f2c44; --fundo: #080f1c; --branco: #0f182a;
@@ -95,6 +95,9 @@ nav.trilho .logo { display: grid; place-items: center; width: 56px; height: 56px
   box-shadow: 0 0 0 3px rgba(245, 194, 27, .35), 0 6px 16px -6px rgba(11, 27, 51, .35); transition: transform .16s var(--mola); }
 nav.trilho .logo img { width: 50px; height: 50px; border-radius: 50%; display: block; }
 nav.trilho .logo:active { transform: scale(.95); }
+/* Nome do app (SEK) embaixo da logo, com a primeira letra em amarelo como na tela de entrada */
+nav.trilho .marca-app { font: 800 17px/1 var(--f-titulo); letter-spacing: -.04em; color: var(--titulo); margin: -6px 0 12px; user-select: none; }
+nav.trilho .marca-app em { font-style: normal; color: var(--amarelo-marca); }
 .grupos { display: flex; flex-direction: column; gap: 3px; flex: 1; overflow-y: auto; scrollbar-width: none; }
 .grupos a { position: relative; width: 70px; padding: 9px 0 7px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px;
   color: var(--texto-2); text-decoration: none; font-size: 11px; font-weight: 600; transition: color .15s, background-color .15s, transform .16s var(--mola); }
@@ -855,7 +858,7 @@ input:disabled, select:disabled, textarea:disabled { background: var(--superfici
   nav.trilho { position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; flex-direction: row; padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
     border-right: 0; border-top: 1px solid var(--borda); background: color-mix(in srgb, var(--superficie) 90%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(170%); backdrop-filter: blur(18px) saturate(170%); }
-  nav.trilho .logo, .trilho-pe { display: none; }
+  nav.trilho .logo, nav.trilho .marca-app, .trilho-pe { display: none; }
   .grupos { flex-direction: row; justify-content: space-around; width: 100%; gap: 0; }
   .grupos a { width: auto; flex: 1; font-size: 10px; padding-inline: 2px; }
   .grupos a .ponto { right: 8px; }
