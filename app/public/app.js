@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.12.0';
+const VERSAO = '4.14.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -179,7 +179,8 @@ function toast(msg, erro) {
     tempo = 8000;
   }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.remove(), tempo);
+  // Sai descendo pelo mesmo caminho por onde entrou; uma mensagem nova no meio disso reaproveita a mesma caixa
+  toastTimer = setTimeout(() => { t.classList.add('saindo'); toastTimer = setTimeout(() => t.remove(), 200); }, tempo);
 }
 // Chamado pelo api() depois de um DELETE que foi para a lixeira. Se a tela não mostrar mensagem nenhuma, mostra uma.
 function avisarLixeira(id) {
@@ -188,12 +189,25 @@ function avisarLixeira(id) {
 }
 const tentar = (fn) => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
 
+// A janela de verdade sai do documento na hora (nenhum código acha uma janela "fechando");
+// no lugar dela fica por 0,16s uma cópia sem ids e sem clique, que some encolhendo de leve.
+function sumirSuave(f) {
+  if (!f.isConnected || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const copia = f.cloneNode(true);
+  copia.className = 'fundo-modal-saindo';
+  copia.setAttribute('aria-hidden', 'true');
+  copia.inert = true;
+  copia.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
+  f.after(copia);
+  setTimeout(() => copia.remove(), 180);
+}
+
 function modal(tituloTxt, corpoHtml, { onAbrir } = {}) {
   const f = document.createElement('div');
   f.className = 'fundo-modal';
   f.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h2><span>${esc(tituloTxt)}</span><button class="x" aria-label="Fechar">×</button></h2>${corpoHtml}</div>`;
   // Fechou a janela (salvou, cancelou ou apertou Esc): o rascunho não serve mais
-  const fechar = () => { f.remove(); document.removeEventListener('keydown', tecla); apagarRascunho(tituloTxt); mostrarRascunhos(); };
+  const fechar = () => { sumirSuave(f); f.remove(); document.removeEventListener('keydown', tecla); apagarRascunho(tituloTxt); mostrarRascunhos(); };
   const tecla = (e) => { if (e.key === 'Escape') fechar(); };
   f.addEventListener('click', (e) => { if (e.target === f || e.target.closest('.x') || e.target.closest('[data-fechar]')) fechar(); });
   document.addEventListener('keydown', tecla);
@@ -252,7 +266,14 @@ function temaAtual() {
   } catch { return 'claro'; }
 }
 // "escolhido" só é verdadeiro quando a pessoa clica no botão: quem nunca escolheu continua seguindo o Windows.
+let temaTimer;
 function aplicarTema(tema, escolhido) {
+  // Só quando a pessoa clica: as cores mudam suavemente em vez de piscar (ao abrir a tela, nada de transição)
+  if (escolhido) {
+    const raiz = document.documentElement;
+    raiz.classList.add('trocando-tema');
+    clearTimeout(temaTimer); temaTimer = setTimeout(() => raiz.classList.remove('trocando-tema'), 350);
+  }
   document.documentElement.dataset.tema = tema;
   if (escolhido) { try { localStorage.setItem('iel-tema', tema); } catch { /* navegador sem armazenamento */ } }
   const b = $('#tema');
@@ -505,6 +526,8 @@ async function rotear() {
     const fq = $('#fq', c) || $('#q', c);
     if (qTela && fq) { fq.value = qTela; fq.dispatchEvent(new Event('input')); }
   } catch (e) { c.innerHTML = `<div class="cartao"><h2>Ops!</h2><p>${esc(e.message)}</p></div>`; }
+  // A tela nova chega com um leve movimento (reinicia a animação a cada troca de tela)
+  c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra');
   atualizarBadge();
   mostrarRascunhos();
   window.scrollTo(0, 0);

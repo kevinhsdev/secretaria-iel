@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **28/09/2026**, versão **4.12.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
+> Última atualização: **28/09/2026**, versão **4.14.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**). O que vem a seguir está em §7.
 
 ---
 
@@ -312,7 +312,7 @@ copiar para o repositório**). O histórico da 4.9.0 foi refeito para sair igual
 - Armadilha que mordeu: ao editar arquivo com `String.replace` num script, **`$` no texto novo vira `# HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **28/09/2026**, versão **4.12.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**). O que vem a seguir está em §7.
+> Última atualização: **28/09/2026**, versão **4.14.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**). O que vem a seguir está em §7.
 
 ---
 
@@ -625,6 +625,48 @@ o documento precisa. A tela `#/hist/<id>` agora tem: **Identificação**, um qua
   Aprovado, salvar, série antiga com nota final digitada, documento com a média na coluna do 7º ano; 24 telas sem erro.
 - Armadilha: dentro de parágrafo com a classe `dado`, `<b>` vira bloco (`.dado b { display:block }`) — não usar `dado` em texto corrido com negrito.
 
+### Acabamento "premium" do visual (versão 4.13.0, 28/09/2026)
+O Kevin pediu que o app tivesse cara de sistema premium. Mesmo azul (#0e3d7a) e amarelo (#f5c21b) — só o acabamento mudou, quase tudo em `app.css`:
+- **Profundidade:** sombras em camadas (`--sombra`, `--sombra-alta`, `--sombra-modal`) no lugar de borda + sombra; cartões com raio 14px (`--raio`, `--raio-p` = 10px).
+- **Letra:** "Segoe UI Variable" (Windows 11; no Windows 10 cai na Segoe UI), títulos maiores com letras mais juntas, números alinhados (`tabular-nums`).
+- **Menu lateral:** degradê do mesmo azul, item atual em "pílula" com um traço amarelo que brilha, contadores e avatar com relevo.
+- **Barra de cima e mensagens:** vidro fosco (`--vidro` + `backdrop-filter`), o conteúdo passa desfocado por baixo.
+- **Movimento** (curto, sem quicar, `--mola`): a tela chega subindo 6px (`.conteudo.entra`, ligado no `rotear`); a janela cresce de 96% ao abrir e
+  encolhe ao fechar; a mensagem (toast) sobe e desce pelo mesmo caminho; botões afundam no clique; barras de progresso crescem; aba ativa com traço que se abre.
+  Claro/escuro troca em 0,3s (`.trocando-tema`, só quando a pessoa clica).
+- **Janela fechando (armadilha):** `modal()` tira a janela de verdade do documento **na hora**, como antes; quem anima é uma **cópia** (`sumirSuave`,
+  classe `.fundo-modal-saindo`, sem ids, `inert`) que some em 0,18s. Assim nenhum código acha uma janela "fechando" nem um `#sim` repetido.
+- **Acessibilidade:** respeita "Mostrar animações" desligado (`prefers-reduced-motion`), "Efeitos de transparência" desligado (vidro vira sólido) e alto contraste.
+- **Consertos que vieram junto:** `td.acoes` voltou a ser célula de tabela (o `display:flex` fazia a borda e o fundo da linha pararem antes dos botões,
+  em ~11 tabelas); botões de situação da ficha tinham `#fff` fixo (ficavam brancos no escuro); o logo da tela de entrada sumia no modo escuro.
+- Testado no Edge headless: 22 telas no claro e no escuro sem erro de JS, celular (390px) e um teste de movimento (janela abre/fecha/reabre, toast some, tema troca).
+  A impressão não mudou (o bloco `@media print` continua vencendo).
+
+### Anos anteriores do histórico à vista (versão 4.14.0, 28/09/2026)
+O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era só uma caixinha "Série" pequena no canto do quadro.
+- Na tela `#/hist/<id>` o quadro virou **"Notas de cada ano"**, com **um botão por ano** do curso do aluno (1º–9º no Fundamental, 1ª–3ª no Médio).
+  Cada botão diz o estado: **✓ com notas**, **cursando** (série atual), **falta lançar** (ano já cursado sem notas, em laranja),
+  **na outra escola** (aluno novo: a série anterior ainda está em andamento lá) e **ainda não** (anos seguintes, apagados).
+  O `<select id="b_serie">` continua existindo, escondido — o resto do código lê a série dele.
+- `#/hist/<id>/<série>` (ex.: `#/hist/12/F3`) abre direto naquele ano. Na lista do Histórico, cada ano de "Falta lançar" virou um link assim
+  (o servidor manda `faltam_ch` além de `faltam`).
+- Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
+  → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Protótipo "Secretaria IEL 2.0" (pasta `prototipo/`, 28/09/2026)
+Pedido do Kevin: ver o app inteiro num visual completamente novo. **Não é o app** e não grava nada: é uma página solta, com dados fictícios.
+- `prototipo/index.html`: as 20 telas, ficha do aluno em gaveta, busca (`/`), ajuda (`?`), entrada/bloqueio/troca de senha, claro e escuro.
+  Abre com dois cliques, sem servidor. Navegação em 6 grupos (os mesmos do menu atual) com abas no topo.
+- **Documentos iguais aos do app:** `prototipo/documento.html` carrega o `doc.js`, o `doc.css` e o `historico-doc.js` **do próprio app**
+  (`<base href="../app/public/">`); só o servidor é trocado pelo `prototipo/dados-demo.js`, que intercepta o `fetch` e responde com
+  a demonstração. Por isso a pasta `prototipo/` tem de ficar ao lado de `app/`. Mudou um documento no app, muda no protótipo.
+- `dados-demo.js` foi **gravado do servidor com "Carregar demonstração"** (18 alunos fictícios, `demo = 1` conferido, históricos e
+  relatórios); tirei da config as pastas e as chaves de backup. Para refazer: subir o servidor de teste com a demonstração e gravar as
+  respostas de `/api/documentos/alunos`, `/api/historico/aluno/:id` e `/api/relatorios`.
+- A tela de notas do protótipo usa as disciplinas e notas da demonstração, e o que se digita ali fica no `localStorage`
+  (`iel2-hist-<id>`), que o `documento.html` lê: o histórico impresso sai com as notas digitadas.
+- Também publicado como Artifact (claude.ai), sem os documentos do app (lá aparece uma folha de exemplo).
+
 ### Estado dos dados no PC de origem (23/09)
 - O banco real (`dados/secretaria.db`, **fora do Git**) tinha **0 alunos** e **519 interessados reais do SIG**.
 - Kevin **achava** que tinha carregado a demonstração, mas não tinha.
@@ -776,7 +818,7 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 | **Balcão sem ninguém por perto** | Bloqueio de tela com senha, validado no servidor |
 | **Senha fraca / script estranho na página** | Mínimo de 8 caracteres, recusa de senhas óbvias, cabeçalho CSP |
 | **"Quantos alunos temos?" para a Diretoria** | Tela de Relatórios + uma folha timbrada de fechamento |
-| **Cara de protótipo** | Ícones SVG, esqueleto de carregamento, telas vazias que ensinam, modo compacto, claro/escuro |
+| **Cara de protótipo** | Ícones SVG, esqueleto de carregamento, telas vazias que ensinam, modo compacto, claro/escuro; acabamento premium com profundidade, vidro e movimento (4.13.0) |
 | **Depender do Kevin para atualizar** | Botão "Verificar atualizações": mostra o que mudou, faz backup, aplica e reinicia sozinho |
 | **Excluir era para sempre** (4.3.0) | Lixeira de 30 dias, botão Desfazer logo depois de excluir e tela para restaurar |
 | **Achar as coisas** (4.4.0) | Busca global agrupada por tipo, que abre a tela já filtrada |

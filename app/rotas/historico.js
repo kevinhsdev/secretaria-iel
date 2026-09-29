@@ -225,7 +225,7 @@ module.exports = function historico(ctx) {
       return {
         id: a.id, mat: a.mat, nome: a.nome, novo: !!a.novo, serie_chave: a.serie_chave, turma: a.turma, turma_rotulo: turmaRotulo(a), curso,
         ordem: ordemSerie(a.serie_chave), esperadas: esperadas.length, feitas: esperadas.length - faltam.length,
-        faltam: faltam.map(rotuloSerie), atual: !!completo(a.serie_chave), anos_lancados: f.size,
+        faltam: faltam.map(rotuloSerie), faltam_ch: faltam, atual: !!completo(a.serie_chave), anos_lancados: f.size,
       };
     });
     const turmas = [...new Map(lista.map((a) => [a.turma_rotulo, { rotulo: a.turma_rotulo, serie: a.serie_chave, turma: a.turma || '', ordem: a.ordem }])).values()]

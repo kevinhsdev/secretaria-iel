@@ -113,7 +113,7 @@ async function abaHistAlunos(el) {
       <td>${esc(a.turma_rotulo)}</td>
       <td>${a.esperadas ? `<span class="progresso"><span class="trilho"><i style="width:${Math.round((100 * a.feitas) / a.esperadas)}%"></i></span>${a.feitas} de ${a.esperadas}</span>` : '<span class="dado">primeiro ano do curso</span>'}
         ${a.atual ? '<br><span class="tag t-novo">ano atual já lançado</span>' : ''}</td>
-      <td>${a.faltam.length ? `<span class="tag t-vencendo">${esc(a.faltam.join(', '))}</span>` : '<span class="tag t-concluida">em dia</span>'}</td>
+      <td>${a.faltam.length ? `<span class="anos-faltam">${a.faltam.map((r, i) => `<a class="tag t-vencendo" href="#/hist/${a.id}/${esc((a.faltam_ch || [])[i] || '')}" title="Abrir as notas do ${esc(r)}">${esc(r)}</a>`).join('')}</span>` : '<span class="tag t-concluida">em dia</span>'}</td>
       <td class="acoes" style="justify-content:flex-end"><a class="btn peq" href="#/hist/${a.id}">Notas</a><button class="btn peq" data-doc="${a.id}">🖨️ Histórico</button></td></tr>`), {
       colunas: 5,
       vazio: `<tr><td colspan="5">${d.alunos.length ? '<p class="vazio">Ninguém com esse filtro.</p>' : vazio('historico', 'Nenhum aluno do Fundamental ou do Médio',
@@ -358,6 +358,13 @@ TELAS.hist = async (c, id) => {
   const fc = d.fund_conclusao || {};
   const t0 = d.transf;
   const serieInicial = /^(F\d|EM\d)$/.test(a.serie_chave || '') ? a.serie_chave : 'F1';
+  // "#/hist/<id>/F3" abre direto no 3º ano (vem das etiquetas "falta lançar" da lista)
+  const serieDoLink = (location.hash.split('?')[0].split('/')[3] || '');
+  const serieAbrir = /^(F\d|EM\d)$/.test(serieDoLink) ? serieDoLink : serieInicial;
+  // Anos que aparecem nos botões: os do curso do aluno (quem está no Médio vê as 3 séries; no Fundamental, do 1º ao 9º)
+  const cursoAluno = cursoDaSerie(serieInicial);
+  const seriesDoCurso = SERIES_HIST.filter(([k]) => cursoDaSerie(k) === cursoAluno);
+  const idxAtual = seriesDoCurso.findIndex(([k]) => k === a.serie_chave);
   c.innerHTML = `<div class="acoes" style="justify-content:space-between;align-items:flex-start"><div><h1>Histórico de ${esc(titulo(a.nome))}</h1>
       <p class="sub">${esc(a.turma_rotulo)} · Mat. ${esc(a.mat || '—')}${a.novo ? ' · aluno novo' : ''} · <a href="#/aluno/${a.id}">abrir a ficha</a></p></div>
     <div class="acoes"><a class="btn" href="#/historico">← Voltar</a><button class="btn" id="hDoc">🖨️ Gerar histórico</button><button class="btn pri" id="hSalvar">Salvar</button></div></div>
@@ -372,13 +379,17 @@ TELAS.hist = async (c, id) => {
     <p class="dado" style="margin-top:6px">O RG corrigido aqui fica corrigido também na ficha do aluno. A filiação não sai no histórico (deliberação CEE 04/95).</p></div>
 
     <div class="cartao" style="margin-top:14px">
-      <h2 style="margin-bottom:6px">Notas do ano por bimestre</h2>
-      <p style="margin:0 0 10px;font-size:12.5px;color:var(--texto-2)">Escolha a série e lance as notas de cada bimestre. Com os <b>4 bimestres</b>, a <b>nota final do ano</b> é calculada sozinha
-        (média arredondada para ${cf.arredonda === 0.5 ? '0,5' : 'uma casa decimal'}) e é ela que sai no histórico. Anos antigos ou de outra escola: digite direto a nota final.
+      <h2 style="margin-bottom:4px">Notas de cada ano</h2>
+      <p style="margin:0 0 12px;font-size:13px;color:var(--texto-2)">O histórico traz <b>todos os anos</b> que o aluno já cursou. <b>Clique em um ano</b> para lançar as notas dele —
+        os anteriores também (inclusive os feitos em outra escola, copiando do histórico que a família trouxe).</p>
+      <div class="anos-hist" id="b_anos" role="tablist" aria-label="Ano do histórico"></div>
+      <select id="b_serie" hidden aria-hidden="true" tabindex="-1"></select>
+      <div class="acoes" style="margin:14px 0 8px;justify-content:space-between">
+        <h3 id="b_titulo" style="margin:0;font-size:15px"></h3>
+        <button type="button" class="btn peq perigo" id="b_apagar" hidden>Apagar este ano do histórico</button></div>
+      <p style="margin:0 0 10px;font-size:12.5px;color:var(--texto-2)">Com os <b>4 bimestres</b>, a <b>nota final do ano</b> é calculada sozinha
+        (média arredondada para ${cf.arredonda === 0.5 ? '0,5' : 'uma casa decimal'}) e é ela que sai no histórico. Ano antigo sem as notas de cada bimestre: digite direto a nota final.
         Nota abaixo de ${numBR(cf.media)} fica vermelha; <b>Enter</b> desce; colar um bloco do Excel espalha pelas células.</p>
-      <div class="acoes" style="margin-bottom:12px;justify-content:space-between">
-        <label class="dado">Série <select id="b_serie"></select></label>
-        <button type="button" class="btn peq perigo" id="b_apagar" hidden>Apagar esta série do histórico</button></div>
       <div class="campos" id="b_info"></div>
       <div class="campos" id="blocoFundConc" style="margin-top:12px">
         <div class="campo"><label for="h_fano">Ensino Fundamental — ano de conclusão</label><input id="h_fano" value="${esc(dd.fund_ano || '')}" placeholder="${esc(fc.ano || '')}"></div>
@@ -411,9 +422,28 @@ TELAS.hist = async (c, id) => {
 
   const bGrade = $('#b_grade', c), bInfo = $('#b_info', c), selSerie = $('#b_serie', c);
   const temDados = (ch) => todosCampos(cursoDaSerie(ch)).some((f) => (f.startsWith('n:') || f.startsWith('b:')) && ler(ch, f));
+  const bAnos = $('#b_anos', c);
   const desenharOpcoes = () => {
-    const atual = selSerie.value || serieInicial;
-    selSerie.innerHTML = SERIES_HIST.map(([k, r]) => `<option value="${k}" ${k === atual ? 'selected' : ''}>${r}${temDados(k) ? ' ✓' : ''}${k === a.serie_chave ? ' (atual)' : ''}</option>`).join('');
+    const atual = selSerie.value || serieAbrir;
+    selSerie.innerHTML = SERIES_HIST.map(([k, r]) => `<option value="${k}" ${k === atual ? 'selected' : ''}>${r}</option>`).join('');
+    // Um botão por ano: ✓ já tem notas · "cursando" é o ano de agora · "falta" é ano já cursado sem notas · os seguintes ficam apagados
+    const lista = seriesDoCurso.some(([k]) => k === atual) ? seriesDoCurso : [...seriesDoCurso, SERIES_HIST.find(([k]) => k === atual)];
+    bAnos.innerHTML = lista.map(([k, r], i) => {
+      const tem = temDados(k), eAtual = k === a.serie_chave, futuro = idxAtual >= 0 && i > idxAtual, cursado = idxAtual >= 0 && i < idxAtual;
+      // Aluno novo está cadastrado na série do ano que vem: a anterior ele ainda está cursando na outra escola
+      const naOutra = a.novo && idxAtual >= 0 && i === idxAtual - 1;
+      const estado = tem ? 'tem' : eAtual ? 'agora' : naOutra ? '' : cursado ? 'falta' : futuro ? 'futuro' : '';
+      const sub = tem ? '✓ com notas' : eAtual ? 'cursando' : naOutra ? 'na outra escola' : cursado ? 'falta lançar' : futuro ? 'ainda não' : '';
+      return `<button type="button" role="tab" class="ano-hist ${estado} ${k === atual ? 'on' : ''}" data-serie="${k}" aria-selected="${k === atual}"
+        ${futuro ? 'title="O aluno ainda não chegou a este ano"' : ''}><b>${esc(r)}</b><small>${sub}</small></button>`;
+    }).join('');
+    $('#b_titulo', c).textContent = `Notas do ${SERIES_HIST.find(([k]) => k === atual)[1]}${atual === a.serie_chave ? ' (ano atual)' : ''} — por bimestre`;
+  };
+  bAnos.onclick = (e) => {
+    const b = e.target.closest('[data-serie]');
+    if (!b || b.dataset.serie === selSerie.value) return;
+    selSerie.value = b.dataset.serie;
+    desenharSerie();
   };
 
   // Ao abrir uma série que o aluno já cursou (ou está cursando), o que dá para saber vem preenchido
