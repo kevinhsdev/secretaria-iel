@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.5.0';
+const VERSAO = '5.5.1';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -461,7 +461,7 @@ function vazio(nomeIcone, titulo2, texto, acaoHtml = '') {
 // ───────────── login ─────────────
 // Metade escura da entrada: o logo da escola, o nome e as faixas dos turnos (manhã em azul, tarde em amarelo)
 const ARTE_LOGIN = `<div class="login-arte">
-    <span class="logo-grande"><img src="logo.png" alt="Instituto Educacional Luterano"></span>
+    <span class="logo-grande"><img src="logo-escuro.png" alt="Instituto Educacional Luterano"></span>
     <div><div class="login-nome">Secretaria IEL</div><h1><em>S</em>EK</h1>
       <p>Matrícula, documentos, portão e o dia a dia da secretaria num lugar só. Funciona sem internet, num computador da escola.</p>
       <div class="faixas" aria-hidden="true"><i style="width:62%;background:#1c3c73;animation-delay:.05s"></i><i style="width:74%;background:#1c3c73;animation-delay:.12s"></i>

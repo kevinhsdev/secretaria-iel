@@ -389,8 +389,9 @@ textarea { width: 100%; min-height: 160px; resize: vertical; line-height: 1.5; }
 /* ───────────── Entrada: metade azul-marinho com a marca, metade com o formulário ───────────── */
 .login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); background: var(--fundo); }
 .login-arte { background: var(--login-arte); color: #fff; padding: clamp(24px, 5vw, 64px); display: flex; flex-direction: column; justify-content: space-between; gap: 24px; overflow: hidden; }
-.login-arte .logo-grande { width: 84px; height: 84px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(245, 194, 27, .45); }
-.login-arte .logo-grande img { width: 76px; height: 76px; border-radius: 50%; }
+/* Logo de letras brancas direto sobre o azul-marinho (a metade da arte é escura nos dois temas) */
+.login-arte .logo-grande { width: 104px; height: 104px; display: grid; place-items: center; }
+.login-arte .logo-grande img { width: 104px; height: 104px; display: block; }
 .login-arte h1 { color: #fff; font-size: clamp(56px, 10vw, 140px); line-height: .85; letter-spacing: -.06em; margin: 0; }
 .login-arte h1 em { font-style: normal; color: #f5c21b; }
 /* Acima do nome do app (SEK), o nome da secretaria em letra pequena */
