@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **29/09/2026**, versão **5.4.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
+> Última atualização: **29/09/2026**, versão **5.4.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
 
 ---
 
@@ -360,6 +360,12 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
 
+### Nome provisório "SEK" (versão 5.4.1, 29/09/2026)
+- O Kevin escolheu **SEK** por enquanto ("vamos verificar futuramente"). Fica na constante `NOME_APP` (app.js) e no `<title>`
+  do index.html e do doc.html; o `doc.js` monta "<documento> — SEK". Trocar o nome = mudar esses quatro lugares.
+- Tela de entrada: "SECRETARIA IEL" pequeno em amarelo (`.login-nome`) e **<em>S</em>EK** grande (S amarelo). A aba do navegador passa a
+  dizer "SEK · Secretaria IEL" depois de entrar (antes ficava "Entrar — …" até recarregar).
+- Apresentação para a direção: documento "SEK — Apresentação à Direção" no claude.ai (Claude Docs, do Kevin).
 ### Polimento total (versão 5.4.0, 29/09/2026)
 - **Tela que se atualiza não pula mais**: `rotear()` sabe se é navegação (endereço novo) ou atualização (mesmo endereço,
   depois de salvar/marcar/excluir — `hashNaTela`). Na atualização: sem esqueleto, sem animação de entrada, mesma rolagem,

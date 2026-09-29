@@ -646,7 +646,7 @@ async function iniciar() {
   const tipo = P.get('tipo');
   DEF = DOCS[tipo];
   if (!DEF) { $('#painel').innerHTML = '<p>Documento desconhecido.</p>'; return; }
-  document.title = DEF.nome + ' — Secretaria IEL';
+  document.title = DEF.nome + ' — SEK';
   try { DADOS = await DEF.carregar(); } catch (e) { $('#painel').innerHTML = `<h1>${esc(DEF.nome)}</h1><p class="aviso">${esc(e.message)}</p>`; return; }
   // Atenção: em alguns documentos (relatórios) "alunos" é um resumo, não uma lista
   const lista = Array.isArray(DADOS.alunos) ? DADOS.alunos : null;

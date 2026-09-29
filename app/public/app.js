@@ -3,7 +3,9 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.4.0';
+const VERSAO = '5.4.1';
+// Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
+const NOME_APP = 'SEK';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -459,7 +461,7 @@ function vazio(nomeIcone, titulo2, texto, acaoHtml = '') {
 // Metade escura da entrada: o logo da escola, o nome e as faixas dos turnos (manhã em azul, tarde em amarelo)
 const ARTE_LOGIN = `<div class="login-arte">
     <span class="logo-grande"><img src="logo.png" alt="Instituto Educacional Luterano"></span>
-    <div><h1>Secretaria<br><em>IEL</em></h1>
+    <div><div class="login-nome">Secretaria IEL</div><h1><em>S</em>EK</h1>
       <p>Matrícula, documentos, portão e o dia a dia da secretaria num lugar só. Funciona sem internet, num computador da escola.</p>
       <div class="faixas" aria-hidden="true"><i style="width:62%;background:#1c3c73;animation-delay:.05s"></i><i style="width:74%;background:#1c3c73;animation-delay:.12s"></i>
         <i style="width:48%;margin-left:44%;background:#6b5611;animation-delay:.19s"></i><i style="width:52%;margin-left:48%;background:#6b5611;animation-delay:.26s"></i>
@@ -473,7 +475,7 @@ function telaAguarde(tituloTxt, textoHtml) {
 }
 
 function telaLogin() {
-  document.title = 'Entrar — Secretaria IEL';
+  document.title = 'Entrar — ' + NOME_APP;
   $('#raiz').innerHTML = `
   <div class="login">${ARTE_LOGIN}<div class="login-form"><form id="f" autocomplete="on">
     <div><div class="quando">Gestão da secretaria escolar</div><h2>Entrar</h2></div>
@@ -610,10 +612,11 @@ async function iniciar() {
   grupoNaTela = null; marcadorAntes = null; hashNaTela = null;
   const h = new Date().getHours();
   const perfil = EU.perfil === 'admin' ? 'Administração' : 'Aprendiz';
+  document.title = NOME_APP + ' · Secretaria IEL'; // a aba do navegador deixava de dizer "Entrar" só ao recarregar
   $('#raiz').innerHTML = `
   <div class="app">
     <nav class="trilho" aria-label="Menu principal">
-      <a class="logo" href="#/" title="Secretaria IEL — Instituto Educacional Luterano"><img src="logo.png" alt="Instituto Educacional Luterano"></a>
+      <a class="logo" href="#/" title="${NOME_APP} · Secretaria IEL — Instituto Educacional Luterano"><img src="logo.png" alt="Instituto Educacional Luterano"></a>
       <div class="grupos">${gruposVisiveis().map((g) => `<a href="#/${g.telas[0].rota}" data-grupo="${g.id}">${icone(g.ic)}${esc(g.nome)}<span class="ponto" hidden></span></a>`).join('')}</div>
       <div class="trilho-pe">
         <button id="tema" class="icone-btn"></button>

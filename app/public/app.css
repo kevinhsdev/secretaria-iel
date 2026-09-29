@@ -383,8 +383,10 @@ textarea { width: 100%; min-height: 160px; resize: vertical; line-height: 1.5; }
 .login-arte { background: var(--login-arte); color: #fff; padding: clamp(24px, 5vw, 64px); display: flex; flex-direction: column; justify-content: space-between; gap: 24px; overflow: hidden; }
 .login-arte .logo-grande { width: 84px; height: 84px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(245, 194, 27, .45); }
 .login-arte .logo-grande img { width: 76px; height: 76px; border-radius: 50%; }
-.login-arte h1 { color: #fff; font-size: clamp(44px, 7vw, 96px); line-height: .9; letter-spacing: -.05em; margin: 0; }
+.login-arte h1 { color: #fff; font-size: clamp(56px, 10vw, 140px); line-height: .85; letter-spacing: -.06em; margin: 0; }
 .login-arte h1 em { font-style: normal; color: #f5c21b; }
+/* Acima do nome do app (SEK), o nome da secretaria em letra pequena */
+.login-arte .login-nome { font: 500 13px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: #f5c21b; margin: 0 0 14px 4px; }
 .login-arte p { color: #aebbd2; max-width: 40ch; margin: 14px 0 0; }
 .login-arte .faixas { display: grid; gap: 10px; margin-top: 28px; }
 .login-arte .faixas i { display: block; height: 22px; border-radius: 8px; transform-origin: left; animation: crescer .9s var(--mola) both; }
@@ -401,7 +403,7 @@ textarea { width: 100%; min-height: 160px; resize: vertical; line-height: 1.5; }
   .login { grid-template-columns: minmax(0, 1fr); }
   .login-arte { padding: 28px 20px; }
   .login-arte .faixas, .login-arte p, .login-arte small { display: none; }
-  .login-arte h1 { font-size: 40px; }
+  .login-arte h1 { font-size: 56px; }
 }
 
 .kanban-mini { display: flex; gap: 6px; flex-wrap: wrap; }
