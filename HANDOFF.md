@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **29/09/2026**, versão **5.5.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
+> Última atualização: **29/09/2026**, versão **5.5.2** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
 
 ---
 
@@ -362,7 +362,7 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
 
 ### Logo de letras brancas na entrada (versão 5.5.1, 29/09/2026)
 - A tela de entrada (e as telas de espera, que usam a mesma arte `ARTE_LOGIN`) mostra `logo-escuro.png` direto sobre o
-  azul-marinho, sem o disco branco, em 104 px. A tela de bloqueio continua com `logo.png` (fica sobre um cartão claro/escuro).
+  azul-marinho, sem o disco branco, em 104 px. A tela de bloqueio (5.5.2) troca com o tema como o menu: `.logo-bloqueio.logo-claro` / `.logo-escuro`, sem disco branco.
 
 ### Celular e rede com QR Code (versão 5.5.0, 29/09/2026)
 - **Configurações › Celular e rede** (`abaCelular` em telas5.js): botão "Liberar para o celular" grava `rede_liberada = '1'`

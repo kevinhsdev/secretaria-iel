@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.5.1';
+const VERSAO = '5.5.2';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 

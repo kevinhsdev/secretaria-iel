@@ -249,7 +249,7 @@ window.mostrarBloqueio = () => {
   const f = document.createElement('div');
   f.id = 'telaBloqueada';
   f.className = 'bloqueio';
-  f.innerHTML = `<form class="cartao" id="fb"><img src="logo.png" alt="" style="width:76px;display:block;margin:0 auto 10px">
+  f.innerHTML = `<form class="cartao" id="fb"><img class="logo-bloqueio logo-claro" src="logo.png" alt=""><img class="logo-bloqueio logo-escuro" src="logo-escuro.png" alt="">
     <h2 style="text-align:center">Tela bloqueada</h2>
     <p class="dado" style="text-align:center">Saiu de perto do computador? Os dados ficam protegidos até você digitar sua senha.</p>
     <div class="campo" style="margin-top:12px"><label>Senha de ${esc(EU.nome)}</label><input type="password" id="b_senha" autocomplete="current-password" required></div>
