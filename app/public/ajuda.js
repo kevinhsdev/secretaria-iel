@@ -9,7 +9,7 @@ const AJUDA = {
     serve: 'Resumo do dia e da campanha de matrícula. Cada número é um link: clique para abrir a tela onde aquilo se resolve.',
     passos: [
       'Olhe primeiro o bloco "Para hoje": suas tarefas, quem vem buscar aluno, atendimentos em aberto e lembretes do mês.',
-      'Use os atalhos para o que mais se faz no balcão: registrar atendimento, consultar o portão, emitir documento.',
+      'Use os atalhos para o que mais se faz na secretaria: registrar atendimento, consultar o portão, emitir documento.',
       'No bloco da matrícula, os documentos vencidos aparecem primeiro. "Ver todas as pendências" mostra a lista por turma.',
     ],
     dicas: ['Vermelho = tem algo esperando. Verde = em dia.', 'A faixa amarela no topo aparece quando falta cópia de segurança ou ficou uma janela sem salvar.'],
@@ -67,7 +67,7 @@ const AJUDA = {
   extras: {
     nome: 'Atividades extras',
     serve: 'Inscrições em ballet, judô, futsal e outras atividades, com parcelas, contrato, cancelamento, lista de chamada e ingressos de eventos.',
-    passos: ['Aba Inscrições: inscreva o aluno. As parcelas vão do mês da inscrição até novembro, com vencimento no dia 10.', 'Gere o contrato da atividade pelo botão da linha.', 'Para cancelar, use o termo de cancelamento (não exclua).', 'Aba Ingressos e eventos: quantidade por aluno e registro de retirada.'],
+    passos: ['Aba Inscrições: inscreva o aluno. As parcelas vão do mês da inscrição até novembro, com vencimento no dia 10.', 'Gere o contrato da atividade pelo botão da linha.', 'Para cancelar, use o termo de cancelamento (não exclua).', 'Clique no cartão de uma atividade para ver só as inscrições dela e imprimir a lista de chamada.', 'Aba Ingressos e eventos: quantidade por aluno e registro de retirada.'],
     dicas: ['Valores e horários das atividades ficam na aba "Atividades e valores".'],
   },
   bolsas: {
@@ -79,25 +79,25 @@ const AJUDA = {
   boletos: {
     nome: 'Boletos',
     serve: 'Registrar a entrega dos boletos em papel: quem recebeu, quando e como.',
-    passos: ['Crie uma remessa (por exemplo, "Boletos 2027 — massa anual").', 'Escolha a turma e marque quem recebeu (dá para marcar a turma toda).', 'Imprima a folha de assinatura por turma.'],
+    passos: ['Crie uma remessa (por exemplo, "Boletos 2027 — massa anual").', 'Abra a turma e ligue o interruptor de quem recebeu. Dá para anotar quem retirou, como e uma observação.', 'Para o protocolo de assinatura, escolha a turma no filtro e clique em "Protocolo de entrega".'],
     dicas: ['Cada entrega fica registrada com a data e quem retirou.'],
   },
   fotos: {
     nome: 'Mutirão de fotos',
     serve: 'Quem ainda está sem foto no ACADESC, na SED e no Lanche Card.',
-    passos: ['Filtre a turma do dia do mutirão.', 'Depois de colocar a foto em cada sistema, marque a caixa correspondente (dá para marcar a turma toda de uma vez).', 'Imprima a folha de controle para levar à sala.'],
+    passos: ['Filtre a turma do dia do mutirão.', 'Depois de colocar a foto em cada sistema, clique no nome do sistema no cartão do aluno (fica verde com ✓).', 'Para a turma toda de uma vez: filtre e use "Marcar filtrados…".', 'Imprima a lista para levar à sala.'],
     dicas: ['Marcar qualquer sistema já conta como foto tirada.'],
   },
   portao: {
     nome: 'Portão · Saída',
     serve: 'Quem pode buscar cada aluno e os avisos do dia ("hoje quem busca é a avó"). Serve também no celular, no portão.',
-    passos: ['Digite o nome do aluno na consulta rápida.', 'Confira o documento de quem veio buscar com a lista de autorizados.', 'Aviso do dia: registre quem avisou, como avisou e o horário.', 'Na saída, clique em "Liberar saída": fica registrado quem conferiu.'],
+    passos: ['Digite o nome do aluno na consulta rápida.', 'Confira o documento de quem veio buscar com a lista de autorizados.', 'Aviso do dia: registre quem avisou, como avisou e o horário.', 'Na saída, segure o botão "Segure para liberar a saída" até a barra verde encher: fica registrado quem conferiu. Se soltar antes, nada acontece.', 'Liberou por engano? "Desfazer" no próprio cartão.'],
     dicas: ['Aviso só por telefone é recusado, como diz o termo de saída. Exceções pedem confirmação.', 'Na dúvida, não libere: chame a coordenação.'],
   },
   atendimentos: {
     nome: 'Atendimentos',
-    serve: 'Registro de quem procurou a secretaria (balcão, telefone, WhatsApp, e-mail), o que precisava e se ficou resolvido.',
-    passos: ['Logo depois de atender, clique em "+ Registrar atendimento".', 'Se não resolveu na hora, desmarque "Ficou resolvido" e diga com quem ficou e até quando retornar.', 'Quando resolver, clique em "Resolvido" na linha.'],
+    serve: 'Registro de quem procurou a secretaria (pessoalmente na secretaria, telefone, WhatsApp, e-mail), o que precisava e se ficou resolvido.',
+    passos: ['Logo depois de atender, clique em "+ Registrar atendimento".', 'Se não resolveu na hora, desmarque "Ficou resolvido" e diga com quem ficou e até quando retornar.', 'Quando resolver, clique em "Resolvido" na linha.', 'Os cartões de cada canal (Secretaria, Telefone…) filtram a lista.'],
     dicas: ['Em um mês, isto vira o retrato do que mais toma o tempo da secretaria (aparece nos Relatórios).'],
   },
   historico: {
@@ -155,13 +155,13 @@ const AJUDA = {
   relatorios: {
     nome: 'Relatórios',
     serve: 'Os números do ano (alunos, rematrícula, atendimentos, financeiro, bolsas, fotos, saída e equipe) para a Samara e a Direção.',
-    passos: ['Escolha o ano.', 'Use "Versão para imprimir" para levar uma folha timbrada à reunião.'],
+    passos: ['Escolha o ano.', 'Use "Folha de fechamento" para levar uma folha timbrada à reunião.'],
     dicas: [],
   },
   mensagens: {
     nome: 'Mensagens',
     serve: 'Textos prontos para WhatsApp e e-mail, com campos que se preenchem sozinhos.',
-    passos: ['Crie ou edite um modelo.', 'Use os campos {aluno} {responsavel} {serie} {serie_destino} {documentos} {prazo} no texto.', 'O modelo aparece para escolher quando você clica em WhatsApp numa ficha ou lista.'],
+    passos: ['Crie ou edite um modelo.', 'Use os campos {aluno} {responsavel} {serie} {serie_destino} {documentos} {prazo} no texto.', 'Clique num campo embaixo do texto para colocá-lo onde está o cursor. A prévia mostra como a família vai ver.', 'Clique em "Salvar". O modelo aparece para escolher quando você clica em WhatsApp numa ficha ou lista.'],
     dicas: ['O sistema não manda mensagem sozinho: ele abre o WhatsApp com o texto pronto e você confere antes de enviar.'],
   },
   lixeira: {

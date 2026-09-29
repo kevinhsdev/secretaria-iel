@@ -15,11 +15,11 @@ async function baixar(url, nomeArquivo) {
 }
 
 const TIPOS_DOC = [
-  ['escolaridade', '📄 Declaração de escolaridade'], ['vaga', '📄 Declaração de vaga'], ['transferencia', '📄 Declaração de transferência'],
-  ['conclusao', '📄 Declaração de conclusão'], ['comparecimento', '📄 Declaração de comparecimento'], ['pagamento', '💲 Declaração de pagamento', true],
-  ['termo_saida', '✍️ Autorização de saída'], ['termo_canc_matricula', '✍️ Cancelamento de matrícula'], ['termo_canc_extra', '✍️ Cancelamento de atividade extra'],
-  ['termo_canc_bolsa', '✍️ Cancelamento de bolsa'], ['carteirinha', '🪪 Carteirinha olímpica'],
-  ['historico', '🎓 Histórico escolar'],
+  ['escolaridade', 'Declaração de escolaridade', false, 'pasta'], ['vaga', 'Declaração de vaga', false, 'pasta'], ['transferencia', 'Declaração de transferência', false, 'pasta'],
+  ['conclusao', 'Declaração de conclusão', false, 'pasta'], ['comparecimento', 'Declaração de comparecimento', false, 'pasta'], ['pagamento', 'Declaração de pagamento', true, 'boletos'],
+  ['termo_saida', 'Autorização de saída', false, 'rematricula'], ['termo_canc_matricula', 'Cancelamento de matrícula', false, 'rematricula'], ['termo_canc_extra', 'Cancelamento de atividade extra', false, 'rematricula'],
+  ['termo_canc_bolsa', 'Cancelamento de bolsa', false, 'rematricula'], ['carteirinha', 'Carteirinha olímpica', false, 'carteira'],
+  ['historico', 'Histórico escolar', false, 'historico'],
 ];
 
 // Campo de busca de aluno reaproveitável (retorna o aluno escolhido)
@@ -46,10 +46,10 @@ window.fichaEtapa2 = async (el, a) => {
   const ano = new Date().getFullYear();
   const inscr = await api('GET', `/api/inscricoes?aluno=${a.id}`);
   el.innerHTML = `<div class="grade g2" style="margin-top:14px">
-    <div class="cartao"><h2>🖨️ Documentos</h2><div class="acoes">
-      ${TIPOS_DOC.filter((t) => !t[2] || EU.perfil === 'admin').map(([t, n]) => `<button class="btn peq" data-doc="${t}">${n}</button>`).join('')}</div>
+    <div class="cartao"><h2>${icone('documentos')}Documentos</h2><div class="acoes">
+      ${TIPOS_DOC.filter((t) => !t[2] || EU.perfil === 'admin').map(([t, n, , ic]) => `<button class="btn peq" data-doc="${t}">${icone(ic || 'pasta')}${n}</button>`).join('')}</div>
       <p class="dado" style="margin-top:10px">O documento abre numa nova aba, já preenchido. Confira, ajuste se precisar e imprima.</p></div>
-    <div class="cartao"><div class="acoes" style="justify-content:space-between"><h2 style="margin:0">🩰 Atividades extras</h2><button class="btn peq ama" id="insc">＋ Inscrever</button></div>
+    <div class="cartao"><div class="acoes" style="justify-content:space-between"><h2 style="margin:0">${icone('extras')}Atividades extras</h2><button class="btn peq ama" id="insc">${icone('mais')}Inscrever</button></div>
       ${inscr.length ? `<table style="margin-top:10px"><tbody>${inscr.map((i) => `<tr><td><b>${esc(i.atividade)}</b> <span class="dado">${i.ano}</span><br>
         <small class="dado">${i.parcelas || '?'}x ${moedaBR(i.valor_parcela)} · 1º venc. ${dataBR(i.primeiro_venc)}${i.desconto_folha ? ' · desconto em folha' : ''}</small>
         ${i.status === 'cancelada' ? `<br><small style="color:var(--vermelho)">Cancelada em ${dataBR(i.data_cancelamento)}${i.motivo ? ' — ' + esc(i.motivo) : ''}</small>` : ''}</td>
@@ -133,14 +133,14 @@ TELAS.documentos = async (c) => {
   const d = new Date();
   c.innerHTML = `<h1>Documentos</h1><p class="sub">Declarações, termos, carteirinhas e livro ponto com 1 clique. Tudo sai com o papel timbrado da OASE.</p>
   <div class="grade g2">
-    <div class="cartao"><h2>📄 Documento de um aluno</h2>
+    <div class="cartao"><h2>${icone('pasta')}Documento de um aluno</h2>
       <div class="campo"><label>Aluno</label><div id="selDoc"></div></div>
       <div class="acoes" style="margin-top:12px" id="botoesDoc"><p class="dado">Escolha o aluno para ver os documentos.</p></div></div>
-    <div class="cartao"><h2>🪪 Carteirinhas olímpicas por turma</h2>
+    <div class="cartao"><h2>${icone('carteira')}Carteirinhas olímpicas por turma</h2>
       <div class="acoes"><select id="turmaCart">${turmas.map((t) => `<option value="${t.serie_chave}|${esc(t.turma)}">${esc(t.rotulo)} (${t.n})</option>`).join('')}</select>
       <button class="btn pri" id="gerarCart">Gerar carteirinhas</button></div>
       <p class="dado" style="margin-top:8px">8 por folha A4, com foto quando houver. Dá para escolher alunos e categorias antes de imprimir.</p>
-      <h2 style="margin-top:20px">🕒 Livro ponto</h2>
+      <h2 style="margin-top:20px">${icone('relogio')}Livro ponto</h2>
       <div class="acoes"><select id="lpMes">${['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map((m, i) => `<option value="${i + 1}" ${i === d.getMonth() ? 'selected' : ''}>${m}</option>`).join('')}</select>
         <input type="number" id="lpAno" value="${d.getFullYear()}" style="width:90px"><button class="btn pri" id="gerarLp">Gerar folhas</button>
         ${EU.perfil === 'admin' ? '<button class="btn" id="func">Funcionários e feriados</button>' : ''}</div></div>
@@ -151,7 +151,7 @@ TELAS.documentos = async (c) => {
       <td>${e.aluno_id ? `<a href="#/aluno/${e.aluno_id}">${esc(titulo(e.aluno || ''))}</a>` : '—'}</td></tr>`).join('') : '<tr><td colspan="4" class="vazio">Nenhum documento emitido ainda.</td></tr>'}
     </tbody></table></div></div>`;
   seletorAluno($('#selDoc'), (a) => {
-    $('#botoesDoc').innerHTML = TIPOS_DOC.filter((t) => !t[2] || EU.perfil === 'admin').map(([t, n]) => `<button class="btn peq" data-doc="${t}">${n}</button>`).join('');
+    $('#botoesDoc').innerHTML = TIPOS_DOC.filter((t) => !t[2] || EU.perfil === 'admin').map(([t, n, , ic]) => `<button class="btn peq" data-doc="${t}">${icone(ic || 'pasta')}${n}</button>`).join('');
     $$('[data-doc]').forEach((b) => (b.onclick = () => abrirDoc({ tipo: b.dataset.doc, aluno: a.id })));
   });
   $('#gerarCart').onclick = () => { const [serie, turma] = $('#turmaCart').value.split('|'); abrirDoc({ tipo: 'carteirinha', serie, turma }); };
@@ -181,107 +181,7 @@ async function janelaFuncionarios() {
 }
 
 // ───────────── Atividades extras ─────────────
-TELAS.extras = async (c, aba = 'inscricoes') => {
-  const ano = new Date().getFullYear();
-  const ABAS = { inscricoes: 'Inscrições', eventos: 'Ingressos e eventos', atividades: 'Atividades e valores' };
-  c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Atividades extras</h1><p class="sub">Ballet, judô, futsal, recreação e apresentações · ${ano}</p></div>
-    <button class="btn ama" id="novaInsc">＋ Nova inscrição</button></div>
-    <div class="abas">${Object.entries(ABAS).map(([k, v]) => `<button data-aba="${k}" class="${aba === k ? 'on' : ''}">${v}</button>`).join('')}</div><div id="aba"></div>`;
-  $$('[data-aba]').forEach((b) => (b.onclick = () => (location.hash = '#/extras/' + b.dataset.aba)));
-  $('#novaInsc').onclick = () => formInscricao();
-  const el = $('#aba');
-
-  if (aba === 'inscricoes') {
-    const [ativs, lista] = await Promise.all([api('GET', '/api/atividades?ano=' + ano), api('GET', '/api/inscricoes?ano=' + ano)]);
-    let sel = null;
-    el.innerHTML = `<div class="grade g4">${ativs.filter((t) => t.ativo).map((t) => `<div class="cartao kpi" data-at="${t.id}" style="cursor:pointer" tabindex="0">
-      <div class="rot">${esc(t.nome)}</div><div class="val" style="font-size:24px">${t.inscritos}${t.vagas ? `<small style="font-size:13px;color:var(--texto-2)"> / ${t.vagas}</small>` : ''}</div>
-      <div class="det">${esc(t.publico || '')}<br>${esc(t.dias || '')} ${t.horario ? '· ' + esc(t.horario) : ''}<br>Prof. ${esc(t.professor || '—')} · ${moedaBR(t.valor)}/mês</div></div>`).join('')}</div>
-      <div class="cartao" style="margin-top:14px"><div class="filtros"><h2 style="margin:0;flex:1" id="tl">Todas as inscrições</h2>
-        <select id="fs"><option value="ativa">Ativas</option><option value="cancelada">Canceladas</option><option value="">Todas</option></select>
-        <button class="btn peq" id="chamada" hidden>🖨️ Lista de chamada</button><button class="btn peq" id="todas">Todas as atividades</button></div>
-        <div class="tabela-wrap"><table><thead><tr><th>Aluno</th><th>Turma</th><th>Atividade</th><th>Inscrição</th><th>Parcelas</th><th>Situação</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
-    const desenhar = () => {
-      const fs = $('#fs').value;
-      const f = lista.filter((i) => (!sel || i.atividade_id === sel) && (!fs || i.status === fs));
-      $('#tl').textContent = sel ? ativs.find((t) => t.id === sel).nome : 'Todas as inscrições';
-      $('#chamada').hidden = !sel;
-      $('#tb').innerHTML = f.length ? f.map((i) => `<tr><td><a href="#/aluno/${i.aluno_id}"><b>${esc(titulo(i.aluno))}</b></a>${i.filho_funcionario ? ' <span class="tag t-func">func.</span>' : ''}</td>
-        <td>${esc(i.turma_rotulo)}</td><td>${esc(i.atividade)}</td><td>${dataBR(i.data_inscricao)}</td><td>${i.parcelas || '?'}x ${moedaBR(i.valor_parcela)}${i.desconto_folha ? ' <span class="dado">(folha)</span>' : ''}</td>
-        <td>${i.status === 'ativa' ? '<span class="tag t-concluida">ativa</span>' : `<span class="tag t-nao_renova">cancelada</span><br><small class="dado">${dataBR(i.data_cancelamento)}</small>`}</td>
-        <td class="acoes">${i.status === 'ativa' ? `<button class="btn peq" data-contrato="${i.id}">Contrato</button><button class="btn peq perigo" data-cancelar="${i.id}">Cancelar</button>`
-          : `<button class="btn peq" data-reativar="${i.id}">Reativar</button>`}</td></tr>`).join('') : '<tr><td colspan="7" class="vazio">Nenhuma inscrição.</td></tr>';
-      $$('[data-contrato]').forEach((b) => (b.onclick = tentar(async () => {
-        const i = lista.find((x) => x.id === +b.dataset.contrato);
-        await baixar(`/api/inscricoes/${i.id}/contrato`, `CONTRATO ${i.atividade.toUpperCase()} ${i.ano} - ${titulo(i.aluno)}.xlsx`); toast('Contrato gerado!');
-      })));
-      $$('[data-cancelar]').forEach((b) => (b.onclick = () => cancelarInscricao(lista.find((x) => x.id === +b.dataset.cancelar))));
-      $$('[data-reativar]').forEach((b) => (b.onclick = tentar(async () => { await api('POST', `/api/inscricoes/${b.dataset.reativar}/reativar`); toast('Reativada'); rotear(); })));
-    };
-    $$('[data-at]').forEach((k) => (k.onclick = k.onkeydown = (e) => { if (e.type === 'keydown' && e.key !== 'Enter') return; sel = +k.dataset.at; desenhar(); }));
-    $('#todas').onclick = () => { sel = null; desenhar(); };
-    $('#fs').onchange = desenhar;
-    $('#chamada').onclick = () => abrirDoc({ tipo: 'chamada', atividade: sel, ano });
-    desenhar();
-  }
-
-  if (aba === 'eventos') {
-    const evs = await api('GET', '/api/eventos');
-    el.innerHTML = `<div class="acoes" style="margin-bottom:12px"><button class="btn" id="novoEv">＋ Novo evento</button></div>
-      <div class="grade g4">${evs.map((e) => `<div class="cartao kpi" data-ev="${e.id}" style="cursor:pointer"><div class="rot">${esc(e.nome)}</div>
-        <div class="val" style="font-size:24px">${e.total}<small style="font-size:13px;color:var(--texto-2)"> ingressos</small></div><div class="det">${e.data ? dataBR(e.data) + ' · ' : ''}${e.retirados} famílias já retiraram${e.limite_por_aluno ? ` · até ${e.limite_por_aluno} por aluno` : ''}</div></div>`).join('')
-        || '<p class="vazio">Nenhum evento. Crie a apresentação do balé ou a festa junina.</p>'}</div><div id="evDet"></div>`;
-    $('#novoEv').onclick = () => modal('Novo evento', `<form id="fe"><div class="campos"><div class="campo"><label>Nome *</label><input id="en" required placeholder="Apresentação de Balé ${ano}"></div>
-      <div class="campo"><label>Data</label><input type="date" id="ed"></div><div class="campo"><label>Limite de ingressos por aluno</label><input type="number" id="el" min="1"></div></div>
-      <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Criar</button></div></form>`,
-    { onAbrir: (m, fechar) => { $('#fe', m).onsubmit = tentar(async (ev) => { ev.preventDefault(); await api('POST', '/api/eventos', { nome: $('#en', m).value, data: $('#ed', m).value, limite_por_aluno: $('#el', m).value }); fechar(); rotear(); }); } });
-    $$('[data-ev]').forEach((k) => (k.onclick = tentar(() => detalheEvento(+k.dataset.ev, 'ballet'))));
-    if (evs[0]) detalheEvento(evs[0].id, 'ballet');
-  }
-
-  if (aba === 'atividades') {
-    const ativs = await api('GET', '/api/atividades?ano=' + ano);
-    const adm = EU.perfil === 'admin';
-    el.innerHTML = `<div class="cartao tabela-wrap"><p>${adm ? 'Edite direto na tabela; salva sozinho.' : 'Só a administração altera valores e horários.'} Estes dados vão para o contrato da atividade.</p>
-      <table><thead><tr><th>Atividade</th><th>Público</th><th>Dias</th><th>Horário</th><th>Valor/mês</th><th>Professor(a)</th><th>Vagas</th><th>Ativa</th></tr></thead><tbody>
-      ${ativs.map((t) => `<tr data-t="${t.id}">${['nome', 'publico', 'dias', 'horario'].map((k) => `<td><input data-k="${k}" value="${esc(t[k] || '')}" ${adm ? '' : 'disabled'} style="width:100%"></td>`).join('')}
-        <td><input type="number" step="0.01" data-k="valor" value="${t.valor ?? ''}" ${adm ? '' : 'disabled'} style="width:90px"></td><td><input data-k="professor" value="${esc(t.professor || '')}" ${adm ? '' : 'disabled'} style="width:110px"></td>
-        <td><input type="number" data-k="vagas" value="${t.vagas ?? ''}" ${adm ? '' : 'disabled'} style="width:70px"></td><td><input type="checkbox" data-k="ativo" ${t.ativo ? 'checked' : ''} ${adm ? '' : 'disabled'}></td></tr>`).join('')}
-      </tbody></table>${adm ? '<div class="acoes" style="margin-top:10px"><button class="btn" id="novaAt">＋ Nova atividade</button></div>' : ''}</div>`;
-    $$('[data-t] [data-k]').forEach((i) => (i.onchange = tentar(async () => {
-      await api('PUT', '/api/atividades/' + i.closest('tr').dataset.t, { [i.dataset.k]: i.type === 'checkbox' ? i.checked : i.value }); toast('Salvo');
-    })));
-    if ($('#novaAt')) $('#novaAt').onclick = tentar(async () => { await api('POST', '/api/atividades', { nome: 'Nova atividade' }); rotear(); });
-  }
-};
-
-async function detalheEvento(id, filtro) {
-  const d = await api('GET', `/api/eventos/${id}/ingressos?filtro=${encodeURIComponent(filtro)}`);
-  const box = $('#evDet');
-  if (!box) return;
-  box.innerHTML = `<div class="cartao" style="margin-top:14px"><div class="filtros"><h2 style="margin:0;flex:1">${esc(d.evento.nome)}</h2>
-    <select id="evF"><option value="ballet" ${filtro === 'ballet' ? 'selected' : ''}>Alunos do ballet</option><option value="extras" ${filtro === 'extras' ? 'selected' : ''}>Todas as atividades extras</option><option value="todos" ${filtro === 'todos' ? 'selected' : ''}>Todos os alunos</option></select>
-    <input id="evQ" placeholder="Filtrar nome…"><button class="btn peq" id="evImp">🖨️ Lista para assinatura</button></div>
-    <div class="tabela-wrap"><table><thead><tr><th>Aluno</th><th>Turma</th><th>Ingressos</th><th>Retirou?</th></tr></thead><tbody id="evTb"></tbody></table></div></div>`;
-  const desenhar = () => {
-    const q = norm($('#evQ').value);
-    $('#evTb').innerHTML = d.alunos.filter((a) => !q || norm(a.nome).includes(q)).map((a) => `<tr><td>${esc(titulo(a.nome))}</td><td>${esc(a.turma_rotulo)}</td>
-      <td><input type="number" min="0" ${d.evento.limite_por_aluno ? `max="${d.evento.limite_por_aluno}"` : ''} value="${a.quantidade || 0}" data-q="${a.id}" style="width:70px"></td>
-      <td><label><input type="checkbox" data-r="${a.id}" ${a.retirado_em ? 'checked' : ''}> ${a.retirado_em ? dataBR(a.retirado_em) : ''}</label></td></tr>`).join('') || '<tr><td colspan="4" class="vazio">Ninguém nesta lista.</td></tr>';
-    const salvar = (aid, corpo) => tentar(async () => {
-      const al = d.alunos.find((x) => x.id === aid);
-      await api('PUT', `/api/eventos/${id}/ingressos/${aid}`, { quantidade: al.quantidade || 0, ...corpo });
-      Object.assign(al, corpo, corpo.retirado !== undefined ? { retirado_em: corpo.retirado ? hojeIso() : null } : {});
-      toast('Salvo');
-    })();
-    $$('[data-q]').forEach((i) => (i.onchange = () => salvar(+i.dataset.q, { quantidade: +i.value })));
-    $$('[data-r]').forEach((i) => (i.onchange = () => salvar(+i.dataset.r, { retirado: i.checked })));
-  };
-  $('#evF').onchange = tentar(() => detalheEvento(id, $('#evF').value));
-  $('#evQ').oninput = desenhar;
-  $('#evImp').onclick = () => abrirDoc({ tipo: 'ingressos', evento: id, filtro: $('#evF').value });
-  desenhar();
-}
+// A tela de Atividades extras (inscrições, eventos e valores) está em telas5.js (5.1).
 
 // ───────────── Bolsas (CEBAS) ─────────────
 TELAS.bolsas = async (c) => {
@@ -295,8 +195,8 @@ TELAS.bolsas = async (c) => {
   const tagStatus = (s) => `<span class="tag ${['concedida', 'ofertada'].includes(s) ? 't-concluida' : ['indeferida', 'sem_oferta', 'desistiu'].includes(s) ? 't-nao_renova' : 't-reservada'}">${esc(d.status[s])}</span>`;
   c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Bolsas de estudo (CEBAS) ${d.ano}</h1>
     <p class="sub">Requerimentos a partir de ${dataBR(cfg.cebas_retirada)} · entrega de ${dataBR(cfg.cebas_entrega_ini)} a ${dataBR(cfg.cebas_entrega_fim)} · resultado a partir de ${dataBR(cfg.cebas_resultado)} · prestação de contas até ${dataBR(cfg.cebas_prestacao)}</p></div>
-    <div class="acoes"><label class="btn">📥 Importar Planilha Bolsas<input type="file" id="arqB" accept=".xlsx" hidden></label><button class="btn ama" id="novoB">＋ Novo processo</button></div></div>
-  <div class="faixa-lgpd">🔒 Dados socioeconômicos: uso exclusivo para análise da bolsa (LGPD, edital item 6.7). Não compartilhe prints desta tela.</div>
+    <div class="acoes"><label class="btn">${icone('importar')}Importar Planilha Bolsas<input type="file" id="arqB" accept=".xlsx" hidden></label><button class="btn ama" id="novoB">${icone('mais')}Novo processo</button></div></div>
+  <div class="faixa-lgpd">${icone('cadeado')}Dados socioeconômicos: uso exclusivo para análise da bolsa (LGPD, edital item 6.7). Não compartilhe prints desta tela.</div>
   <div class="grade g4">
     <div class="cartao kpi destaque"><div class="rot">Processos</div><div class="val">${d.bolsas.length}</div><div class="det">${d.bolsas.filter((b) => b.tipo === 'renovacao').length} renovações · ${d.bolsas.filter((b) => b.tipo === 'novo').length} pedidos novos</div></div>
     <div class="cartao kpi"><div class="rot">Em análise</div><div class="val">${['inscrito', 'conferido', 'assistente', 'visita'].reduce((s, k) => s + (cont[k] || 0), 0)}</div><div class="det">${d.bolsas.filter((b) => !completos(b) && ['inscrito', 'conferido'].includes(b.status)).length} com documentos faltando</div></div>
@@ -356,7 +256,7 @@ function formBolsa(d, b) {
     <div class="campo" style="margin-top:10px"><label>Observações (parecer da assistente social etc.)</label><textarea id="b_obs" style="min-height:80px">${esc(b.obs || '')}</textarea></div>
     ${b.atualizado_por ? `<p class="dado">Última alteração: ${esc(b.atualizado_por)} em ${new Date(b.atualizado_em).toLocaleString('pt-BR')}</p>` : ''}
     <div class="rodape">${novo ? '' : '<button type="button" class="btn perigo" id="delB" style="margin-right:auto">Excluir</button>'}
-      ${!novo && b.aluno_id ? `<button type="button" class="btn" id="termoB">✍️ Termo de cancelamento</button>` : ''}
+      ${!novo && b.aluno_id ? `<button type="button" class="btn" id="termoB">${icone('rematricula')}Termo de cancelamento</button>` : ''}
       <button type="button" class="btn" data-fechar>Fechar</button><button class="btn pri">Salvar</button></div></form>`,
   { onAbrir: (el, fechar) => {
     let alunoId = b.aluno_id || null;

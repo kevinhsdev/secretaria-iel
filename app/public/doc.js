@@ -495,7 +495,7 @@ const DOCS = {
       const r = d.rematricula, a = d.alunos, at = d.atendimentos;
       const linha = (rot, valor, det = '') => `<tr><td>${esc(rot)}</td><td class="n"><b>${esc(valor)}</b></td><td style="font-size:8.5pt">${esc(det)}</td></tr>`;
       const bloco = (titulo2, linhas) => `<h3 class="sec">${esc(titulo2)}</h3><table class="doc" style="font-size:9.5pt"><tbody>${linhas.join('')}</tbody></table>`;
-      const canais = { balcao: 'Balcão', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail' };
+      const canais = { balcao: 'Secretaria', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail' };
       const pc = (n, t) => (t ? Math.round((100 * n) / t) + '%' : '—');
       return folha(`${TIMBRE}<p class="local-data">Ferraz de Vasconcelos, ${dataExtenso(v.data)}.</p>
         <p class="inep">Código no INEP ${esc(d.escola.inep)}<br>${esc(v.para)}</p>

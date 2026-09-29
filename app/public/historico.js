@@ -99,12 +99,12 @@ async function abaHistAlunos(el) {
     </div>
     <div class="dica">Cada ano cursado é uma coluna do histórico. Clique em <b>Notas</b> para digitar os anos de um aluno (quem veio de outra escola:
       copie do histórico que a família trouxe). No fim do ano, use <b>Lançar notas da turma</b> — dá para colar direto do Excel.
-      O botão <b>🖨️ Histórico</b> monta o documento na hora.</div>
+      O botão <b>Histórico</b> monta o documento na hora.</div>
     <div class="cartao" style="margin-top:14px"><div class="filtros">
       <select id="ft"><option value="">Todas as turmas</option>${d.turmas.map((t) => `<option>${esc(t.rotulo)}</option>`).join('')}</select>
       <label class="chk"><input type="checkbox" id="ff"> Só quem tem ano faltando</label>
       <input id="fq" placeholder="Buscar aluno ou matrícula…" style="flex:1;min-width:200px">
-      <button class="btn peq" id="imp">🖨️ Imprimir lista</button></div>
+      <button class="btn peq" id="imp">${icone('documentos')}Imprimir lista</button></div>
     <div class="tabela-wrap"><table><thead><tr><th>Aluno</th><th>Turma</th><th>Anos no histórico</th><th>Falta lançar</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   const desenhar = () => {
     const ft = $('#ft', el).value, ff = $('#ff', el).checked, q = norm($('#fq', el).value);
@@ -114,7 +114,7 @@ async function abaHistAlunos(el) {
       <td>${a.esperadas ? `<span class="progresso"><span class="trilho"><i style="width:${Math.round((100 * a.feitas) / a.esperadas)}%"></i></span>${a.feitas} de ${a.esperadas}</span>` : '<span class="dado">primeiro ano do curso</span>'}
         ${a.atual ? '<br><span class="tag t-novo">ano atual já lançado</span>' : ''}</td>
       <td>${a.faltam.length ? `<span class="anos-faltam">${a.faltam.map((r, i) => `<a class="tag t-vencendo" href="#/hist/${a.id}/${esc((a.faltam_ch || [])[i] || '')}" title="Abrir as notas do ${esc(r)}">${esc(r)}</a>`).join('')}</span>` : '<span class="tag t-concluida">em dia</span>'}</td>
-      <td class="acoes" style="justify-content:flex-end"><a class="btn peq" href="#/hist/${a.id}">Notas</a><button class="btn peq" data-doc="${a.id}">🖨️ Histórico</button></td></tr>`), {
+      <td class="acoes" style="justify-content:flex-end"><a class="btn peq" href="#/hist/${a.id}">Notas</a><button class="btn peq" data-doc="${a.id}">${icone('documentos')}Histórico</button></td></tr>`), {
       colunas: 5,
       vazio: `<tr><td colspan="5">${d.alunos.length ? '<p class="vazio">Ninguém com esse filtro.</p>' : vazio('historico', 'Nenhum aluno do Fundamental ou do Médio',
         'O histórico escolar começa no 1º ano. Importe os alunos do ACADESC em Configurações (ou carregue a demonstração) e eles aparecem aqui.')}</td></tr>`,
@@ -138,7 +138,7 @@ async function abaHistTurma(el) {
       <label class="dado">Ano letivo <input type="number" id="ha" style="width:90px"></label>
       <span id="cargasTurma" class="acoes"></span>
     </div><div id="dicaTurma"></div><div class="tabela-wrap" id="gradeTurma"></div>
-    <div class="acoes" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="htImp">🖨️ Históricos desta turma</button><button class="btn pri" id="htSalvar">Salvar notas da turma</button></div></div>`;
+    <div class="acoes" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="htImp">${icone('documentos')}Históricos desta turma</button><button class="btn pri" id="htSalvar">Salvar notas da turma</button></div></div>`;
   let d = null, sujo = false;
   const grade = $('#gradeTurma', el);
   comoPlanilha(grade);
@@ -238,7 +238,7 @@ async function abaHistDisciplinas(el) {
           <button class="btn peq" data-ed="${x.id}">Editar</button><button class="btn peq" data-at="${x.id}" data-v="${x.ativo ? 0 : 1}">${x.ativo ? 'Tirar' : 'Voltar'}</button></td></tr>`).join('')}
       </tbody></table>
       <form class="acoes" data-novo="${k}" style="margin-top:10px"><input name="area" placeholder="Área (ex.: Parte Diversificada e Eletivas)" style="width:220px">
-        <input name="nome" placeholder="Nova disciplina" required style="flex:1;min-width:140px"><button class="btn">＋ Adicionar</button></form></div>`).join('')}</div>
+        <input name="nome" placeholder="Nova disciplina" required style="flex:1;min-width:140px"><button class="btn">${icone('mais')}Adicionar</button></form></div>`).join('')}</div>
     <div class="cartao" style="margin-top:14px"><h2>Regras e assinaturas</h2>
       <form id="regras"><div class="campos">
         <div class="campo"><label>Média para aprovação</label><input id="r_media" value="${esc(numBR(cf.hist_media))}"></div>
@@ -367,7 +367,7 @@ TELAS.hist = async (c, id) => {
   const idxAtual = seriesDoCurso.findIndex(([k]) => k === a.serie_chave);
   c.innerHTML = `<div class="acoes" style="justify-content:space-between;align-items:flex-start"><div><h1>Histórico de ${esc(titulo(a.nome))}</h1>
       <p class="sub">${esc(a.turma_rotulo)} · Mat. ${esc(a.mat || '—')}${a.novo ? ' · aluno novo' : ''} · <a href="#/aluno/${a.id}">abrir a ficha</a></p></div>
-    <div class="acoes"><a class="btn" href="#/historico">← Voltar</a><button class="btn" id="hDoc">🖨️ Gerar histórico</button><button class="btn pri" id="hSalvar">Salvar</button></div></div>
+    <div class="acoes"><a class="btn" href="#/historico">← Voltar</a><button class="btn" id="hDoc">${icone('documentos')}Gerar histórico</button><button class="btn pri" id="hSalvar">Salvar</button></div></div>
     <div class="cartao"><h2>Identificação (cabeçalho do histórico)</h2><div class="campos">
       ${campoDado('h_nat', 'Local de nascimento — cidade', dd.naturalidade)}${campoDado('h_uf', 'UF de nascimento', dd.uf_nasc, 'maxlength="2" placeholder="SP"')}
       ${campoDado('h_nac', 'Nacionalidade', dd.nacionalidade, 'placeholder="Brasileira"')}

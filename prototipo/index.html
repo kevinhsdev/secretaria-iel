@@ -80,9 +80,9 @@ svg.i { width: 18px; height: 18px; flex: none; }
 .app { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100%; }
 .rail { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 18px 0; border-right: 1px solid var(--line); background: var(--surface); z-index: 20; }
-.mark { width: 44px; height: 44px; border-radius: 14px; background: #0E3D7A; color: #fff; display: grid; place-items: center; margin-bottom: 16px;
-  font: 800 15px/1 var(--display); letter-spacing: -.04em; position: relative; }
-.mark::after { content: ""; position: absolute; right: 7px; top: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--sol); }
+.mark { width: 56px; height: 56px; border-radius: 50%; background: #fff; display: grid; place-items: center; margin-bottom: 14px;
+  box-shadow: 0 0 0 3px rgba(245, 194, 27, .35), 0 6px 16px -6px rgba(11, 27, 51, .35); }
+.mark img { width: 50px; height: 50px; border-radius: 50%; display: block; }
 .nav { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .nav a { width: 70px; padding: 9px 0 7px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); text-decoration: none;
   font-size: 11px; font-weight: 600; position: relative; transition: color 150ms ease, background-color 150ms ease, transform 160ms var(--ease-out); }
@@ -636,7 +636,7 @@ details.turma .inner { padding: 8px 18px 14px; }
 
 <div class="app">
   <nav class="rail" aria-label="Menu">
-    <div class="mark" aria-label="Secretaria IEL">iel</div>
+    <div class="mark"><img src="../app/public/logo.png" alt="Instituto Educacional Luterano"></div>
     <div class="nav" id="nav"></div>
     <div class="rail-foot">
       <button class="icon-btn" id="themeBtn" aria-label="Alternar claro e escuro"></button>
@@ -676,7 +676,7 @@ details.turma .inner { padding: 8px 18px 14px; }
 
 <div class="gate" id="gate" aria-hidden="true">
   <div class="gate-art">
-    <div class="mark" style="margin:0">iel</div>
+    <div class="mark" style="margin:0;width:84px;height:84px"><img src="../app/public/logo.png" alt="Instituto Educacional Luterano" style="width:76px;height:76px"></div>
     <div>
       <h1>Secretaria<br><em>IEL 2.0</em></h1>
       <p>Matrícula, documentos, portão e o dia a dia da secretaria num lugar só. Funciona sem internet, num computador da escola.</p>
@@ -767,7 +767,7 @@ details.turma .inner { padding: 8px 18px 14px; }
   ];
   const TAREFAS = [
     { p: 'Toda a equipe', t: 'Conferir os avisos de saída do dia', d: 'Antes de liberar qualquer aluno', turno: 'todos', done: false },
-    { p: 'Toda a equipe', t: 'Registrar os atendimentos do dia', d: 'Balcão, telefone e WhatsApp', turno: 'todos', done: false },
+    { p: 'Toda a equipe', t: 'Registrar os atendimentos do dia', d: 'Secretaria, telefone e WhatsApp', turno: 'todos', done: false },
     { p: 'Kevin', t: 'Portão: entrada e saída dos alunos', d: 'Conferir quem pode buscar antes de liberar', turno: '13h', done: true },
     { p: 'Kevin', t: 'Lanche Card (tarde)', d: 'Recargas e cadastros da cantina', turno: '14h', done: true },
     { p: 'Kevin', t: 'Digitalização e prontuário', d: 'PDF Renamer e pasta do aluno', turno: '15h', done: false },
@@ -829,7 +829,7 @@ details.turma .inner { padding: 8px 18px 14px; }
     { q: 'ontem 17:22', canal: 'email', quem: 'Daniela Honorato', assunto: 'Segunda via do boleto de outubro', cat: 'Financeiro', st: 'resolvido', por: 'Duda' },
     { q: 'ontem 13:05', canal: 'balcao', quem: 'Márcio Freitas', assunto: 'Declaração de vaga para a 1ª EM', cat: 'Documentos', st: 'resolvido', por: 'Kevin' },
   ];
-  const CANAL = { balcao: ['Balcão', 'balcao', 'p-azul'], telefone: ['Telefone', 'tel', 'p-sol'], whatsapp: ['WhatsApp', 'chat', 'p-ok'], email: ['E-mail', 'mail', 'p-roxo'] };
+  const CANAL = { balcao: ['Secretaria', 'balcao', 'p-azul'], telefone: ['Telefone', 'tel', 'p-sol'], whatsapp: ['WhatsApp', 'chat', 'p-ok'], email: ['E-mail', 'mail', 'p-roxo'] };
   const CAL = [
     ['Janeiro', [['Massa de boletos do ano: conferir e distribuir', 'Duda', 1]]],
     ['Fevereiro', [['Entrega dos boletos físicos por turma', 'Duda', 1], ['SED: fechamento das matrículas e turmas', 'Samara', 1], ['Conferir documentação dos alunos novos', 'Toda a equipe', 1]]],
@@ -1009,7 +1009,7 @@ details.turma .inner { padding: 8px 18px 14px; }
     bolsas: ['Bolsas (CEBAS)', 'Processo das bolsas sociais, do requerimento à concessão. Dados sensíveis: só a administração vê.', ['Acompanhe a etapa de cada família.']],
     boletos: ['Entrega de boletos', 'Quem já recebeu o boleto físico, por turma.', ['Abra a turma e marque a entrega.']],
     portao: ['Portão · Saída', 'Quem pode buscar cada aluno e os avisos de hoje.', ['Confira o documento do adulto.', 'Segure o botão até encher para liberar.', 'Aviso só por telefone não vale.']],
-    atendimentos: ['Atendimentos', 'Tudo o que foi atendido no balcão, telefone, WhatsApp e e-mail.', ['Registre logo depois de atender.']],
+    atendimentos: ['Atendimentos', 'Tudo o que foi atendido na secretaria, por telefone, WhatsApp e e-mail.', ['Registre logo depois de atender.']],
     calendario: ['Calendário da secretaria', 'A rotina do ano, mês a mês. O mês atual fica destacado.', ['Marque o item quando estiver feito neste ano.']],
     relatorios: ['Relatórios', 'Os números do ano para levar à Samara e à Diretoria.', ['Os gráficos usam os mesmos dados das telas.']],
     mensagens: ['Modelos de mensagem', 'Textos prontos para o WhatsApp, com o nome do aluno e do responsável preenchidos sozinhos.', ['Clique numa variável para colocá-la no texto.']],
@@ -1537,7 +1537,7 @@ details.turma .inner { padding: 8px 18px 14px; }
           <div class="stat"><div class="eyebrow">Vencimento</div><div class="v">dia 10</div><div class="d">massa de boletos em novembro</div></div></div>
         ${turmas.map((t) => { const as = ALUNOS.filter((a) => a.turma === t), ok = as.filter((a) => a.boleto).length;
           return `<details class="turma" ${abertas.has(t) ? 'open' : ''} data-t="${esc(t)}"><summary><b>${esc(t)}</b><div class="bar-h"><i style="width:${(ok / as.length) * 100}%;background:var(--ok);animation:none"></i></div><span class="mono muted">${ok}/${as.length}</span></summary>
-            <div class="inner">${as.map((a) => `<div class="brow"><span><b style="font-size:14px">${esc(a.nome)}</b><br><small>${a.boleto ? `recebido por ${esc(a.resp.split(' ')[0])} · balcão` : 'ainda não entregue'}</small></span>
+            <div class="inner">${as.map((a) => `<div class="brow"><span><b style="font-size:14px">${esc(a.nome)}</b><br><small>${a.boleto ? `recebido por ${esc(a.resp.split(' ')[0])} · secretaria` : 'ainda não entregue'}</small></span>
               <button class="toggle" data-b="${a.mat}" aria-pressed="${!!a.boleto}" aria-label="Boleto entregue para ${esc(a.nome)}"></button></div>`).join('')}</div></details>`; }).join('')}`;
     };
     const abertas = new Set([turmas[0]]);
@@ -1624,7 +1624,7 @@ details.turma .inner { padding: 8px 18px 14px; }
   TELAS.relatorios = (v) => {
     const seg = [['Infantil', 62], ['Fund. I', 188], ['Fund. II', 171], ['Médio', 114]], tot = 535;
     const mes = [['jan', 48], ['fev', 96], ['mar', 71], ['abr', 55], ['mai', 60], ['jun', 38], ['jul', 22], ['ago', 64], ['set', 81]], mx = 100;
-    const canal = [['Balcão', 42, 'var(--azul)'], ['WhatsApp', 33, 'var(--ok)'], ['Telefone', 19, 'var(--sol)'], ['E-mail', 6, 'var(--roxo)']];
+    const canal = [['Secretaria', 42, 'var(--azul)'], ['WhatsApp', 33, 'var(--ok)'], ['Telefone', 19, 'var(--sol)'], ['E-mail', 6, 'var(--roxo)']];
     const docs = [['Escolaridade', 58], ['Comparecimento', 21], ['Pagamento', 17], ['Transferência', 14], ['Histórico', 11], ['Vaga', 9]];
     const W = 560, H = 200, x0 = 34, y0 = 170, px = (i) => x0 + (i * (W - x0 - 14)) / (mes.length - 1), py = (n) => y0 - (n / mx) * 150;
     const linha = mes.map(([, n], i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)} ${py(n).toFixed(1)}`).join(' ');

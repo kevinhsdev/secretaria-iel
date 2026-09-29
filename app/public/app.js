@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '4.14.0';
+const VERSAO = '5.4.0';
 
 // ───────────── utilitários ─────────────
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -123,7 +123,7 @@ function mostrarRascunhos() {
   const caixa = $('#rascunhos');
   if (!caixa) return;
   const lista = rascunhosPendentes().filter((t) => !$$('.modal h2 span').some((s) => s.textContent === t));
-  caixa.innerHTML = lista.length ? `<div class="aviso-fixo">📝 <b>Ficou sem salvar:</b> ${lista.map((t) => {
+  caixa.innerHTML = lista.length ? `<div class="aviso-fixo">${icone('rematricula')}<b>Ficou sem salvar:</b> ${lista.map((t) => {
     const r = lerRascunho(t);
     return `“${esc(t)}” <a class="btn peq" href="${esc(r.tela || '#/')}">Voltar para aquela tela</a>`;
   }).join(' · ')} <span>Abra a mesma janela de novo e clique em <b>Recuperar</b>.</span>
@@ -161,8 +161,17 @@ let toastTimer;
 let desfazerPendente = null;
 function toast(msg, erro) {
   let t = $('.toast');
-  if (!t) { t = document.createElement('div'); document.body.appendChild(t); }
+  const jaAberto = t && !t.classList.contains('saindo');
+  if (!t) {
+    t = document.createElement('div'); t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite');
+    // Mouse em cima (ou janela escondida) segura o aviso: dá tempo de ler e de clicar em "Desfazer"
+    t.onmouseenter = () => pausarToast(t);
+    t.onmouseleave = () => retomarToast(t);
+    document.body.appendChild(t);
+  }
   t.className = 'toast' + (erro ? ' erro' : '');
+  // Chegou outro aviso com este ainda na tela: troca o texto com um desfoque rápido, sem "pular"
+  if (jaAberto) { void t.offsetWidth; t.classList.add('troca'); }
   t.textContent = msg;
   let tempo = erro ? 5000 : 2600;
   const d = desfazerPendente;
@@ -179,15 +188,60 @@ function toast(msg, erro) {
     tempo = 8000;
   }
   clearTimeout(toastTimer);
-  // Sai descendo pelo mesmo caminho por onde entrou; uma mensagem nova no meio disso reaproveita a mesma caixa
-  toastTimer = setTimeout(() => { t.classList.add('saindo'); toastTimer = setTimeout(() => t.remove(), 200); }, tempo);
+  t._resta = tempo;
+  if (t.matches(':hover') || document.hidden) return; // começa a contar quando o mouse sair / a janela voltar
+  retomarToast(t);
 }
+// Sai descendo pelo mesmo caminho por onde entrou; uma mensagem nova no meio disso reaproveita a mesma caixa
+function retomarToast(t) {
+  clearTimeout(toastTimer);
+  t._inicio = Date.now();
+  toastTimer = setTimeout(() => { t.classList.add('saindo'); toastTimer = setTimeout(() => t.remove(), 200); }, Math.max(t._resta || 0, 1200));
+}
+function pausarToast(t) {
+  if (t.classList.contains('saindo')) return;
+  clearTimeout(toastTimer);
+  if (t._inicio) t._resta -= Date.now() - t._inicio;
+}
+document.addEventListener('visibilitychange', () => { const t = $('.toast'); if (!t) return; if (document.hidden) pausarToast(t); else if (!t.matches(':hover')) retomarToast(t); });
 // Chamado pelo api() depois de um DELETE que foi para a lixeira. Se a tela não mostrar mensagem nenhuma, mostra uma.
 function avisarLixeira(id) {
   desfazerPendente = { id, em: Date.now() };
   setTimeout(() => { if (desfazerPendente && desfazerPendente.id === id) toast('Excluído'); }, 400);
 }
 const tentar = (fn) => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
+const semMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Caixinha de marcar: a linha fica "feita" na hora do clique, antes de o servidor responder; se der erro, volta
+// como estava. Espera a marquinha terminar de desenhar antes de a tela se atualizar (senão ela é cortada no meio).
+async function marcarNaHora(cb, acao) {
+  const li = cb.closest('li'), inicio = performance.now();
+  if (li) li.classList.toggle('ok', cb.checked);
+  try { await acao(); } catch (e) { cb.checked = !cb.checked; if (li) li.classList.toggle('ok', cb.checked); throw e; }
+  const falta = 220 - (performance.now() - inicio);
+  if (falta > 0) await new Promise((r) => setTimeout(r, falta));
+}
+
+// Linha que sai da lista (lembrete concluído, entrega fora do filtro): encolhe e some em vez de sumir de estalo
+function sumirLinha(el) {
+  if (!el || semMovimento()) return Promise.resolve();
+  const s = getComputedStyle(el);
+  el.style.overflow = 'hidden';
+  return el.animate([
+    { opacity: 1, height: el.offsetHeight + 'px', paddingTop: s.paddingTop, paddingBottom: s.paddingBottom },
+    { opacity: 0, height: '0px', paddingTop: '0px', paddingBottom: '0px' },
+  ], { duration: 220, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'forwards' }).finished.catch(() => {});
+}
+
+// Guarda "quem estava com o foco" antes de a tela se redesenhar, para devolver o foco ao mesmo campo depois
+// (quem usa o teclado não volta para o topo da página a cada caixinha marcada)
+function seletorDoFoco(c) {
+  const el = document.activeElement;
+  if (!el || el === document.body || !c.contains(el)) return null;
+  if (el.id) return '#' + CSS.escape(el.id);
+  const d = [...el.attributes].find((x) => x.name.startsWith('data-'));
+  return d ? `${el.tagName.toLowerCase()}[${d.name}="${CSS.escape(d.value)}"]` : null;
+}
 
 // A janela de verdade sai do documento na hora (nenhum código acha uma janela "fechando");
 // no lugar dela fica por 0,16s uma cópia sem ids e sem clique, que some encolhendo de leve.
@@ -206,13 +260,21 @@ function modal(tituloTxt, corpoHtml, { onAbrir } = {}) {
   const f = document.createElement('div');
   f.className = 'fundo-modal';
   f.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h2><span>${esc(tituloTxt)}</span><button class="x" aria-label="Fechar">×</button></h2>${corpoHtml}</div>`;
-  // Fechou a janela (salvou, cancelou ou apertou Esc): o rascunho não serve mais
-  const fechar = () => { sumirSuave(f); f.remove(); document.removeEventListener('keydown', tecla); apagarRascunho(tituloTxt); mostrarRascunhos(); };
-  const tecla = (e) => { if (e.key === 'Escape') fechar(); };
+  const focoAntes = document.activeElement;
+  // Fechou a janela (salvou, cancelou ou apertou Esc): o rascunho não serve mais, e o foco volta para onde estava
+  const fechar = () => { sumirSuave(f); f.remove(); document.removeEventListener('keydown', tecla); apagarRascunho(tituloTxt); mostrarRascunhos();
+    if (focoAntes && focoAntes.isConnected && focoAntes.focus) focoAntes.focus({ preventScroll: true }); };
+  // Esc fecha só a janela de cima (uma confirmação aberta por cima de outra janela não leva as duas juntas)
+  const tecla = (e) => { if (e.key === 'Escape' && f === $$('.fundo-modal').pop()) { e.stopImmediatePropagation(); fechar(); } };
   f.addEventListener('click', (e) => { if (e.target === f || e.target.closest('.x') || e.target.closest('[data-fechar]')) fechar(); });
   document.addEventListener('keydown', tecla);
   document.body.appendChild(f);
   onAbrir && onAbrir(f, fechar);
+  // O teclado já entra na janela: no primeiro campo, ou no botão principal quando não há campo (ex.: Confirmar)
+  if (!f.contains(document.activeElement)) {
+    const alvo = (tituloTxt.startsWith('Ajuda · ') ? null : $('input:not([type=hidden]):not([disabled]), select, textarea', f)) || $('#sim, .btn.pri', f);
+    if (alvo) alvo.focus({ preventScroll: true });
+  }
   if (tituloTxt !== 'Confirmar' && !tituloTxt.startsWith('Ajuda · ')) ligarRascunho(tituloTxt, f);
   return { el: f, fechar };
 }
@@ -242,7 +304,7 @@ async function janelaWhats(dados, modeloPreferido = 0) {
     <div class="campo"><label>Modelo</label><select id="mod">${opcoes}</select></div>
     <div class="campo" style="margin-top:10px"><label>Mensagem (pode editar antes de enviar)</label><textarea id="txt"></textarea></div>
     <div class="campo" style="margin-top:10px"><label>WhatsApp (com DDD)</label><input id="num" value="${esc(dados.whatsapp ? dados.whatsapp.replace(/^55/, '') : '')}" placeholder="11999998888"></div>
-    <div class="rodape"><button class="btn" id="copiar">📋 Copiar texto</button><button class="btn zap" id="abrir">Abrir no WhatsApp</button></div>`,
+    <div class="rodape"><button class="btn" id="copiar">${icone('copia')}Copiar texto</button><button class="btn zap" id="abrir">Abrir no WhatsApp</button></div>`,
   { onAbrir: (el) => {
     const atualizar = () => { $('#txt', el).value = preencherModelo(modelos[+$('#mod', el).value].texto, dados); };
     $('#mod', el).onchange = atualizar; atualizar();
@@ -301,7 +363,7 @@ function avisarVersaoAntiga() {
   if (EU.versao === VERSAO) return;
   const caixa = $('#avisos');
   if (!caixa) return;
-  caixa.insertAdjacentHTML('afterbegin', `<div class="aviso-fixo perigo">🔄 <b>O sistema foi atualizado neste computador</b>
+  caixa.insertAdjacentHTML('afterbegin', `<div class="aviso-fixo perigo">${icone('volta')}<b>O sistema foi atualizado neste computador</b>
     (telas ${esc(VERSAO)}, servidor ${esc(EU.versao || 'anterior à 4.0.0')}). Feche a <b>janela preta</b> do "Iniciar Secretaria" e abra de novo —
     algumas telas não vão funcionar até lá. <button class="btn peq" id="avVersao">Tentar reiniciar sozinho</button></div>`);
   $('#avVersao').onclick = tentar(async () => {
@@ -324,6 +386,13 @@ function ligarAtalhos() {
     const busca = $('#busca');
     if (busca) { e.preventDefault(); busca.focus(); }
   });
+  // Menu da conta: Esc ou clique fora fecha
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMenuConta(); });
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#menuConta, [aria-controls="menuConta"]')) fecharMenuConta(); });
+  // Janela mudou de tamanho: o marcador das abas volta para baixo da aba certa
+  addEventListener('resize', () => { const m = $('#abasGrupo .marcador'), a = $('#abasGrupo a.ativo'); if (!m || !a) return;
+    m.classList.add('ja'); m.style.transform = `translateX(${a.offsetLeft}px)`; m.style.width = a.offsetWidth + 'px'; marcadorAntes = null;
+    requestAnimationFrame(() => m.classList.remove('ja')); });
   // Quem nunca escolheu um tema acompanha o Windows na hora em que ele mudar
   try {
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
@@ -359,6 +428,23 @@ const ICONES = {
   vivencias: '<path d="M10 8.6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M4.4 20.8v-3.2a5.6 5.6 0 0 1 11.2 0v3.2"/><path d="M19 4.4v4.4M16.8 6.6h4.4"/>',
   lua: '<path d="M20.4 14.2A8.6 8.6 0 1 1 9.8 3.6a6.7 6.7 0 0 0 10.6 10.6z"/>',
   sol: '<path d="M12 17.2a5.2 5.2 0 1 0 0-10.4 5.2 5.2 0 0 0 0 10.4z"/><path d="M12 1.8v2.4M12 19.8v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/>',
+  relogio: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  pasta: '<path d="M14 3.2H7.4a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.2a2 2 0 0 0 2-2V8z"/><path d="M14 3.2V8h4.6M9 12.5h6M9 16h4"/>',
+  cadeado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  chave: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2.5 2.5M14.5 8.5l2 2"/>',
+  balcao: '<circle cx="12" cy="7" r="3.2"/><path d="M5.5 20.5v-2.2A4.8 4.8 0 0 1 10.3 13.5h3.4a4.8 4.8 0 0 1 4.8 4.8v2.2"/>',
+  email: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/>',
+  volta: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  escudo: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/>',
+  alerta: '<path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/>',
+  alvo: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="3"/>',
+  ok: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  copia: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+  arquivo: '<path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4.2l2 2.2H19a1.5 1.5 0 0 1 1.5 1.5v8.3A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/>',
+  lupa: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
+  importar: '<path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2"/>',
+  carteira: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-1.3 1.6-2 3-2s2.5.7 3 2M14.5 10h4M14.5 13.5h3"/>',
   compacto: '<path d="M4 6.4h16M4 12h16M4 17.6h16"/>',
   largo: '<path d="M4 5h16M4 12h16M4 19h16"/><path d="m8 8.6 4-3.6 4 3.6"/>',
 };
@@ -370,17 +456,32 @@ function vazio(nomeIcone, titulo2, texto, acaoHtml = '') {
 }
 
 // ───────────── login ─────────────
+// Metade escura da entrada: o logo da escola, o nome e as faixas dos turnos (manhã em azul, tarde em amarelo)
+const ARTE_LOGIN = `<div class="login-arte">
+    <span class="logo-grande"><img src="logo.png" alt="Instituto Educacional Luterano"></span>
+    <div><h1>Secretaria<br><em>IEL</em></h1>
+      <p>Matrícula, documentos, portão e o dia a dia da secretaria num lugar só. Funciona sem internet, num computador da escola.</p>
+      <div class="faixas" aria-hidden="true"><i style="width:62%;background:#1c3c73;animation-delay:.05s"></i><i style="width:74%;background:#1c3c73;animation-delay:.12s"></i>
+        <i style="width:48%;margin-left:44%;background:#6b5611;animation-delay:.19s"></i><i style="width:52%;margin-left:48%;background:#6b5611;animation-delay:.26s"></i>
+        <i style="width:58%;margin-left:42%;background:#f5c21b;animation-delay:.33s"></i></div></div>
+    <small>Instituto Educacional Luterano · Ferraz de Vasconcelos</small></div>`;
+
+// Tela de espera (reiniciando, restaurando, atualizando): a mesma arte da entrada, com um recado e o sinal de "trabalhando"
+function telaAguarde(tituloTxt, textoHtml) {
+  $('#raiz').innerHTML = `<div class="login">${ARTE_LOGIN}<div class="login-form"><div class="aguarde" role="status">
+    <span class="girando" aria-hidden="true"></span><h2>${esc(tituloTxt)}</h2><p>${textoHtml}</p></div></div></div>`;
+}
+
 function telaLogin() {
   document.title = 'Entrar — Secretaria IEL';
   $('#raiz').innerHTML = `
-  <div class="login"><form id="f" autocomplete="on">
-    <img src="logo.png" alt="Instituto Educacional Luterano">
-    <h1>Secretaria IEL</h1><p>Gestão da secretaria escolar</p>
+  <div class="login">${ARTE_LOGIN}<div class="login-form"><form id="f" autocomplete="on">
+    <div><div class="quando">Gestão da secretaria escolar</div><h2>Entrar</h2></div>
     <div class="campo"><label for="l">Usuário</label><input id="l" name="username" autocomplete="username" required autofocus></div>
     <div class="campo"><label for="s">Senha</label><input id="s" type="password" name="password" autocomplete="current-password" required></div>
     <div class="erro" id="e"></div>
     <button class="btn pri">Entrar</button>
-  </form></div>`;
+  </form></div></div>`;
   $('#f').onsubmit = async (ev) => {
     ev.preventDefault();
     try { await api('POST', '/api/login', { login: $('#l').value.trim(), senha: $('#s').value }); iniciar(); }
@@ -390,15 +491,17 @@ function telaLogin() {
 
 function telaTrocarSenha(obrigatoria) {
   $('#raiz').innerHTML = `
-  <div class="login"><form id="f">
-    <img src="logo.png" alt="">
-    <h1>Crie sua senha</h1><p>${obrigatoria ? 'Primeiro acesso: troque a senha inicial por uma só sua.' : 'Trocar senha'}</p>
-    <div class="campo"><label>Senha atual</label><input id="a" type="password" autocomplete="current-password" required></div>
-    <div class="campo"><label>Nova senha (mín. 6 caracteres)</label><input id="n" type="password" autocomplete="new-password" minlength="6" required></div>
-    <div class="campo"><label>Repita a nova senha</label><input id="n2" type="password" autocomplete="new-password" required></div>
+  <div class="login">${ARTE_LOGIN}<div class="login-form"><form id="f">
+    <div><div class="quando">${obrigatoria ? 'Primeiro acesso' : 'Sua conta'}</div><h2>${obrigatoria ? 'Crie sua senha' : 'Trocar senha'}</h2>
+      <p>${obrigatoria ? 'Troque a senha inicial por uma só sua.' : 'Mínimo de 8 caracteres. Senhas óbvias são recusadas.'}</p></div>
+    <div class="campo"><label for="a">Senha atual</label><input id="a" type="password" autocomplete="current-password" required></div>
+    <div class="campo"><label for="n">Nova senha (mín. 8 caracteres)</label><input id="n" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="campo"><label for="n2">Repita a nova senha</label><input id="n2" type="password" autocomplete="new-password" required></div>
     <div class="erro" id="e"></div>
     <button class="btn pri">Salvar senha</button>
-  </form></div>`;
+    ${obrigatoria ? '' : '<button type="button" class="btn" id="voltar">Voltar sem trocar</button>'}
+  </form></div></div>`;
+  if (!obrigatoria) $('#voltar').onclick = () => iniciar();
   $('#f').onsubmit = async (ev) => {
     ev.preventDefault();
     if ($('#n').value !== $('#n2').value) return ($('#e').textContent = 'As senhas não conferem');
@@ -408,62 +511,148 @@ function telaTrocarSenha(obrigatoria) {
 }
 
 // ───────────── estrutura ─────────────
-const MENU = [
-  { rota: '', ic: 'casa', nome: 'Início' },
-  { rota: 'hoje', ic: 'dia', nome: 'Meu dia', badge: 'tarefas' },
-  { rota: 'alunos', ic: 'alunos', nome: 'Alunos' },
-  { sep: 'Matrícula ' },
-  { rota: 'rematricula', ic: 'rematricula', nome: 'Rematrícula' },
-  { rota: 'pendencias', ic: 'pendencias', nome: 'Pendências', badge: 'pend' },
-  { rota: 'interessados', ic: 'interessados', nome: 'Interessados (SIG)' },
-  { rota: 'vivencias', ic: 'vivencias', nome: 'Vivências' },
-  { sep: 'Secretaria' },
-  { rota: 'documentos', ic: 'documentos', nome: 'Documentos' },
-  { rota: 'historico', ic: 'historico', nome: 'Histórico escolar' },
-  { rota: 'extras', ic: 'extras', nome: 'Atividades extras' },
-  { rota: 'bolsas', ic: 'bolsas', nome: 'Bolsas (CEBAS)', admin: true },
-  { rota: 'boletos', ic: 'boletos', nome: 'Boletos' },
-  { rota: 'fotos', ic: 'fotos', nome: 'Mutirão de fotos' },
-  { sep: 'Dia a dia' },
-  { rota: 'portao', ic: 'portao', nome: 'Portão · Saída', badge: 'saida' },
-  { rota: 'atendimentos', ic: 'atendimentos', nome: 'Atendimentos' },
-  { rota: 'calendario', ic: 'calendario', nome: 'Calendário' },
-  { sep: 'Ferramentas' },
-  { rota: 'relatorios', ic: 'relatorios', nome: 'Relatórios', admin: true },
-  { rota: 'mensagens', ic: 'mensagens', nome: 'Mensagens' },
-  { rota: 'lixeira', ic: 'lixeira', nome: 'Lixeira' },
-  { rota: 'config', ic: 'config', nome: 'Configurações', admin: true },
+// As mesmas telas e a mesma ordem do menu de antes, agora em 6 grupos: o grupo fica no trilho da esquerda
+// e as telas dele viram abas no alto. "badge" é o contador amarelo; "admin" só aparece para a administração.
+const GRUPOS = [
+  { id: 'hoje', nome: 'Hoje', ic: 'relogio', telas: [
+    { rota: '', nome: 'Início' },
+    { rota: 'hoje', nome: 'Meu dia', badge: 'tarefas' }] },
+  { id: 'alunos', nome: 'Alunos', ic: 'alunos', telas: [
+    { rota: 'alunos', nome: 'Alunos' },
+    { rota: 'historico', nome: 'Histórico escolar' },
+    { rota: 'fotos', nome: 'Mutirão de fotos' }] },
+  { id: 'matricula', nome: 'Matrícula', ic: 'rematricula', telas: [
+    { rota: 'rematricula', nome: 'Rematrícula' },
+    { rota: 'pendencias', nome: 'Pendências', badge: 'pend' },
+    { rota: 'interessados', nome: 'Interessados (SIG)' },
+    { rota: 'vivencias', nome: 'Vivências' }] },
+  { id: 'secretaria', nome: 'Secretaria', ic: 'pasta', telas: [
+    { rota: 'documentos', nome: 'Documentos' },
+    { rota: 'extras', nome: 'Atividades extras' },
+    { rota: 'bolsas', nome: 'Bolsas (CEBAS)', admin: true },
+    { rota: 'boletos', nome: 'Boletos' }] },
+  { id: 'dia', nome: 'Dia a dia', ic: 'portao', telas: [
+    { rota: 'portao', nome: 'Portão · Saída', badge: 'saida' },
+    { rota: 'atendimentos', nome: 'Atendimentos' },
+    { rota: 'calendario', nome: 'Calendário' }] },
+  { id: 'gestao', nome: 'Gestão', ic: 'config', telas: [
+    { rota: 'relatorios', nome: 'Relatórios', admin: true },
+    { rota: 'mensagens', nome: 'Mensagens' },
+    { rota: 'lixeira', nome: 'Lixeira' },
+    { rota: 'config', nome: 'Configurações', admin: true }] },
 ];
+// Telas que não estão no menu, mas pertencem a um grupo (ficha do aluno, notas de um aluno)
+const ROTA_PAI = { aluno: 'alunos', hist: 'historico' };
+const gruposVisiveis = () => GRUPOS.map((g) => ({ ...g, telas: g.telas.filter((t) => !t.admin || EU.perfil === 'admin') })).filter((g) => g.telas.length);
+const grupoDaRota = (rota) => { const r = ROTA_PAI[rota] ?? rota; return gruposVisiveis().find((g) => g.telas.some((t) => t.rota === r)) || gruposVisiveis()[0]; };
+
+// Contadores amarelos: guardados aqui porque as abas são redesenhadas a cada troca de tela
+const BADGES = {};
+function definirBadge(id, n) {
+  BADGES[id] = n || 0;
+  const b = $('#badge-' + id);
+  if (b) { b.hidden = !n; b.textContent = n; }
+  // no trilho, o grupo mostra a soma dos contadores das telas dele
+  for (const g of gruposVisiveis()) {
+    const soma = g.telas.reduce((s, t) => s + (t.badge ? BADGES[t.badge] || 0 : 0), 0);
+    const p = $(`.grupos a[data-grupo="${g.id}"] .ponto`);
+    if (p) { p.hidden = !soma; p.textContent = soma; }
+  }
+}
+
+// Abas do grupo atual; o marcador desliza da aba de antes para a nova (se o grupo não mudou)
+let grupoNaTela = null, marcadorAntes = null;
+function desenharNavegacao(rota) {
+  const g = grupoDaRota(rota), r = ROTA_PAI[rota] ?? rota;
+  const mudouGrupo = grupoNaTela !== g.id; grupoNaTela = g.id;
+  $$('.grupos a').forEach((a) => a.classList.toggle('ativo', a.dataset.grupo === g.id));
+  const abas = $('#abasGrupo');
+  abas.innerHTML = `<span class="marcador${mudouGrupo ? ' ja' : ''}" aria-hidden="true"></span>` + g.telas.map((t) => `<a href="#/${t.rota}" data-rota="${t.rota}" class="${t.rota === r ? 'ativo' : ''}"
+    ${t.rota === r ? 'aria-current="page"' : ''}>${esc(t.nome)}${t.badge ? `<span class="num" id="badge-${t.badge}" ${BADGES[t.badge] ? '' : 'hidden'}>${BADGES[t.badge] || ''}</span>` : ''}</a>`).join('');
+  const tela = g.telas.find((t) => t.rota === r);
+  $('#ondeGrupo').textContent = g.id === 'matricula' ? 'Matrícula ' + EU.config.ano_matricula : g.nome;
+  $('#ondeTela').textContent = rota === 'aluno' ? 'Ficha do aluno' : rota === 'hist' ? 'Notas do aluno' : tela ? tela.nome : '';
+  const m = $('.marcador', abas), alvo = $('a.ativo', abas);
+  if (!alvo) { m.hidden = true; return; }
+  if (!mudouGrupo && marcadorAntes) { m.style.transform = marcadorAntes.t; m.style.width = marcadorAntes.w; m.getBoundingClientRect(); }
+  marcadorAntes = { t: `translateX(${alvo.offsetLeft}px)`, w: alvo.offsetWidth + 'px' };
+  m.style.transform = marcadorAntes.t; m.style.width = marcadorAntes.w;
+  if (mudouGrupo) requestAnimationFrame(() => m.classList.remove('ja'));
+  alvo.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// Menu da conta (avatar): nasce do botão que o abriu e fecha ao clicar fora ou com Esc
+function abrirMenuConta(botao) {
+  const m = $('#menuConta');
+  if (m.classList.contains('aberto')) return fecharMenuConta();
+  const r = botao.getBoundingClientRect();
+  const embaixo = r.top > innerHeight / 2;
+  m.style.left = Math.min(r.left < 120 ? r.right + 10 : r.right - 250, innerWidth - 266) + 'px';
+  m.style.top = embaixo ? 'auto' : r.bottom + 8 + 'px';
+  m.style.bottom = embaixo ? innerHeight - r.bottom + 'px' : 'auto';
+  m.style.transformOrigin = `${r.left < 120 ? 'left' : 'right'} ${embaixo ? 'bottom' : 'top'}`;
+  $('#mcTema').innerHTML = `${icone(temaAtual() === 'escuro' ? 'sol' : 'lua')}${temaAtual() === 'escuro' ? 'Modo claro' : 'Modo escuro'}`;
+  $('#mcDensidade').innerHTML = `${icone(densidadeAtual() === 'compacta' ? 'largo' : 'compacto')}${densidadeAtual() === 'compacta' ? 'Linhas normais' : 'Modo compacto'}`;
+  m.classList.add('aberto');
+  botao.setAttribute('aria-expanded', 'true');
+}
+function fecharMenuConta() {
+  const m = $('#menuConta');
+  if (!m || !m.classList.contains('aberto')) return false;
+  m.classList.remove('aberto');
+  $$('[aria-controls="menuConta"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  return true;
+}
 
 async function iniciar() {
   try { EU = await api('GET', '/api/eu'); } catch { return; }
   if (EU.trocar_senha) return telaTrocarSenha(true);
-  const ano = EU.config.ano_matricula;
-  MENU.find((m) => m.sep === 'Matrícula ').sep = 'Matrícula ' + ano;
+  grupoNaTela = null; marcadorAntes = null; hashNaTela = null;
+  const h = new Date().getHours();
+  const perfil = EU.perfil === 'admin' ? 'Administração' : 'Aprendiz';
   $('#raiz').innerHTML = `
   <div class="app">
-    <nav class="lateral" aria-label="Menu principal">
-      <div class="marca"><img src="logo.png" alt=""><div><b>Secretaria IEL</b><small>Instituto Educacional Luterano</small></div></div>
-      <ul class="menu">${MENU.filter((m) => !m.admin || EU.perfil === 'admin').map((m) => m.sep ? `<li class="sep">${esc(m.sep)}</li>`
-        : `<li><a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.ic)}${esc(m.nome)}${m.badge ? `<span class="num" id="badge-${m.badge}" hidden></span>` : ''}</a></li>`).join('')}</ul>
-      <div class="usuario"><span class="av">${esc(EU.nome[0])}</span><span class="quem">${esc(EU.nome)}<br><small style="color:var(--azul-claro)">${EU.perfil === 'admin' ? 'Administração' : 'Aprendiz'}</small></span>
-        <button id="tema" class="tema-btn"></button><button id="sair" title="Sair">Sair</button></div>
+    <nav class="trilho" aria-label="Menu principal">
+      <a class="logo" href="#/" title="Secretaria IEL — Instituto Educacional Luterano"><img src="logo.png" alt="Instituto Educacional Luterano"></a>
+      <div class="grupos">${gruposVisiveis().map((g) => `<a href="#/${g.telas[0].rota}" data-grupo="${g.id}">${icone(g.ic)}${esc(g.nome)}<span class="ponto" hidden></span></a>`).join('')}</div>
+      <div class="trilho-pe">
+        <button id="tema" class="icone-btn"></button>
+        <button class="avatar" id="conta" aria-haspopup="menu" aria-controls="menuConta" aria-expanded="false" title="${esc(EU.nome)} · ${perfil}">${esc(EU.nome[0])}</button>
+      </div>
     </nav>
     <div class="principal">
       <header class="topo">
-        <span class="saudacao" id="saudacao"></span>
-        <button class="btn peq ajuda-btn" id="ajuda" title="Como usar esta tela (tecla ?)" aria-label="Ajuda desta tela">? Ajuda</button>
-        <div class="busca"><input id="busca" placeholder="Buscar em tudo: aluno, responsável, CPF, atendimento, aviso…" autocomplete="off" aria-label="Buscar em todo o sistema" title="Dica: aperte a tecla / para vir direto para cá"><div class="resultados" id="res" hidden></div></div>
+        <div class="topo-linha">
+          <div class="onde"><b id="ondeGrupo"></b><span id="ondeTela"></span></div>
+          <div class="busca"><input id="busca" placeholder="Buscar em tudo: aluno, responsável, CPF, atendimento…" autocomplete="off" aria-label="Buscar em todo o sistema" title="Dica: aperte a tecla / para vir direto para cá"><kbd>/</kbd><div class="resultados" id="res" hidden></div></div>
+          <button class="ajuda-btn" id="ajuda" title="Como usar esta tela (tecla ?)" aria-label="Ajuda desta tela">?</button>
+          <button class="avatar so-celular" id="conta2" aria-haspopup="menu" aria-controls="menuConta" aria-expanded="false" aria-label="Conta de ${esc(EU.nome)}" style="width:36px;height:36px">${esc(EU.nome[0])}</button>
+        </div>
+        <nav class="abas-grupo" id="abasGrupo" aria-label="Telas do grupo"></nav>
       </header>
       <div id="avisos"></div><div id="rascunhos"></div>
       <main class="conteudo" id="conteudo"></main>
     </div>
+  </div>
+  <div class="menu-conta" id="menuConta" role="menu">
+    <div class="quem"><b>${esc(EU.nome)}</b><small id="saudacao"></small><br><small>${perfil}</small></div>
+    <button role="menuitem" id="mcTema"></button>
+    <button role="menuitem" id="mcDensidade"></button>
+    <button role="menuitem" id="mcBloquear">${icone('cadeado')}Bloquear a tela</button>
+    <button role="menuitem" id="mcSenha">${icone('chave')}Trocar senha</button>
+    <button role="menuitem" id="sair">${icone('sair')}Sair</button>
   </div>`;
-  const h = new Date().getHours();
-  $('#saudacao').textContent = `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}, ${EU.nome.split(' ')[0]}`;
-  $('#sair').onclick = tentar(async () => { await api('POST', '/api/logout'); EU = null; telaLogin(); });
+  $('#saudacao').textContent = `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}!`;
+  $('#sair').onclick = tentar(async () => { fecharMenuConta(); await api('POST', '/api/logout'); EU = null; telaLogin(); });
   aplicarTema(temaAtual());
   $('#tema').onclick = () => aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro', true);
+  $('#conta').onclick = (e) => abrirMenuConta(e.currentTarget);
+  $('#conta2').onclick = (e) => abrirMenuConta(e.currentTarget);
+  $('#mcTema').onclick = () => { fecharMenuConta(); aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro', true); };
+  $('#mcDensidade').onclick = () => { fecharMenuConta(); aplicarDensidade(densidadeAtual() === 'compacta' ? 'normal' : 'compacta', true); };
+  $('#mcSenha').onclick = () => { fecharMenuConta(); telaTrocarSenha(false); };
+  // Bloquear na hora (o mesmo bloqueio de quando o computador fica parado)
+  $('#mcBloquear').onclick = tentar(async () => { fecharMenuConta(); await api('POST', '/api/bloquear'); if (window.mostrarBloqueio) window.mostrarBloqueio(); });
   aplicarDensidade(densidadeAtual());
   ligarAtalhos();
   if (window.ligarBloqueio) window.ligarBloqueio();
@@ -515,29 +704,49 @@ async function rotear() {
   const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
   const [rota, arg] = caminho.split('/');
   const qTela = new URLSearchParams(consulta || '').get('q');
-  $$('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === ({ aluno: 'alunos', hist: 'historico' }[rota] || rota)));
+  fecharMenuConta();
+  desenharNavegacao(rota);
   const c = $('#conteudo');
-  // Esqueleto cinza no lugar de "Carregando…": a tela não "pula" quando o conteúdo chega
-  c.innerHTML = `<div class="carregando"><div class="bloco" style="width:220px;height:26px"></div><div class="bloco" style="width:340px;height:14px;margin-top:8px"></div>
-    <div class="grade g4" style="margin-top:20px">${'<div class="bloco" style="height:92px"></div>'.repeat(4)}</div>
-    <div class="bloco" style="height:260px;margin-top:14px"></div></div>`;
+  // Mesmo endereço de antes = só atualizar (depois de salvar, marcar ou excluir): a tela fica onde está,
+  // sem esqueleto, sem animação de entrada e na mesma altura de rolagem. Endereço novo = navegar.
+  const atualizando = hashNaTela === location.hash;
+  hashNaTela = location.hash;
+  const rolagem = scrollY, focado = atualizando ? seletorDoFoco(c) : null;
+  if (atualizando) {
+    c.style.minHeight = c.offsetHeight + 'px'; // segura a altura para a página não encolher e pular para cima
+    // "quieta": o que for redesenhado não repete as animações de entrada (barras crescendo etc.) — só na navegação
+    c.classList.add('atualizando', 'quieta');
+  } else {
+    c.classList.remove('quieta');
+    // Esqueleto cinza no lugar de "Carregando…": a tela não "pula" quando o conteúdo chega
+    c.innerHTML = `<div class="carregando"><div class="bloco" style="width:220px;height:26px"></div><div class="bloco" style="width:340px;height:14px;margin-top:8px"></div>
+      <div class="grade g4" style="margin-top:20px">${'<div class="bloco" style="height:92px"></div>'.repeat(4)}</div>
+      <div class="bloco" style="height:260px;margin-top:14px"></div></div>`;
+  }
   try {
     await (TELAS[rota] || TELAS[''])(c, arg);
     const fq = $('#fq', c) || $('#q', c);
     if (qTela && fq) { fq.value = qTela; fq.dispatchEvent(new Event('input')); }
   } catch (e) { c.innerHTML = `<div class="cartao"><h2>Ops!</h2><p>${esc(e.message)}</p></div>`; }
-  // A tela nova chega com um leve movimento (reinicia a animação a cada troca de tela)
-  c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra');
+  if (atualizando) {
+    window.scrollTo(0, rolagem);
+    const f = focado && $(focado, c);
+    if (f) f.focus({ preventScroll: true });
+    requestAnimationFrame(() => { c.style.minHeight = ''; c.classList.remove('atualizando'); });
+  } else {
+    // A tela nova chega com um leve movimento (reinicia a animação a cada troca de tela)
+    c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra');
+    window.scrollTo(0, 0);
+  }
   atualizarBadge();
   mostrarRascunhos();
-  window.scrollTo(0, 0);
 }
+let hashNaTela = null;
 
 async function atualizarBadge() {
   try {
     const p = await api('GET', '/api/painel');
-    const b = $('#badge-pend');
-    if (b) { const n = p.pendencias.vencidas + p.pendencias.vencendo; b.hidden = !n; b.textContent = n; b.title = 'Vencidas ou vencendo em 7 dias'; }
+    definirBadge('pend', p.pendencias.vencidas + p.pendencias.vencendo); // vencidas ou vencendo em 7 dias
     if (window.badgesEtapa3) window.badgesEtapa3();
     if (window.avisosEtapa4) window.avisosEtapa4();
   } catch { /* silencioso */ }
@@ -573,7 +782,7 @@ window.addEventListener('beforeprint', () => {
   $$('details.turma-grupo').forEach((d) => { d.open = true; });
 });
 
-const faixaDemo = (p) => (p.demo ? '<div class="faixa-demo">⚠️ <b>Modo demonstração:</b> os alunos exibidos são fictícios. Para usar dados reais, apague a demonstração e importe o ACADESC em Configurações.</div>' : '');
+const faixaDemo = (p) => (p.demo ? '<div class="faixa-demo">' + icone('alerta') + '<span><b>Modo demonstração:</b> os alunos exibidos são fictícios. Para usar dados reais, apague a demonstração e importe o ACADESC em Configurações.</span></div>' : '');
 
 // ───────────── Início ─────────────
 // Três blocos, na ordem em que a secretaria pensa: o que é para hoje, o que fazer rápido e como vai a rematrícula.
@@ -610,9 +819,17 @@ TELAS[''] = async (c) => {
     </div>`;
   }
 
+  // Frase do dia: soma o que ainda pede a pessoa (tarefas dela, saídas sem conferir, atendimentos em aberto)
+  const hr = new Date().getHours(), oi = hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
+  const nT = h ? h.tarefas.minhas - h.tarefas.minhas_feitas : 0, nS = h ? h.saida.pendentes : 0, nA = h ? h.atendimentos.em_aberto : 0, n = nT + nS + nA;
   c.innerHTML = `${faixaDemo(p)}
-  <h1>${esc(h ? h.dia_nome : '')}${h ? ', ' : ''}${+dd} de ${MESES[+mm - 1]} de ${aa}</h1>
-  <p class="sub">${p.total_alunos} alunos ativos cadastrados · clique em qualquer número para abrir a tela correspondente</p>
+  <div class="hero"><div>
+      <div class="quando">${esc(h ? h.dia_nome + ', ' : '')}${+dd} de ${MESES[+mm - 1]} de ${aa}</div>
+      <h1>${oi}, ${esc(EU.nome.split(' ')[0])}.<br>${n ? `<em>${n} ${n === 1 ? 'coisa pede' : 'coisas pedem'}</em> você.` : '<em>Tudo em dia.</em>'}</h1>
+      ${h ? `<p><b>${plural(nS, 'saída', 'saídas')}</b> aguardando no portão, <b>${plural(nT, 'tarefa sua', 'tarefas suas')}</b> por fazer e
+        <b>${plural(nA, 'atendimento', 'atendimentos')}</b> em aberto. Clique em qualquer número para abrir a tela.</p>` : ''}</div>
+    <div class="relogio"><div class="t" id="relogioT"></div><div class="s">${p.total_alunos} alunos ativos</div></div></div>
+  ${h ? linhaDoDia(h, cfg) : ''}
 
   <h2 class="titulo-secao" style="margin-top:4px">Para hoje</h2>
   ${hoje}
@@ -642,7 +859,7 @@ TELAS[''] = async (c) => {
         ${p.urgentes.length ? `<span class="dado">${plural(p.pendencias.vencidas + p.pendencias.vencendo, 'aluno', 'alunos')}</span>` : ''}</div>
       ${p.urgentes.length ? `<table style="margin-top:6px"><tbody>${p.urgentes.slice(0, 5).map((u) => `<tr class="clic" data-id="${u.aluno_id}" title="Falta: ${esc(u.faltam.join(', '))}"><td><b>${esc(titulo(u.nome))}</b><br><small class="dado">${esc(u.turma)} · ${u.faltam.length === 1 ? 'falta: ' + esc(u.faltam[0]) : `faltam ${u.faltam.length} documentos`}</small></td>
         <td class="num-col"><span class="tag t-${u.situacao}">${u.dias == null ? 'sem data' : u.dias < 0 ? `venceu há ${-u.dias}d` : u.dias === 0 ? 'vence hoje' : `em ${u.dias}d`}</span></td></tr>`).join('')}</tbody></table>
-        <p style="margin:10px 0 0"><a href="#/pendencias">Ver todas as pendências por turma →</a></p>` : '<p class="vazio">Nenhum documento vencido ou vencendo 🎉</p>'}
+        <p style="margin:10px 0 0"><a href="#/pendencias">Ver todas as pendências por turma →</a></p>` : '<p class="vazio">Nenhum documento vencido ou vencendo.</p>'}
     </div>
     <div class="cartao"><h3>Datas da campanha ${p.ano}</h3><div class="datas">
       ${datas.map(([rot, d], i) => { const n = diasAte(d); return `<div class="data-item ${n < 0 ? 'passou' : ''} ${i === proxima ? 'proxima' : ''}"><span>${esc(rot)}${i === proxima ? ` <span class="tag t-reservada">${n === 0 ? 'é hoje' : 'próxima'}</span>` : ''}</span><span><b>${dataBR(d)}</b> ${n > 0 ? `· ${n === 1 ? 'falta' : 'faltam'} ${plural(n, 'dia', 'dias')}` : n < 0 ? '· passou' : ''}</span></div>`; }).join('')}
@@ -658,7 +875,53 @@ TELAS[''] = async (c) => {
   });
   $('#atBusca').onclick = () => $('#busca').focus();
   $('#atNovo').onclick = () => formAluno();
+  ligarLinhaDoDia();
 };
+
+// ───────────── Linha do dia (Início) ─────────────
+// Faixas com os horários de cada segmento (Configurações › Geral) e os avisos de saída de hoje no horário em que foram marcados.
+const DIA_INI = 7 * 60, DIA_FIM = 19 * 60;
+const posDia = (m) => ((Math.min(Math.max(m, DIA_INI), DIA_FIM) - DIA_INI) / (DIA_FIM - DIA_INI)) * 100;
+const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+// "das 13h30 às 18h" → [810, 1080]; "12:35" → 755
+const minutosDe = (txt) => [...String(txt || '').matchAll(/(\d{1,2})\s*[h:]\s*(\d{2})?/g)].map((m) => +m[1] * 60 + (+m[2] || 0));
+function linhaDoDia(h, cfg) {
+  const faixas = [['Fund. II', '6º ao 9º ano', cfg.horario_fund2], ['Ensino Médio', '1ª a 3ª série', cfg.horario_medio],
+    ['Infantil', 'Maternal e Jardim', cfg.horario_infantil], ['Fund. I', '1º ao 5º ano', cfg.horario_fund1]]
+    .map(([n, s, t]) => [n, s, minutosDe(t)]).filter(([, , m]) => m.length >= 2 && m[1] > m[0]);
+  if (!faixas.length) return '';
+  const avisos = h.saida.avisos.map((v) => ({ ...v, min: minutosDe(v.horario)[0] })).filter((v) => v.min != null);
+  const semHora = h.saida.avisos.length - avisos.length;
+  return `<section class="dia" aria-label="Linha do dia">
+    <div class="dia-cab"><h2>Linha do dia</h2><div class="dia-leg"><span><i class="b-manha"></i>Manhã</span><span><i class="b-tarde"></i>Tarde</span>
+      <span><i style="background:var(--laranja);border-radius:50%;width:9px;height:9px"></i>Saída aguardando</span><span><i style="background:var(--verde);border-radius:50%;width:9px;height:9px"></i>Saída conferida</span></div></div>
+    <div class="dia-rolar"><div class="dia-grade">
+      ${faixas.map(([n, s, [a, b]], i) => `<div class="faixa-nome">${esc(n)}<small>${esc(s)}</small></div><div class="faixa"><div class="barra-t ${a < 12 * 60 ? 'b-manha' : 'b-tarde'}"
+        style="left:${posDia(a)}%;width:${posDia(b) - posDia(a)}%;--i:${i}">${hhmm(a)} – ${hhmm(b)}</div></div>`).join('')}
+      <div class="faixa-nome">Portão<small>${h.saida.total ? plural(h.saida.total, 'aviso hoje', 'avisos hoje') : 'nenhum aviso hoje'}${semHora ? ` · ${semHora} sem horário` : ''}</small></div>
+      <div class="faixa">${avisos.map((v, i) => `<a class="saida-pt ${v.conferido_em ? 'ok' : 'espera'}" href="#/portao" style="left:${posDia(v.min)}%;${i % 2 ? 'margin-left:4px;' : ''}"
+        title="${esc(hhmm(v.min) + ' · ' + titulo(v.aluno) + ' com ' + v.quem)}" aria-label="${esc(titulo(v.aluno) + ', saída às ' + hhmm(v.min) + (v.conferido_em ? ', conferida' : ', aguardando'))}">${v.conferido_em ? '✓' : '!'}</a>`).join('')}</div>
+      <div class="horas">${[7, 9, 11, 13, 15, 17, 19].map((x) => `<span style="left:${posDia(x * 60)}%">${x}h</span>`).join('')}</div>
+      <div class="agora" id="agoraDia" style="left:116px" hidden></div>
+    </div></div></section>`;
+}
+// A agulha vermelha sai do começo do dia e para na hora atual; depois anda sozinha a cada meio minuto
+let relogioDia = null;
+function ligarLinhaDoDia() {
+  clearInterval(relogioDia);
+  const passo = () => {
+    const agulha = $('#agoraDia'), t = $('#relogioT');
+    if (!t) { clearInterval(relogioDia); return; }
+    const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+    t.textContent = hhmm(m);
+    if (!agulha) return;
+    agulha.hidden = m < DIA_INI || m > DIA_FIM;
+    agulha.dataset.t = hhmm(m);
+    agulha.style.left = `calc(116px + (100% - 116px) * ${posDia(m) / 100})`;
+  };
+  requestAnimationFrame(() => requestAnimationFrame(passo));
+  relogioDia = setInterval(passo, 30000);
+}
 
 // ───────────── Alunos ─────────────
 TELAS.alunos = async (c) => {
@@ -675,7 +938,7 @@ TELAS.alunos = async (c) => {
   const turmas = [...new Map(lista.map((a) => [a.turma_rotulo, a.ordem])).entries()].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).map((t) => t[0]);
   c.innerHTML = `
   <div class="acoes" style="justify-content:space-between"><div><h1>Alunos</h1><p class="sub">${lista.length} alunos ativos</p></div>
-    <button class="btn ama" id="novo">＋ Cadastrar aluno novo ${esc(EU.config.ano_matricula)}</button></div>
+    <button class="btn ama" id="novo">${icone('mais')}Cadastrar aluno novo ${esc(EU.config.ano_matricula)}</button></div>
   <div class="filtros">
     <input id="q" placeholder="Filtrar por nome, mãe, pai, matrícula…" style="flex:1;min-width:220px">
     <select id="t"><option value="">Todas as turmas</option>${turmas.map((t) => `<option>${esc(t)}</option>`).join('')}</select>
@@ -759,11 +1022,11 @@ TELAS.aluno = async (c, id) => {
     <div class="info"><h1>${esc(titulo(a.nome))} ${a.novo ? '<span class="tag t-novo">aluno novo</span>' : ''} ${a.filho_funcionario ? '<span class="tag t-func">filho(a) de funcionário</span>' : ''} ${a.demo ? '<span class="tag t-demo">fictício</span>' : ''}</h1>
       <p class="sub" style="margin:0">Mat. <b class="mono">${esc(a.mat || '—')}</b> · ${a.novo ? 'Ingresso ' + ano : esc(a.turma_rotulo) + (a.turno ? ` (${a.turno === 'M' ? 'manhã' : 'tarde'})` : '')} → <b>${esc(f.destino?.rotulo || '?')}</b> em ${ano}</p></div>
     <div class="acoes">
-      <a class="btn pri" href="/api/alunos/${a.id}/contrato" id="btnContrato">📄 Gerar contrato ${ano}</a>
-      <button class="btn zap" id="btnZap">💬 WhatsApp</button>
-      <button class="btn" id="btnPasta">📁 Abrir pasta</button>
-      ${/^(F\d|EM\d)$/.test(a.serie_chave || '') ? `<a class="btn" href="#/hist/${a.id}">🎓 Notas do histórico</a>` : ''}
-      <button class="btn" id="btnEditar">✏️ Editar</button>
+      <a class="btn pri" href="/api/alunos/${a.id}/contrato" id="btnContrato">${icone('pasta')}Gerar contrato ${ano}</a>
+      <button class="btn zap" id="btnZap">${icone('mensagens')}WhatsApp</button>
+      <button class="btn" id="btnPasta">${icone('arquivo')}Abrir pasta</button>
+      ${/^(F\d|EM\d)$/.test(a.serie_chave || '') ? `<a class="btn" href="#/hist/${a.id}">${icone('historico')}Notas do histórico</a>` : ''}
+      <button class="btn" id="btnEditar">${icone('rematricula')}Editar</button>
     </div>
   </div>
   <div class="grade g2">
@@ -787,7 +1050,7 @@ TELAS.aluno = async (c, id) => {
         <span class="nome"><span>${esc(d.nome)}</span> ${d.obrigatorio ? '' : '<span class="opcional">opcional</span>'}
           <small>${d.entregue ? `Entregue em ${dataBR(d.data_entrega)}${d.atualizado_por ? ' · ' + esc(d.atualizado_por) : ''}` : d.arquivo ? `PDF: <span class="mono">${esc(d.arquivo)}.pdf</span>` : ''}</small></span>
         ${d.pdf ? '<span class="pdf-ok" title="Arquivo encontrado na pasta do prontuário">PDF na pasta ✓</span>' : ''}</li>`).join('')}</ul>
-      <div class="acoes" style="margin-top:12px"><button class="btn peq" id="pelosPdfs">🔎 Marcar pelos PDFs da pasta</button>
+      <div class="acoes" style="margin-top:12px"><button class="btn peq" id="pelosPdfs">${icone('lupa')}Marcar pelos PDFs da pasta</button>
         ${faltam.length && a.whatsapp !== undefined ? '<button class="btn peq zap" id="cobrar">Cobrar documentos no WhatsApp</button>' : ''}</div>
       <p class="dado" style="margin-top:10px">Pasta do prontuário: ${f.pastas.length ? f.pastas.map((p) => `<span class="mono">${esc(p.turma)}\\${esc(titulo(a.nome))}</span> (${p.arquivos.length} PDFs)`).join(', ') : '<b>nenhuma pasta encontrada com o nome do aluno</b>'}</p>
     </div>
@@ -812,7 +1075,7 @@ TELAS.aluno = async (c, id) => {
   $('#robs').onchange = (e) => salvarRem({ obs: e.target.value });
   if ($('#spc')) $('#spc').onchange = (e) => salvarRem({ spc: e.target.value });
   $$('#docs input[type=checkbox]').forEach((cb) => (cb.onchange = tentar(async () => {
-    await api('PUT', `/api/alunos/${a.id}/documentos/${cb.dataset.doc}`, { entregue: cb.checked });
+    await marcarNaHora(cb, () => api('PUT', `/api/alunos/${a.id}/documentos/${cb.dataset.doc}`, { entregue: cb.checked }));
     toast(cb.checked ? 'Marcado como entregue' : 'Desmarcado'); rotear();
   })));
   $('#pelosPdfs').onclick = tentar(async () => {
@@ -854,7 +1117,7 @@ TELAS.rematricula = async (c) => {
       <div class="val" style="font-size:22px">${ocup}${g.capacidade ? `<small style="font-size:13px;color:var(--texto-2)"> / ${g.capacidade} vagas</small>` : ''}</div>
       <div class="det">${g.concluida} concluídas · ${g.reservada} em andamento · ${g.pendente} a contatar${g.novos ? ` · ${g.novos} novos` : ''}</div>
       <div class="barra"><i class="b-concl" style="width:${p(g.concluida)}"></i><i class="b-and" style="width:${p(g.reservada)}"></i></div>
-      ${g.capacidade && ocup > g.capacidade ? '<div class="det" style="color:var(--vermelho);margin-top:6px">⚠️ acima da capacidade</div>' : ''}
+      ${g.capacidade && ocup > g.capacidade ? '<div class="det" style="color:var(--vermelho);margin-top:6px">acima da capacidade</div>' : ''}
     </div>`;
   }).join('')}</div>
   ${EU.perfil === 'admin' ? '<p class="dado" style="margin-top:8px">As vagas por série são definidas em Configurações › Vagas (copie da planilha de controle do Google).</p>' : ''}
@@ -896,7 +1159,7 @@ TELAS.pendencias = async (c) => {
   const turmas = Object.keys(ordemTurma).sort(porOrdem);
   c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Pendências de documentos</h1>
     <p class="sub">Alunos (re)matriculados em ${esc(EU.config.ano_matricula)} com documento obrigatório faltando. Prazo: ${esc(EU.config.prazo_dias)} dias após a matrícula.</p></div>
-    <button class="btn" id="imp">🖨️ Imprimir lista</button></div>
+    <button class="btn" id="imp">${icone('documentos')}Imprimir lista</button></div>
   <div class="filtros">
     <select id="fs"><option value="">Todas as situações</option>${Object.entries(SITUACAO).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
     <select id="ft"><option value="">Todas as turmas</option>${turmas.map((t) => `<option>${esc(t)}</option>`).join('')}</select>
@@ -919,7 +1182,7 @@ TELAS.pendencias = async (c) => {
           <td>${esc(p.faltam.join(', '))}</td>
           <td>${dataBR(p.prazo)} <span class="tag t-${p.situacao}">${p.dias == null ? '' : p.dias < 0 ? `venceu há ${-p.dias}d` : p.dias === 0 ? 'hoje' : `${p.dias}d`}</span></td>
           <td class="nao-imprimir"><button class="btn peq zap" data-zap="${p.aluno_id}">WhatsApp</button></td></tr>`).join('')}
-        </tbody></table></div></details>`).join('') : '<div class="cartao vazio">Nenhuma pendência com esses filtros 🎉</div>';
+        </tbody></table></div></details>`).join('') : '<div class="cartao vazio">Nenhuma pendência com esses filtros.</div>';
     if ($('#abrirTodas')) $('#abrirTodas').onclick = () => $$('details.turma-grupo').forEach((d) => { d.open = true; });
     $$('[data-zap]').forEach((b) => (b.onclick = tentar(() => {
       const p = lista.find((x) => x.aluno_id === +b.dataset.zap);
@@ -935,7 +1198,7 @@ TELAS.pendencias = async (c) => {
 TELAS.interessados = async (c) => {
   const lista = await api('GET', '/api/interessados');
   c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Interessados (SIG)</h1><p class="sub">Primeiro contato das famílias que querem conhecer a escola.</p></div>
-    <div class="acoes"><label class="btn">📥 Importar planilha SIG<input type="file" id="arq" accept=".xlsx,.csv" hidden></label><button class="btn ama" id="novo">＋ Novo contato</button></div></div>
+    <div class="acoes"><label class="btn">${icone('importar')}Importar planilha SIG<input type="file" id="arq" accept=".xlsx,.csv" hidden></label><button class="btn ama" id="novo">${icone('mais')}Novo contato</button></div></div>
   <div class="filtros"><select id="fs"><option value="">Todos</option>${Object.entries(STATUS_INT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
     <input id="fq" placeholder="Buscar…" style="flex:1;min-width:200px"></div>
   <div class="cartao tabela-wrap" style="padding:0"><table><thead><tr><th>Data</th><th>Aluno</th><th>Série de interesse</th><th>Responsável / contato</th><th>Escola atual</th><th>Situação</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
@@ -992,166 +1255,7 @@ function formInteressado(i) {
 }
 
 // ───────────── Modelos de mensagem ─────────────
-TELAS.mensagens = async (c) => {
-  const modelos = await api('GET', '/api/modelos');
-  c.innerHTML = `<div class="acoes" style="justify-content:space-between"><div><h1>Modelos de mensagem</h1><p class="sub">Textos prontos para WhatsApp. O app troca as palavras entre chaves pelos dados do aluno.</p></div>
-    <button class="btn ama" id="novo">＋ Novo modelo</button></div>
-  <div class="dica">Campos disponíveis: <span class="mono">{aluno} {responsavel} {serie} {serie_destino} {documentos} {prazo}</span></div>
-  <div class="grade g2">${modelos.map((m) => `<div class="cartao"><div class="acoes" style="justify-content:space-between"><h3 style="margin:0">${esc(m.titulo)}</h3><button class="btn peq" data-ed="${m.id}">Editar</button></div>
-    <p style="white-space:pre-wrap;color:var(--texto-2);font-size:13px">${esc(m.texto)}</p></div>`).join('')}</div>`;
-  const form = (m) => modal(m ? 'Editar modelo' : 'Novo modelo', `<form id="fm"><div class="campo"><label>Título</label><input id="mt" value="${esc(m?.titulo || '')}" required></div>
-    <div class="campo" style="margin-top:10px"><label>Texto</label><textarea id="mx" required>${esc(m?.texto || '')}</textarea></div>
-    <div class="rodape">${m ? '<button type="button" class="btn perigo" id="del" style="margin-right:auto">Excluir</button>' : ''}<button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`,
-  { onAbrir: (el, fechar) => {
-    $('#fm', el).onsubmit = tentar(async (ev) => {
-      ev.preventDefault();
-      const b = { titulo: $('#mt', el).value, texto: $('#mx', el).value };
-      if (m) await api('PUT', '/api/modelos/' + m.id, b); else await api('POST', '/api/modelos', b);
-      fechar(); toast('Modelo salvo'); rotear();
-    });
-    if ($('#del', el)) $('#del', el).onclick = tentar(async () => { if (!(await confirmar('Excluir o modelo "' + m.titulo + '"?', 'Excluir'))) return; await api('DELETE', '/api/modelos/' + m.id); fechar(); rotear(); });
-  } });
-  $('#novo').onclick = () => form();
-  $$('[data-ed]').forEach((b) => (b.onclick = () => form(modelos.find((m) => m.id === +b.dataset.ed))));
-};
-
-// ───────────── Configurações (admin) ─────────────
-TELAS.config = async (c, aba = 'geral') => {
-  if (EU.perfil !== 'admin') { c.innerHTML = '<div class="cartao">Somente a administração acessa as configurações.</div>'; return; }
-  const d = await api('GET', '/api/admin');
-  const ABAS = { geral: 'Geral', importar: 'Importar dados', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários',
-    backup: 'Cópias de segurança', atualizacao: 'Atualizações', lgpd: 'LGPD e acessos', log: 'Auditoria' };
-  c.innerHTML = `<h1>Configurações</h1><p class="sub">Só a administração vê esta área.</p>
-    <div class="abas">${Object.entries(ABAS).map(([k, v]) => `<button data-aba="${k}" class="${aba === k ? 'on' : ''}">${v}</button>`).join('')}</div><div id="aba"></div>`;
-  $$('[data-aba]').forEach((b) => (b.onclick = () => (location.hash = '#/config/' + b.dataset.aba)));
-  const el = $('#aba');
-  const cfg = d.config;
-
-  if (aba === 'geral') {
-    const campo = (k, rot, tipo = 'date') => `<div class="campo"><label>${rot}</label><input id="c_${k}" type="${tipo}" value="${esc(cfg[k] || '')}"></div>`;
-    el.innerHTML = `<form class="cartao" id="fg"><div class="campos">
-      ${campo('ano_matricula', 'Ano da matrícula', 'number')}${campo('prazo_dias', 'Prazo para documentos (dias)', 'number')}
-      ${campo('data_inicio', 'Início das matrículas')}${campo('data_desconto', 'Fim do desconto')}${campo('data_garantia_vaga', 'Fim da garantia de vaga')}${campo('data_fim', 'Encerramento')}
-    </div><div class="campo" style="margin-top:12px"><label>Pasta dos prontuários (Contratos)</label><input id="c_pasta_prontuario" value="${esc(cfg.pasta_prontuario)}" style="width:100%"></div>
-    <p class="dado">O app procura as pastas assim: <span class="mono">Pasta\\&lt;turma&gt;\\&lt;nome do aluno&gt;\\*.pdf</span>, com os nomes do PDF Renamer.</p>
-    <div class="campo" style="margin-top:12px"><label>Pastas das fotos dos alunos (separe com ;)</label><input id="c_pastas_fotos" value="${esc(cfg.pastas_fotos || '')}" style="width:100%"></div>
-    <h3 style="margin-top:18px">Declarações</h3><div class="campos">
-      ${campo('inep', 'Código INEP', 'text')}${campo('horario_infantil', 'Horário Ed. Infantil', 'text')}${campo('horario_fund1', 'Horário Fund. I', 'text')}
-      ${campo('horario_fund2', 'Horário Fund. II', 'text')}${campo('horario_medio', 'Horário Ensino Médio', 'text')}</div>
-    <h3 style="margin-top:18px">Atividades extras e olimpíada</h3><div class="campos">
-      ${campo('extras_dia_venc', 'Dia de vencimento das parcelas', 'number')}${campo('extras_ultimo_mes', 'Último mês de parcela (11 = novembro)', 'number')}
-      ${campo('olimpiada_titulo', 'Título da olimpíada', 'text')}${campo('olimpiada_validade', 'Validade da carteirinha')}</div>
-    <h3 style="margin-top:18px">Bolsa social (CEBAS)</h3><div class="campos">
-      ${campo('cebas_ano', 'Ano das bolsas', 'number')}${campo('cebas_retirada', 'Retirada do requerimento')}${campo('cebas_entrega_ini', 'Entrega: início')}
-      ${campo('cebas_entrega_fim', 'Entrega: fim')}${campo('cebas_resultado', 'Divulgação do resultado')}${campo('cebas_prestacao', 'Prestação de contas')}</div>
-    <h3 style="margin-top:18px">Boletos, fotos e saída</h3><div class="campos">
-      ${campo('desconto_funcionario', 'Desconto do filho de funcionário (%)', 'number')}${campo('boletos_dia_venc', 'Dia de vencimento das mensalidades', 'number')}
-      ${campo('boletos_mes_massa', 'Mês da massa de boletos (11 = novembro)', 'number')}${campo('fotos_sistemas', 'Sistemas do mutirão de fotos (separe com ;)', 'text')}
-      <div class="campo"><label>Aviso de saída só por telefone</label><select id="c_saida_aviso_telefone">
-        <option value="0" ${cfg.saida_aviso_telefone !== '1' ? 'selected' : ''}>Não aceitar (regra do termo)</option>
-        <option value="1" ${cfg.saida_aviso_telefone === '1' ? 'selected' : ''}>Aceitar sem avisar</option></select></div></div>
-    <h3 style="margin-top:18px">Aparência (vale só neste computador)</h3>
-    <label class="chk"><input type="checkbox" id="c_compacto"> Modo compacto: linhas mais juntas, cabe mais aluno na tela</label>
-    <p class="dado">O claro/escuro fica no botão da barra lateral, embaixo.</p>
-    <div class="rodape" style="display:flex;justify-content:flex-end"><button class="btn pri">Salvar</button></div></form>`;
-    $('#c_compacto').checked = densidadeAtual() === 'compacta';
-    $('#c_compacto').onchange = (ev) => aplicarDensidade(ev.target.checked ? 'compacta' : 'normal', true);
-    $('#fg').onsubmit = tentar(async (ev) => {
-      ev.preventDefault();
-      const b = {}; ['ano_matricula', 'prazo_dias', 'data_inicio', 'data_desconto', 'data_garantia_vaga', 'data_fim', 'pasta_prontuario', 'pastas_fotos', 'inep',
-        'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
-        'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
-        'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone'].forEach((k) => { b[k] = $('#c_' + k).value.trim(); });
-      await api('PUT', '/api/admin/config', b); EU = await api('GET', '/api/eu'); toast('Configurações salvas');
-    });
-  }
-
-  if (aba === 'importar') {
-    const p = await api('GET', '/api/painel');
-    el.innerHTML = `<div class="grade g2">
-      <div class="cartao"><h2>📥 Importar alunos do ACADESC</h2>
-        <p>Use a exportação de alunos do ACADESC em Excel (.xlsx) com as colunas <span class="mono">Mat, Nome, AnoLetivo, Descricao, Serie, Turma, Turno, FilhoFuncionario, NomeMae, NomePai, NomeResp, Email, CelularMae, CelularPai, DtNascimento, CPF…</span>
-        É o mesmo formato da aba <b>Planilha1</b> do contrato.</p>
-        <p class="dica">Os alunos são identificados pela matrícula: quem já existe é atualizado e quem não existe é criado. Nada é apagado. Rematrículas e documentos já marcados continuam.</p>
-        <label class="btn pri">Escolher arquivo…<input type="file" id="arqA" accept=".xlsx,.csv" hidden></label>
-        <div id="resA" style="margin-top:12px"></div></div>
-      <div class="cartao"><h2>🧪 Dados de demonstração</h2>
-        <p>Cria alunos <b>fictícios</b> para testar e apresentar o sistema sem expor dados reais (LGPD): cerca de 160, ou uns 535 no tamanho real da escola.</p>
-        ${p.demo ? '<p><span class="tag t-demo">Demonstração carregada</span></p><button class="btn perigo" id="apagarDemo">Apagar dados de demonstração</button>'
-          : '<div class="acoes"><button class="btn" id="carregarDemo">Carregar demonstração</button><button class="btn" id="carregarDemoReal" title="Uns 535 alunos fictícios, como a escola de verdade">Demonstração no tamanho real</button></div>'}
-        <p class="dado" style="margin-top:12px">Antes de importar os alunos reais, apague a demonstração.</p></div></div>`;
-    $('#arqA').onchange = tentar(async (e) => {
-      const file = e.target.files[0]; if (!file) return;
-      $('#resA').textContent = 'Importando…';
-      const r = await api('POST', '/api/admin/importar-alunos?arquivo=' + encodeURIComponent(file.name), undefined, file);
-      invalidar();
-      $('#resA').innerHTML = `<div class="dica">✅ <b>${r.novos}</b> novos · <b>${r.atualizados}</b> atualizados · ${r.ignorados} linhas ignoradas${r.sem_serie.length ? `<br>⚠️ ${r.sem_serie.length} sem série reconhecida: ${esc(r.sem_serie.slice(0, 10).join(', '))}${r.sem_serie.length > 10 ? '…' : ''}` : ''}</div>`;
-    });
-    const demo = (tam) => tentar(async () => { const r = await api('POST', '/api/admin/demo' + (tam ? '?tamanho=' + tam : '')); invalidar(); toast(r.alunos + ' alunos fictícios criados'); location.hash = '#/'; });
-    if ($('#carregarDemo')) $('#carregarDemo').onclick = demo('');
-    if ($('#carregarDemoReal')) $('#carregarDemoReal').onclick = demo('real');
-    if ($('#apagarDemo')) $('#apagarDemo').onclick = tentar(async () => {
-      if (!(await confirmar('Apagar todos os alunos e contatos fictícios da demonstração?', 'Apagar'))) return;
-      await api('DELETE', '/api/admin/demo'); invalidar(); toast('Demonstração apagada'); rotear();
-    });
-  }
-
-  if (aba === 'vagas') {
-    el.innerHTML = `<form class="cartao" id="fv"><p>Capacidade máxima de alunos por série em ${esc(cfg.ano_matricula)} (somando todas as turmas). Deixe em branco se não houver limite definido.</p>
-      <div class="campos">${d.vagas.map((v) => `<div class="campo"><label>${esc(v.rotulo)}</label><input type="number" min="0" data-v="${v.chave}" value="${v.capacidade ?? ''}"></div>`).join('')}</div>
-      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn pri">Salvar vagas</button></div></form>`;
-    $('#fv').onsubmit = tentar(async (ev) => { ev.preventDefault(); const b = {}; $$('[data-v]').forEach((i) => { b[i.dataset.v] = i.value; }); await api('PUT', '/api/admin/vagas', b); toast('Vagas salvas'); });
-  }
-
-  if (aba === 'documentos') {
-    el.innerHTML = `<div class="cartao"><p>Lista de documentos da matrícula (vocês ainda vão definir a lista oficial; ela pode ser ajustada aqui a qualquer momento).
-      O "arquivo PDF" é o nome padronizado do PDF Renamer ({ano} vira o ano da matrícula).</p>
-      <div class="tabela-wrap"><table><thead><tr><th>Documento</th><th>Arquivo PDF</th><th>Obrigatório</th><th>Vale para</th><th>Ativo</th></tr></thead><tbody>
-      ${d.documentos.map((x) => `<tr data-doc="${x.id}"><td><input data-k="nome" value="${esc(x.nome)}" style="width:100%"></td><td><input data-k="arquivo" value="${esc(x.arquivo || '')}" style="width:100%"></td>
-        <td><input type="checkbox" data-k="obrigatorio" ${x.obrigatorio ? 'checked' : ''}></td>
-        <td><select data-k="aplica"><option value="todos" ${x.aplica === 'todos' ? 'selected' : ''}>Todos</option><option value="novos" ${x.aplica === 'novos' ? 'selected' : ''}>Só novos</option></select></td>
-        <td><input type="checkbox" data-k="ativo" ${x.ativo ? 'checked' : ''}></td></tr>`).join('')}
-      </tbody></table></div>
-      <div class="acoes" style="margin-top:12px"><button class="btn" id="addDoc">＋ Adicionar documento</button></div></div>`;
-    $$('[data-doc] [data-k]').forEach((i) => (i.onchange = tentar(async () => {
-      const v = i.type === 'checkbox' ? i.checked : i.value;
-      await api('PUT', '/api/admin/documentos/' + i.closest('tr').dataset.doc, { [i.dataset.k]: v }); toast('Salvo');
-    })));
-    $('#addDoc').onclick = tentar(async () => { await api('POST', '/api/admin/documentos', { nome: 'Novo documento', obrigatorio: true }); rotear(); });
-  }
-
-  if (aba === 'usuarios') {
-    el.innerHTML = `<div class="cartao"><table><thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>
-      ${d.usuarios.map((u) => `<tr data-u="${u.id}"><td>${esc(u.nome)}</td><td class="mono">${esc(u.login)}</td>
-        <td><select data-k="perfil"><option value="admin" ${u.perfil === 'admin' ? 'selected' : ''}>Administração</option><option value="aprendiz" ${u.perfil === 'aprendiz' ? 'selected' : ''}>Aprendiz</option></select></td>
-        <td>${u.ativo ? (u.trocar_senha ? '<span class="tag t-reservada">aguardando 1º acesso</span>' : '<span class="tag t-concluida">ativo</span>') : '<span class="tag t-nao_renova">desativado</span>'}</td>
-        <td class="acoes"><button class="btn peq" data-reset>Resetar senha</button><button class="btn peq" data-ativo="${u.ativo ? 0 : 1}">${u.ativo ? 'Desativar' : 'Reativar'}</button></td></tr>`).join('')}
-      </tbody></table>
-      <p class="dica">Senha inicial e senha resetada: <b class="mono">luterano</b>. No primeiro acesso a pessoa é obrigada a criar uma senha própria.<br>
-      <b>Administração</b> acessa as configurações, a importação e a auditoria. <b>Aprendiz</b> usa todo o resto.</p>
-      <form id="fu" class="acoes" style="margin-top:10px"><input id="un" placeholder="Nome" required><input id="ul" placeholder="login (ex.: maria)" required>
-        <select id="up"><option value="aprendiz">Aprendiz</option><option value="admin">Administração</option></select><button class="btn pri">Criar usuário</button></form></div>`;
-    $$('[data-u]').forEach((tr) => {
-      const id = tr.dataset.u;
-      $('[data-k=perfil]', tr).onchange = tentar(async (e) => { await api('PUT', '/api/admin/usuarios/' + id, { perfil: e.target.value }); toast('Perfil alterado'); });
-      $('[data-reset]', tr).onclick = tentar(async () => { await api('PUT', '/api/admin/usuarios/' + id, { resetar_senha: true }); toast('Senha resetada para "luterano"'); rotear(); });
-      $('[data-ativo]', tr).onclick = tentar(async (e) => { await api('PUT', '/api/admin/usuarios/' + id, { ativo: e.target.dataset.ativo === '1' }); rotear(); });
-    });
-    $('#fu').onsubmit = tentar(async (ev) => { ev.preventDefault(); await api('POST', '/api/admin/usuarios', { nome: $('#un').value, login: $('#ul').value, perfil: $('#up').value }); toast('Usuário criado. Senha inicial: luterano'); rotear(); });
-  }
-
-  if (aba === 'backup' && window.abaBackup) await window.abaBackup(el);
-  if (aba === 'atualizacao' && window.abaAtualizacao) await window.abaAtualizacao(el);
-  if (aba === 'lgpd' && window.abaLgpd) await window.abaLgpd(el);
-
-  if (aba === 'log') {
-    const log = await api('GET', '/api/admin/log');
-    el.innerHTML = `<div class="cartao tabela-wrap" style="padding:0"><table><thead><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhe</th></tr></thead><tbody>
-      ${log.map((l) => { let det = l.detalhe; try { const o = JSON.parse(l.detalhe); det = o.nome || o.login || Object.entries(o).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · '); } catch { /* texto */ }
-        return `<tr><td class="dado">${new Date(l.quando).toLocaleString('pt-BR')}</td><td>${esc(l.usuario)}</td><td>${esc(l.acao)}</td><td class="dado">${esc(String(det || '').slice(0, 160))}</td></tr>`; }).join('')}
-    </tbody></table></div>`;
-  }
-};
+// Mensagens e Configurações estão em telas5.js (5.1).
 
 // Espera todos os scripts (app.js e etapa2.js) carregarem antes de começar
 document.addEventListener('DOMContentLoaded', iniciar);

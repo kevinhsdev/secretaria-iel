@@ -25,7 +25,7 @@ TELAS.vivencias = async (c, ano) => {
     <div class="acoes" style="justify-content:space-between;margin-bottom:14px">
       <div class="acoes"><button class="btn peq" id="vAnt" aria-label="Ano anterior">←</button><b style="font-size:16px;min-width:44px;text-align:center">${d.ano}</b>
         <button class="btn peq" id="vProx" aria-label="Ano seguinte">→</button></div>
-      <div class="acoes"><button class="btn" id="vImp">📥 Importar planilha</button><button class="btn ama" id="vNova">＋ Agendar vivência</button></div>
+      <div class="acoes"><button class="btn" id="vImp">${icone('importar')}Importar planilha</button><button class="btn ama" id="vNova">${icone('mais')}Agendar vivência</button></div>
     </div>
   <div class="grade g4">
     <div class="cartao kpi destaque"><div class="rot">Total de vivências</div><div class="val">${p.total}</div><div class="det">${p.a_realizar} a realizar${p.hoje ? ` · <b>${p.hoje} hoje</b>` : ''}</div></div>
@@ -34,9 +34,9 @@ TELAS.vivencias = async (c, ano) => {
     <div class="cartao kpi"><div class="rot">% de efetivação</div><div class="val">${String(p.pct_efetivacao).replace('.', ',')}%</div><div class="det">das vivências realizadas</div></div>
   </div>
   <div class="acoes" style="margin-top:10px">
-    <button class="btn peq" data-atalho="sem_contato">${p.sem_contato ? '🔴' : '🟢'} Sem contato depois da vivência: <b>${p.sem_contato}</b></button>
+    <button class="btn peq" data-atalho="sem_contato"><span class="bolinha ${p.sem_contato ? 'vermelha' : 'verde'}"></span>Sem contato depois da vivência: <b>${p.sem_contato}</b></button>
     <button class="btn peq" data-atalho="aguardando">Aguardando resposta da família: <b>${p.aguardando}</b></button>
-    <button class="btn peq" data-atalho="atrasadas">${p.atrasadas ? '🟠' : ''} Agendadas com data que já passou: <b>${p.atrasadas}</b></button>
+    <button class="btn peq" data-atalho="atrasadas">${p.atrasadas ? '<span class="bolinha laranja"></span>' : ''}Agendadas com data que já passou: <b>${p.atrasadas}</b></button>
   </div>
   <div class="abas" style="margin-top:14px"><button data-vaba="registro">Registro</button><button data-vaba="painel">Painel do ano</button></div>
   <div id="vRegistro"><div class="cartao">
@@ -46,7 +46,7 @@ TELAS.vivencias = async (c, ano) => {
       <select id="fx" aria-label="Situação"><option value="">Qualquer situação</option><option value="sem_contato">Sem contato depois da vivência</option>
         <option value="aguardando">Aguardando resposta da família</option><option value="atrasadas">Data já passou e não foi marcada</option><option value="hoje">Vivências de hoje</option></select>
       <input id="fq" placeholder="Buscar criança, responsável ou telefone…" style="flex:1;min-width:200px">
-      <button class="btn peq" id="vPrint">🖨️ Imprimir</button>
+      <button class="btn peq" id="vPrint">${icone('documentos')}Imprimir</button>
     </div>
     <div class="tabela-wrap"><table><thead><tr><th>Data</th><th>Criança</th><th>Responsável</th><th>Vivência na turma</th><th>Status</th><th>Contato depois</th><th>Matrícula</th><th></th></tr></thead>
       <tbody id="tb"></tbody></table></div></div></div>

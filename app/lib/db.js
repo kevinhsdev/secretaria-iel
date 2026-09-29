@@ -354,7 +354,7 @@ function inicializar() {
     const ins = db.prepare('INSERT INTO rotina_tarefas (titulo, detalhe, responsavel, dias, periodo, ordem) VALUES (?,?,?,?,?,?)');
     [
       ['Conferir os avisos de saída do dia', 'Quem busca hoje? Veja em Portão · Saída antes de liberar qualquer aluno.', 'todos', '1,2,3,4,5', 'dia'],
-      ['Registrar os atendimentos do dia', 'Balcão, telefone e WhatsApp: lance em Atendimentos logo depois de atender.', 'todos', '1,2,3,4,5', 'dia'],
+      ['Registrar os atendimentos do dia', 'Secretaria, telefone e WhatsApp: lance em Atendimentos logo depois de atender.', 'todos', '1,2,3,4,5', 'dia'],
       ['Históricos escolares e lançamentos no ACADESC', '', 'samara', '1,2,3', 'dia'],
       ['Baixas de pagamento no ACADESC', 'Conferir o extrato e dar baixa nas parcelas pagas.', 'duda', '1,2,3', 'manha'],
       ['Planilhas do financeiro', 'Inadimplência, descontos e conferências.', 'duda', '1,2,3', 'manha'],
@@ -366,9 +366,9 @@ function inicializar() {
       ['Fotos dos alunos (tarde)', 'Tirar e inserir nos 3 sistemas: ACADESC, SED e Lanche Card.', 'kevin', '1,2,3', 'tarde'],
       ['Foco na SED', 'Cadastros, transferências, classes e atualizações.', 'samara', '4', 'dia'],
       ['Foco na SED (apoio)', '', 'duda', '4', 'manha'],
-      ['Balcão sozinho', 'Na quinta a Duda não vem: atendimento e telefone ficam com você.', 'kevin', '4', 'tarde'],
+      ['Atendimento sozinho', 'Na quinta a Duda não vem: atendimento e telefone ficam com você.', 'kevin', '4', 'tarde'],
       ['Fechamento da semana', 'Conferir pendências, e-mails e o que ficou para segunda.', 'samara', '5', 'dia'],
-      ['Fechamento do financeiro da semana', 'Na sexta o Kevin não vem: balcão e telefone ficam com você.', 'duda', '5', 'manha'],
+      ['Fechamento do financeiro da semana', 'Na sexta o Kevin não vem: atendimento e telefone ficam com você.', 'duda', '5', 'manha'],
     ].forEach((t, i) => ins.run(...t, i + 1));
   }
 

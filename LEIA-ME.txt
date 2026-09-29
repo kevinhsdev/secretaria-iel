@@ -62,7 +62,8 @@ FOTOS DAS CARTEIRINHAS
   O app procura <matrícula>.jpg nas pastas definidas em Configurações > Geral (ex.: fotos alunos\2ºA\2083.jpg).
 
 MODO CLARO E MODO ESCURO
-  Na barra lateral, embaixo, ao lado do botão "Sair", tem um botãozinho com uma lua (ou um sol).
+  Na coluna da esquerda, embaixo, tem um botãozinho com uma lua (ou um sol). O mesmo fica no menu da
+  sua conta (a bolinha amarela com a sua inicial), junto com Modo compacto, Bloquear a tela, Trocar senha e Sair.
   Ele troca entre o modo claro e o escuro. A escolha fica guardada naquele computador/navegador.
   Sem escolher nada, o sistema acompanha o tema do Windows.
   Os documentos e as listas SEMPRE imprimem em branco com letra preta, mesmo com o modo escuro ligado.

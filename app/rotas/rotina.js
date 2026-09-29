@@ -6,7 +6,7 @@ module.exports = function rotina(ctx) {
 
   const DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const CANAIS = { balcao: 'Balcão', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail' };
+  const CANAIS = { balcao: 'Secretaria', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail' };
   const CATEGORIAS = ['Matrícula / rematrícula', 'Documentos e declarações', 'Financeiro / boletos', 'Bolsa (CEBAS)', 'Atividades extras',
     'Saída / portão', 'Lanche Card', 'Transporte escolar', 'Pedagógico', 'Outros'];
   const diaSemana = (iso) => new Date(iso + 'T12:00:00').getDay();
