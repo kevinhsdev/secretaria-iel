@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.4.2';
+const VERSAO = '5.5.0';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -432,6 +432,7 @@ const ICONES = {
   sol: '<path d="M12 17.2a5.2 5.2 0 1 0 0-10.4 5.2 5.2 0 0 0 0 10.4z"/><path d="M12 1.8v2.4M12 19.8v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/>',
   relogio: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   pasta: '<path d="M14 3.2H7.4a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.2a2 2 0 0 0 2-2V8z"/><path d="M14 3.2V8h4.6M9 12.5h6M9 16h4"/>',
+  celular: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
   cadeado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   chave: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2.5 2.5M14.5 8.5l2 2"/>',
   balcao: '<circle cx="12" cy="7" r="3.2"/><path d="M5.5 20.5v-2.2A4.8 4.8 0 0 1 10.3 13.5h3.4a4.8 4.8 0 0 1 4.8 4.8v2.2"/>',
@@ -616,7 +617,7 @@ async function iniciar() {
   $('#raiz').innerHTML = `
   <div class="app">
     <nav class="trilho" aria-label="Menu principal">
-      <a class="logo" href="#/" title="${NOME_APP} · Secretaria IEL — Instituto Educacional Luterano"><img src="logo.png" alt="Instituto Educacional Luterano"></a>
+      <a class="logo" href="#/" title="${NOME_APP} · Secretaria IEL — Instituto Educacional Luterano"><img class="logo-claro" src="logo.png" alt="Instituto Educacional Luterano"><img class="logo-escuro" src="logo-escuro.png" alt="Instituto Educacional Luterano"></a>
       <span class="marca-app" aria-hidden="true"><em>${esc(NOME_APP.slice(0, 1))}</em>${esc(NOME_APP.slice(1))}</span>
       <div class="grupos">${gruposVisiveis().map((g) => `<a href="#/${g.telas[0].rota}" data-grupo="${g.id}">${icone(g.ic)}${esc(g.nome)}<span class="ponto" hidden></span></a>`).join('')}</div>
       <div class="trilho-pe">

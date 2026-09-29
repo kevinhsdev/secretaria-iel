@@ -598,6 +598,74 @@ TELAS.lixeira = async (c) => {
     EU.config.lixeira_dias = String(n); toast('Salvo'); rotear();
   });
 };
+// ───────────── Configurações › Celular e rede ─────────────
+// Liberar o SEK para os aparelhos do mesmo Wi-Fi (grava rede_liberada e reinicia) e mostrar o endereço com um QR Code.
+async function abaCelular(el) {
+  const r = await api('GET', '/api/admin/rede');
+  const principal = r.enderecos.find((e) => e.provavel) || r.enderecos[0];
+  const urlDe = (ip) => `http://${ip}:${r.porta}`;
+  const pendente = r.liberada !== r.ativa && !r.pelo_bat;
+  const botao = r.pelo_bat ? '<span></span>'
+    : pendente ? `<button class="btn pri" id="redeReiniciar">${icone('volta')}Reiniciar agora</button>`
+    : r.ativa ? '<button class="btn" id="redeFechar">Fechar o acesso pela rede</button>'
+    : `<button class="btn pri" id="redeLiberar">${icone('celular')}Liberar para o celular</button>`;
+  const situacao = pendente
+    ? ['info', 'volta', 'Falta reiniciar', r.liberada ? 'O acesso pela rede foi ligado e passa a valer quando o sistema reiniciar.' : 'O acesso pela rede foi desligado e para de valer quando o sistema reiniciar.']
+    : r.ativa ? ['', 'celular', 'Liberado para o celular', r.pelo_bat ? 'Ligado pelo "Iniciar Secretaria.bat" (IEL_REDE=1). Para desligar, tire essa linha do .bat.' : 'Celulares e computadores no mesmo Wi-Fi conseguem abrir o SEK (com usuário e senha).']
+    : ['info', 'cadeado', 'Só este computador abre o SEK', 'Libere para usar o SEK no celular ou em outro computador conectado ao mesmo Wi-Fi.'];
+  el.innerHTML = `
+  <div class="situacao ${situacao[0]}"><span class="selo">${icone(situacao[1])}</span>
+    <span><b>${situacao[2]}</b><span>${esc(situacao[3])}</span></span>${botao}</div>
+  ${r.ativa ? (principal ? `<div class="cartao celular-qr">
+      <div class="qr-caixa" id="qrCaixa">${gerarQR(urlDe(principal.ip))}</div>
+      <div class="celular-passos">
+        <h2>${icone('celular')}Abra no celular</h2>
+        <div class="endereco-rede"><span class="mono" id="qrUrl">${esc(urlDe(principal.ip))}</span>
+          <button class="btn peq" id="qrCopiar">${icone('copia')}Copiar</button></div>
+        <ol class="passos-rede">
+          <li>Conecte o celular no <b>mesmo Wi-Fi</b> deste computador.</li>
+          <li>Abra a câmera e aponte para o código, ou digite o endereço no navegador.</li>
+          <li>Entre com o seu usuário e a sua senha.</li>
+        </ol>
+        <p class="dado">Dica: no Chrome do celular, o menu ⋮ › "Adicionar à tela inicial" deixa o SEK com ícone, como um aplicativo.</p>
+        ${r.enderecos.length > 1 ? `<div class="campo" style="margin-top:12px"><label for="qrRede">Este computador está em mais de uma rede. Não abriu? Tente outra:</label>
+          <select id="qrRede">${r.enderecos.map((e) => `<option value="${esc(e.ip)}" ${e === principal ? 'selected' : ''}>${esc(e.ip)} · ${esc(e.nome)}</option>`).join('')}</select></div>` : ''}
+      </div></div>`
+    : '<div class="cartao"><p class="vazio">Este computador não está conectado a nenhuma rede agora. Conecte o Wi-Fi ou o cabo e abra esta tela de novo.</p></div>') : ''}
+  <div class="cartao" style="margin-top:14px"><h2>${icone('escudo')}Cuidados</h2>
+    <ul class="lista-cuidados">
+      <li>Use só na <b>rede da secretaria</b>. Nunca libere no Wi-Fi de visitantes ou de alunos.</li>
+      <li>A conexão pela rede não tem o cadeado (é <span class="mono">http</span>): qualquer aparelho do mesmo Wi-Fi vê a tela de entrada. Todos ainda precisam de usuário e senha.</li>
+      <li>Fora do Wi-Fi da escola (no 4G, por exemplo) não abre. É de propósito: os dados não vão para a internet.</li>
+      <li>Na primeira vez, o Windows pergunta sobre o Firewall: marque <b>Redes privadas</b> e clique em Permitir. Se o celular não abrir, o Firewall ou a rede marcada como "pública" costumam ser o motivo.</li>
+      <li>"Abrir pasta" do prontuário só funciona neste computador.</li>
+    </ul></div>`;
+
+  const remoto = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  const trocar = (liberar) => tentar(async () => {
+    const aviso = liberar
+      ? 'Liberar o SEK para celulares e computadores deste Wi-Fi? O sistema vai reiniciar e volta em alguns segundos.'
+      : 'Fechar o acesso pela rede? Só este computador vai abrir o SEK. O sistema vai reiniciar e volta em alguns segundos.'
+        + (remoto ? ' Atenção: você está num celular ou outro computador — depois disso, este aparelho perde o acesso.' : '');
+    if (!(await confirmar(aviso, liberar ? 'Liberar e reiniciar' : 'Fechar e reiniciar'))) return;
+    const res = await api('PUT', '/api/admin/rede', { liberada: liberar });
+    if (res.precisa_reiniciar) await reiniciarSistema(false);
+    else { toast('Salvo'); rotear(); }
+  });
+  if ($('#redeLiberar', el)) $('#redeLiberar', el).onclick = trocar(true);
+  if ($('#redeFechar', el)) $('#redeFechar', el).onclick = trocar(false);
+  if ($('#redeReiniciar', el)) $('#redeReiniciar', el).onclick = tentar(() => reiniciarSistema(false));
+  if ($('#qrRede', el)) $('#qrRede', el).onchange = (e) => {
+    $('#qrCaixa', el).innerHTML = gerarQR(urlDe(e.target.value));
+    $('#qrUrl', el).textContent = urlDe(e.target.value);
+  };
+  if ($('#qrCopiar', el)) $('#qrCopiar', el).onclick = async () => {
+    const txt = $('#qrUrl', el).textContent;
+    try { await navigator.clipboard.writeText(txt); toast('Endereço copiado'); }
+    catch { getSelection().selectAllChildren($('#qrUrl', el)); toast('Selecionei o endereço: aperte Ctrl+C para copiar'); }
+  };
+}
+
 // Nome bonito de quem excluiu ("samara" → "Samara"); "sistema" fica como está
 function nomeUsuario(login) { return login ? titulo(login) : '—'; }
 
@@ -606,7 +674,7 @@ TELAS.config = async (c, aba = 'geral') => {
   if (EU.perfil !== 'admin') { c.innerHTML = '<div class="cartao">Somente a administração acessa as configurações.</div>'; return; }
   const d = await api('GET', '/api/admin');
   const ABAS = { geral: 'Geral', importar: 'Importar dados', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários',
-    backup: 'Cópias de segurança', atualizacao: 'Atualizações', lgpd: 'LGPD e acessos', log: 'Auditoria' };
+    backup: 'Cópias de segurança', celular: 'Celular e rede', atualizacao: 'Atualizações', lgpd: 'LGPD e acessos', log: 'Auditoria' };
   if (!ABAS[aba]) aba = 'geral';
   c.innerHTML = cabecalho('Configurações', 'Só a administração vê esta área.')
     + `<div class="config"><nav class="config-nav" aria-label="Assuntos">${Object.entries(ABAS).map(([k, v]) => `<a href="#/config/${k}" class="${aba === k ? 'ativo' : ''}" ${aba === k ? 'aria-current="page"' : ''}>${v}</a>`).join('')}</nav>
@@ -735,6 +803,7 @@ TELAS.config = async (c, aba = 'geral') => {
   if (aba === 'backup' && window.abaBackup) await window.abaBackup(el);
   if (aba === 'atualizacao' && window.abaAtualizacao) await window.abaAtualizacao(el);
   if (aba === 'lgpd' && window.abaLgpd) await window.abaLgpd(el);
+  if (aba === 'celular') await abaCelular(el);
 
   if (aba === 'log') {
     const log = await api('GET', '/api/admin/log');

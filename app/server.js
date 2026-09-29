@@ -3,6 +3,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { db, inicializar, cfg, cfgPublica, registrar, registrarAcesso, transacao, hashSenha, conferirSenha, PASTA_DADOS, restauracao } = require('./lib/db');
@@ -17,8 +18,10 @@ const { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3, gerarDemoHistorico, gerarDe
 inicializar();
 
 const PORTA = Number(process.env.IEL_PORTA || 3000);
-// Por enquanto só este PC acessa. Para liberar aos outros PCs da rede, rode com IEL_REDE=1 (veja LEIA-ME).
-const HOST = process.env.IEL_REDE === '1' ? '0.0.0.0' : '127.0.0.1';
+// Por padrão só este PC acessa. A rede (outros PCs e celulares no mesmo Wi-Fi) é liberada em Configurações › Celular e rede
+// (chave rede_liberada, vale depois de reiniciar) ou à força com IEL_REDE=1 no .bat (veja LEIA-ME).
+const REDE_PELO_BAT = process.env.IEL_REDE === '1';
+const HOST = REDE_PELO_BAT || cfg().rede_liberada === '1' ? '0.0.0.0' : '127.0.0.1';
 const PUBLICO = path.join(__dirname, 'public');
 
 // ───────────────────────── sessões ─────────────────────────
@@ -639,6 +642,32 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
   registrar(u.login, 'alterou configurações', b);
   json(res, 200, { ok: true });
 });
+// Celular e rede: endereços deste PC na rede local (para o QR Code) e a chave que libera o acesso de fora
+function enderecosDaRede() {
+  const virtual = /vethernet|virtualbox|vmware|hyper-v|wsl|loopback|bluetooth|docker|tailscale|zerotier|vpn/i;
+  const semFio = (n) => /wi-?fi|wlan|sem fio|wireless/i.test(n);
+  const lista = [];
+  for (const [nome, ifs] of Object.entries(os.networkInterfaces())) {
+    for (const i of ifs || []) {
+      if (i.family !== 'IPv4' && i.family !== 4) continue;
+      if (i.internal || i.address.startsWith('169.254.')) continue;
+      lista.push({ nome, ip: i.address, provavel: !virtual.test(nome) });
+    }
+  }
+  return lista.sort((a, b) => b.provavel - a.provavel || semFio(b.nome) - semFio(a.nome));
+}
+rota('GET', '/api/admin/rede', async (req, res, { u }) => {
+  exigirAdmin(u);
+  json(res, 200, { liberada: cfg().rede_liberada === '1', ativa: HOST === '0.0.0.0', pelo_bat: REDE_PELO_BAT, porta: PORTA, enderecos: enderecosDaRede() });
+});
+rota('PUT', '/api/admin/rede', async (req, res, { u }) => {
+  exigirAdmin(u);
+  const b = await corpoJson(req);
+  const liberar = !!b.liberada;
+  db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run('rede_liberada', liberar ? '1' : '0');
+  registrar(u.login, liberar ? 'liberou o acesso pela rede (celular e outros PCs)' : 'fechou o acesso pela rede', '');
+  json(res, 200, { ok: true, precisa_reiniciar: liberar !== (HOST === '0.0.0.0') && !REDE_PELO_BAT });
+});
 rota('PUT', '/api/admin/vagas', async (req, res, { u }) => {
   exigirAdmin(u);
   const b = await corpoJson(req); const ano = +cfg().ano_matricula;
@@ -833,7 +862,10 @@ servidor.listen(PORTA, HOST, () => {
   console.log('');
   console.log('  Secretaria IEL rodando!');
   console.log(`  Abra no navegador:  http://localhost:${PORTA}`);
-  if (HOST === '0.0.0.0') console.log('  (liberado para os outros PCs da rede)');
+  if (HOST === '0.0.0.0') {
+    console.log('  (liberado para celulares e outros PCs da rede)');
+    for (const e of enderecosDaRede().filter((x) => x.provavel)) console.log(`  No celular:        http://${e.ip}:${PORTA}`);
+  }
   console.log('  Não feche esta janela enquanto estiver usando o sistema.');
   console.log('');
 });

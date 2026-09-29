@@ -172,12 +172,13 @@ const AJUDA = {
   },
   config: {
     nome: 'Configurações',
-    serve: 'Datas da campanha, pastas, documentos obrigatórios, vagas, usuários, importação do ACADESC, cópias de segurança, atualizações e LGPD.',
+    serve: 'Datas da campanha, pastas, documentos obrigatórios, vagas, usuários, importação do ACADESC, cópias de segurança, acesso pelo celular, atualizações e LGPD.',
     passos: [
       'Importar dados: exporte do ACADESC em Excel e envie aqui (alunos, responsáveis, pagamentos).',
       'Cópias de segurança: aponte a pasta para um pen drive ou o OneDrive, defina a senha e teste uma restauração.',
       'Atualizações: "Verificar atualizações" mostra o que mudou, faz cópia antes e reinicia sozinho.',
       'LGPD e acessos: relatório dos dados de um aluno para a família e descarte de ex-alunos.',
+      'Celular e rede: "Liberar para o celular" reinicia o sistema e mostra um QR Code; aponte a câmera do celular (no mesmo Wi-Fi) e entre com usuário e senha.',
     ],
     dicas: ['Só a administração vê esta área.', 'Backup que nunca foi restaurado não é backup: faça o teste de restauração pelo menos uma vez.'],
   },

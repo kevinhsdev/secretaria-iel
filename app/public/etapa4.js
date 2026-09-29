@@ -38,8 +38,8 @@ window.avisosEtapa4 = async () => {
   });
 };
 
-async function reiniciarSistema() {
-  if (!(await confirmar('Reiniciar o sistema agora? Quem estiver usando vai precisar entrar de novo.', 'Reiniciar'))) return;
+async function reiniciarSistema(perguntar = true) {
+  if (perguntar && !(await confirmar('Reiniciar o sistema agora? Quem estiver usando vai precisar entrar de novo.', 'Reiniciar'))) return;
   try { await api('POST', '/api/admin/reiniciar'); } catch { /* o servidor cai no meio da resposta */ }
   telaAguarde('Reiniciando…', 'O sistema está subindo de novo. Esta página volta sozinha em alguns segundos.');
   const tentarVoltar = async () => {

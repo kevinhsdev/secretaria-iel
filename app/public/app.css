@@ -11,6 +11,7 @@
   /* Marca */
   --azul: #0e3d7a; --azul-2: #1446a0; --azul-claro: #8fb0e6; --azul-fundo: #e3ebfa;
   --amarelo: #f5c21b; --amarelo-claro: #fff4cc; --amarelo-marca: #dba400;
+  --qr-fundo: #ffffff; --qr-ponto: #000000;   /* QR Code: preto no branco nos dois temas (a câmera precisa do contraste) */
   --titulo: #0b1b33;                 /* números grandes e títulos */
   --pri: #0e3d7a; --pri-2: #1446a0;  /* botão principal */
   /* Superfícies e texto (o fundo puxa de leve para o azul) */
@@ -90,10 +91,14 @@ h3 { font-size: 15px; letter-spacing: -.01em; font-weight: 650; margin: 0 0 8px;
 .app { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100vh; }
 nav.trilho { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0;
   background: var(--superficie); border-right: 1px solid var(--borda); z-index: 20; }
-/* logo da escola no alto (no escuro, com um disco branco atrás para o desenho não sumir) */
-nav.trilho .logo { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; margin-bottom: 14px; text-decoration: none; background: #fff;
-  box-shadow: 0 0 0 3px rgba(245, 194, 27, .35), 0 6px 16px -6px rgba(11, 27, 51, .35); transition: transform .16s var(--mola); }
-nav.trilho .logo img { width: 50px; height: 50px; border-radius: 50%; display: block; }
+/* logo da escola no alto, direto sobre o fundo do menu: letras pretas no tema claro (logo.png) e brancas no escuro
+   (logo-escuro.png, a mesma imagem só com as letras do anel trocadas) */
+nav.trilho .logo { display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 12px; text-decoration: none; border-radius: 50%;
+  transition: transform .16s var(--mola); }
+nav.trilho .logo img { width: 60px; height: 60px; display: block; }
+nav.trilho .logo .logo-escuro, :root[data-tema="escuro"] nav.trilho .logo .logo-claro { display: none; }
+:root[data-tema="escuro"] nav.trilho .logo .logo-escuro { display: block; }
+nav.trilho .logo:focus-visible { outline: 2px solid var(--azul-2); outline-offset: 3px; }
 nav.trilho .logo:active { transform: scale(.95); }
 /* Nome do app (SEK) embaixo da logo, com a primeira letra em amarelo como na tela de entrada */
 nav.trilho .marca-app { font: 800 17px/1 var(--f-titulo); letter-spacing: -.04em; color: var(--titulo); margin: -6px 0 12px; user-select: none; }
@@ -925,6 +930,21 @@ details.turma-bloco .barra i { transition: width .45s var(--mola); }
     transition: height .26s var(--mola), opacity .18s ease, content-visibility .26s allow-discrete; }
   details.turma-bloco[open]::details-content, details.turma-grupo[open]::details-content { height: auto; opacity: 1; }
 }
+
+/* ───────────── 5.5 — Celular e rede (Configurações) ───────────── */
+.celular-qr { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; align-items: center; }
+.qr-caixa { background: var(--qr-fundo); border-radius: var(--raio-m); padding: 8px; box-shadow: var(--sombra); }
+.qr { display: block; width: 100%; height: auto; }
+.qr-fundo { fill: var(--qr-fundo); }
+.qr-ponto { fill: var(--qr-ponto); }
+.endereco-rede { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 14px; }
+.endereco-rede .mono { font-size: 20px; font-weight: 500; color: var(--titulo); user-select: all; word-break: break-all; }
+.passos-rede { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 6px; }
+.lista-cuidados { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--texto-2); }
+.lista-cuidados b { color: var(--texto); }
+@media (max-width: 720px) { .celular-qr { grid-template-columns: 1fr; } .qr-caixa { max-width: 240px; } }
+/* Quadro de situação no celular: selo e texto numa linha, o botão embaixo ocupando a largura (antes o texto virava uma coluna fininha) */
+@media (max-width: 720px) { .situacao { grid-template-columns: auto minmax(0, 1fr); } .situacao > .btn, .situacao > span:last-child:empty { grid-column: 1 / -1; } .situacao > .btn { justify-content: center; } }
 
 /* ───────────── Impressão: só a lista, sempre clara ───────────── */
 .so-impressao { display: none; }

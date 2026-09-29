@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **29/09/2026**, versão **5.4.2** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
+> Última atualização: **29/09/2026**, versão **5.5.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
 
 ---
 
@@ -360,6 +360,26 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
 
+### Celular e rede com QR Code (versão 5.5.0, 29/09/2026)
+- **Configurações › Celular e rede** (`abaCelular` em telas5.js): botão "Liberar para o celular" grava `rede_liberada = '1'`
+  (`PUT /api/admin/rede`, admin, fica na Auditoria) e reinicia (`reiniciarSistema(false)` — ganhou o parâmetro `perguntar`).
+  Na subida, `HOST` = `0.0.0.0` se `IEL_REDE=1` (o .bat, que continua valendo e aí a tela não desliga) **ou** `rede_liberada`.
+  Reiniciar depende do laço do .bat (código 90); rodando `node server.js` na mão, o servidor não volta sozinho.
+- `GET /api/admin/rede`: `liberada`, `ativa` (o que está valendo agora), `pelo_bat`, `porta` e `enderecos` (IPv4 da máquina via
+  `os.networkInterfaces()`, sem 169.254, adaptadores virtuais — Hyper-V, WSL, VirtualBox, VPN… — por último e Wi-Fi primeiro).
+  A janela preta também mostra "No celular: http://IP:porta" quando a rede está liberada.
+- **QR Code sem biblioteca**: `public/qr.js`, `gerarQR(texto)` → `<svg class="qr">`. Modo byte (UTF-8), nível M, versões 1–10
+  (até 213 bytes), escolhe a melhor das 8 máscaras. Conferido com o leitor do **OpenCV** (Python 3.11 + cv2 deste PC): 8/8 textos
+  de 3 a 210 caracteres, versões 1 a 10, e o QR tirado da tela nos temas claro e escuro. Cores em `--qr-fundo`/`--qr-ponto`
+  (preto no branco nos dois temas, de propósito).
+- A tela mostra o endereço com "Copiar", os passos, um seletor quando o PC está em mais de uma rede e os cuidados (só na rede da
+  secretaria, é http sem cadeado, fora do Wi-Fi não abre, Firewall em "Redes privadas", "Abrir pasta" só no PC).
+- Teste `t-rede` (navegador, 11 ok): o teste **não** liga a rede de verdade (o Windows abriria o aviso do Firewall no PC do Kevin);
+  confere o botão, o "Falta reiniciar" com o servidor real e simula a resposta de rede liberada para testar o QR. **Falta** o teste
+  real com um celular (em casa, só com a demonstração).
+- `.situacao` no celular: selo e texto numa linha e o botão embaixo (antes o texto virava uma coluna fininha; valia também para
+  Cópias de segurança e Atualizações).
+
 ### Nome provisório "SEK" (versão 5.4.1, 29/09/2026)
 - O Kevin escolheu **SEK** por enquanto ("vamos verificar futuramente"). Fica na constante `NOME_APP` (app.js) e no `<title>`
   do index.html e do doc.html; o `doc.js` monta "<documento> — SEK". Trocar o nome = mudar esses quatro lugares.
@@ -367,6 +387,9 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   dizer "SEK · Secretaria IEL" depois de entrar (antes ficava "Entrar — …" até recarregar).
 - 5.4.2: o nome também aparece no menu lateral, embaixo da logo (`.marca-app`, primeira letra na cor `--amarelo-marca`,
   mais escura no tema claro para ler no fundo branco); some no celular junto com a logo.
+- 5.4.3: a logo do menu lateral fica direto sobre o fundo (sem o disco branco) e troca com o tema: `logo.png` (letras pretas)
+  no claro e `logo-escuro.png` (letras brancas) no escuro. A versão escura foi gerada da original trocando para branco só os
+  pixels cinza/pretos fora do anel amarelo (centro 224,215; raio > 163 px), então a cruz e os contornos da rosa não mudam.
 - Apresentação para a direção: documento "SEK — Apresentação à Direção" no claude.ai (Claude Docs, do Kevin).
 ### Polimento total (versão 5.4.0, 29/09/2026)
 - **Tela que se atualiza não pula mais**: `rotear()` sabe se é navegação (endereço novo) ou atualização (mesmo endereço,
