@@ -386,7 +386,7 @@ rota('GET', '/api/alunos', async (req, res, { url }) => {
   const ano = +cfg().ano_matricula;
   const q = S.norm(url.searchParams.get('q') || '');
   const lin = db.prepare(`SELECT a.id, a.mat, a.nome, a.serie_chave, a.turma, a.turno, a.novo, a.nome_mae, a.nome_pai, a.nome_resp, a.cpf,
-      COALESCE(r.status,'pendente') status, r.serie_destino
+      COALESCE(r.status,'pendente') status, r.serie_destino, r.categoria, r.desconto, r.docs_pendentes
     FROM alunos a LEFT JOIN rematriculas r ON r.aluno_id = a.id AND r.ano = ? WHERE a.ativo = 1 ORDER BY a.nome`).all(ano);
   const ordem = Object.fromEntries(S.SERIES.map((s, i) => [s.chave, i]));
   const saida = lin
@@ -784,6 +784,7 @@ require('./rotas/lixeira')(ctx);
 require('./rotas/busca')(ctx);
 require('./rotas/historico')(ctx);
 require('./rotas/vivencias')(ctx);
+require('./rotas/planilha-rematricula')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {

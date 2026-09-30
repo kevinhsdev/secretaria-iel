@@ -1,0 +1,118 @@
+INSTALAR O SISTEMA (SEK) NOS 3 COMPUTADORES DA SECRETARIA
+==========================================================
+Versão 5.8.5 · 29/09/2026
+
+A IDEIA PRINCIPAL
+  UM computador guarda tudo (o "servidor"). Os outros dois só ABREM o sistema pelo navegador.
+  Assim, o que alguém muda num PC aparece nos outros: é um banco de dados só.
+
+  NÃO instale o sistema separado em cada PC. Cada um teria o seu próprio banco
+  e os dados nunca se juntariam.
+
+
+PASSO 1 - ESCOLHER O COMPUTADOR SERVIDOR
+------------------------------------------
+  Escolha o PC que fica ligado o dia todo (de preferência o da Samara ou o mais novo). Nele:
+
+  [ ] Energia: Configurações do Windows > Sistema > Energia > "Suspender" = Nunca (com o cabo ligado).
+      Se ele dormir, os outros PCs perdem o sistema.
+  [ ] Rede como Privada: Configurações > Rede e Internet > (a rede da escola) > Tipo de perfil = Privada.
+  [ ] Anote o nome do PC: Configurações > Sistema > Sobre > "Nome do dispositivo".
+      Nome: ______________________   (os outros PCs vão usar esse nome)
+  [ ] Recomendado: peça à TI para FIXAR O IP desse PC no roteador (se o IP mudar, o endereço muda junto).
+
+
+PASSO 2 - INSTALAR NO SERVIDOR
+--------------------------------
+  [ ] Instale o Git (git-scm.com), se ainda não tiver.
+  [ ] Abra o Prompt de Comando e baixe o sistema FORA do OneDrive
+      (o banco de dados não pode ficar numa pasta que o OneDrive sincroniza, isso pode estragá-lo):
+
+          cd C:\
+          git clone https://github.com/kevinhsdev/secretaria-iel.git SecretariaIEL
+
+      (vai pedir o login do GitHub da conta kevinhsdev)
+  [ ] Dois cliques em C:\SecretariaIEL\Iniciar Secretaria.bat
+      Na 1ª vez ele baixa o Node sozinho (precisa de internet).
+      A janela preta é o "motor": deixe aberta (pode minimizar).
+  [ ] O navegador abre sozinho. Entre com kevin / luterano e crie a sua senha.
+  [ ] NÃO carregue a demonstração neste PC (é só para testes).
+  [ ] Atalho com o ícone: pasta "ferramentas" > botão direito em "criar-atalho.ps1" > "Executar com o PowerShell".
+  [ ] Abrir sozinho ao ligar o PC: aperte Win + R, digite  shell:startup  e copie para essa pasta
+      o atalho "SEK" da área de trabalho.
+
+
+PASSO 3 - CONFIGURAR E TRAZER OS DADOS (no servidor, nesta ordem)
+-------------------------------------------------------------------
+  Configurações:
+  [ ] 1. Geral: confira o ano da matrícula (2027) e aponte as pastas das FOTOS e dos PRONTUÁRIOS
+         (as pastas precisam estar neste PC ou numa pasta de rede que ele enxergue).
+  [ ] 2. Usuários: samara, kevin e duda já existem (senha inicial "luterano"; cada um troca no 1º acesso).
+  [ ] 3. Cópias de segurança: aponte a pasta para um PEN DRIVE ou para o OneDrive (as CÓPIAS podem ir
+         para o OneDrive; o banco, não), clique em "Proteger com senha" e ANOTE A SENHA.
+         Depois faça uma RESTAURAÇÃO DE TESTE: backup que nunca foi restaurado não é backup.
+         Senha do backup guardada em: ______________________
+
+  Dados do ACADESC (exporte cada um para Excel .xlsx):
+  [ ] 4. Configurações > Importar dados > lista de ALUNOS do ACADESC.
+  [ ] 5. Configurações > Importar dados > exportação de RESPONSÁVEIS
+         (traz endereço, CPF e RG do responsável para o contrato).
+
+  Planilhas do Google (em cada uma: Arquivo > Fazer download > Microsoft Excel .xlsx):
+  [ ] 6. Rematrícula > Importar planilha: "Controle de Matrículas e Rematrículas 2027".
+         Marque "Cadastrar os alunos novos". As VAGAS de cada sala vêm junto.
+         Depois, confira o Resumo geral do app com o da planilha.
+         Jardim II e 2º ano não têm vagas na planilha: preencha em Configurações > Vagas.
+  [ ] 7. Vivências > Importar planilha: "Controle de Vivência".
+  [ ] 8. Interessados (SIG) > Importar planilha SIG.
+  [ ] 9. CEBAS > Importar Planilha Bolsas.
+
+  Histórico escolar:
+  [ ] 10. Histórico escolar > Disciplinas e regras > Importar matriz: a do Ensino Médio e a do
+          Fundamental I e II. Confira a lista de disciplinas antes de gravar.
+  [ ] 11. Boletins: aluno por aluno, pelo botão "Importar boletim", quando precisar.
+
+  Não se importa, é usada na hora:
+      "Consulta Pagamentos" do ACADESC: escolhida no momento de emitir a DECLARAÇÃO DE PAGAMENTO.
+
+  [ ] 12. LGPD: depois de importar, APAGUE os .xlsx baixados (têm dados das famílias) e esvazie a lixeira.
+
+
+PASSO 4 - LIBERAR O ACESSO PARA OS OUTROS PCs (no servidor)
+-------------------------------------------------------------
+  [ ] Configurações > Celular e rede > "Liberar para o celular".
+      O sistema reinicia e mostra o ENDEREÇO (ex.: http://192.168.0.10:3000) e um QR Code.
+      Endereço: ______________________
+  [ ] Na 1ª vez o Firewall do Windows pergunta: clique em PERMITIR em "Redes privadas".
+
+
+PASSO 5 - NOS OUTROS DOIS PCs
+-------------------------------
+  Aqui NÃO se instala nada. NUNCA rode o "Iniciar Secretaria.bat" nestes PCs
+  (isso criaria um sistema separado e os dados não se juntariam).
+
+  [ ] Abra o Edge e digite o endereço do servidor:  http://NOME-DO-SERVIDOR:3000
+      (ex.: http://SECRETARIA-01:3000). Se não abrir, use o IP que apareceu no Passo 4.
+  [ ] Entre com o PRÓPRIO usuário de cada pessoa (Duda com duda, Samara com samara).
+  [ ] Ícone na área de trabalho: no Edge, "..." > Aplicativos > "Instalar este site como um aplicativo".
+      Ele cria um atalho com o ícone do selo que abre direto no sistema.
+
+
+PASSO 6 - TESTAR JUNTOS ANTES DE USAR DE VERDADE
+--------------------------------------------------
+  [ ] Abra a MESMA ficha de aluno em dois PCs e altere algo em um deles: o outro deve AVISAR
+      que alguém mudou.
+  [ ] Mude a situação de um aluno na Rematrícula num PC e, no outro, clique em "Atualizar".
+  [ ] Desligue o servidor por um instante: os outros PCs mostram uma FAIXA VERMELHA e não perdem
+      o que foi digitado. Ligue de novo e confira.
+  [ ] Teste o QR Code com um celular no Wi-Fi da secretaria (nunca no Wi-Fi de visitantes).
+
+
+NO DIA A DIA
+------------
+  - O SERVIDOR PRECISA ESTAR LIGADO para os outros funcionarem.
+  - Atualizar: Configurações > Atualizações > "Verificar se há atualização" SÓ NO SERVIDOR.
+    Os outros PCs pegam a versão nova sozinhos.
+  - Backup: automático, na pasta escolhida. De vez em quando, confira em Configurações >
+    Cópias de segurança se não há aviso de atraso.
+  - Se algo der errado: feche a janela preta do servidor e abra o atalho "SEK" de novo.

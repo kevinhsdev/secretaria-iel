@@ -515,6 +515,112 @@ details.turma-grupo[open] > summary::before { transform: rotate(90deg); }
 .grade-notas td.aluno-nome { text-align: left; white-space: normal; min-width: 180px; position: sticky; left: 0; background: var(--superficie); z-index: 1; }
 .grade-notas input:disabled { background: var(--superficie-2); opacity: .45; cursor: not-allowed; }
 .grade-notas input.ch { width: 56px; color: var(--texto-2); }
+/* Rematrícula (5.7.1): totais do que está na tela e a visão "Completa", com todas as colunas da planilha de controle */
+.resumo-rem { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.resumo-rem > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 12px; background: var(--superficie-2); min-width: 104px; }
+.resumo-rem span { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--texto-2); font-weight: 600; }
+.resumo-rem b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.resumo-rem .ok b { color: var(--verde); }
+.resumo-rem .alerta b { color: var(--vermelho); }
+/* Rematrícula 5.8.0: abas das salas, painel (Resumo Geral) e a grade editável como no Google Sheets */
+.abas-salas { display: flex; flex-wrap: wrap; margin: 4px 0 16px; }
+.abas-salas a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 10px; color: var(--texto-2); font-weight: 600; font-size: 13px; text-decoration: none; }
+.abas-salas a small { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 8px; background: var(--superficie); color: var(--texto-2); }
+.abas-salas a.on { color: var(--texto); background: var(--superficie); box-shadow: var(--sombra); }
+.abas-salas a.on small { background: var(--azul-fundo); color: var(--azul-2); }
+@media (hover: hover) and (pointer: fine) { .abas-salas a:hover:not(.on) { color: var(--texto); } }
+.tab-resumo td, .tab-resumo th { text-align: center; white-space: nowrap; }
+.tab-resumo td:first-child, .tab-resumo th:first-child { text-align: left; }
+.tab-resumo tr[data-sala] { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .tab-resumo tr[data-sala]:hover td { background: var(--superficie-2); } }
+.tab-resumo tr.total td { font-weight: 700; border-top: 2px solid var(--borda); }
+/* Resumo geral da rematrícula (5.8.2): barra de andamento, legenda e cartões das salas */
+.kpis .kpi .val small { font-size: 15px; color: var(--texto-2); font-weight: 500; }
+.andamento-rem { display: flex; gap: 2px; height: 14px; margin-top: 12px; border-radius: 8px; overflow: hidden; background: var(--superficie-2); }
+.andamento-rem i { display: block; height: 100%; transform-origin: left; animation: crescer .5s var(--mola) both; }
+.a-concluida { background: var(--verde); } .a-reservada { background: var(--laranja); } .a-nao_renova { background: var(--vermelho); } .a-pendente { background: var(--superficie-2); border: 1px solid var(--borda); }
+.legenda-rem { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 13px; color: var(--texto-2); }
+.legenda-rem span { display: inline-flex; align-items: center; gap: 6px; }
+.legenda-rem i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.legenda-rem b { color: var(--texto); font-variant-numeric: tabular-nums; }
+.salas-rem { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.sala-rem { display: flex; flex-direction: column; gap: 2px; color: var(--texto); text-decoration: none; transition: box-shadow .2s, transform .16s var(--mola); }
+@media (hover: hover) and (pointer: fine) { .sala-rem:hover { box-shadow: var(--sombra-hover, var(--sombra)); transform: translateY(-1px); } }
+.sala-rem:active { transform: scale(.99); }
+.sala-rem-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sala-rem-topo b { font-size: 15px; }
+.sala-rem-num { margin-top: 8px; color: var(--texto-2); font-size: 13px; }
+.sala-rem-num b { font-size: 26px; color: var(--texto); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.sala-rem .andamento-rem { height: 9px; margin-top: 8px; }
+.sala-rem-rodape { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--texto-2); }
+.sala-rem-rodape b { color: var(--texto); }
+.sala-rem-avisos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.sala-rem-avisos .tag { font-size: 11px; }
+details.cartao > summary { cursor: pointer; }
+@media print { .sala-rem { break-inside: avoid; } }
+
+/* Sala da rematrícula (5.8.1): lista à esquerda + painel do aluno à direita */
+.sala-duo { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 14px; align-items: start; }
+.sala-lista { padding: 6px; }
+.lista-rem { font-size: 13.5px; }
+.lista-rem td { padding: 9px 12px; vertical-align: middle; }
+.lista-rem td small { display: block; margin-top: 1px; }
+.lista-rem td.num { text-align: right; }
+.lista-rem td:first-child { min-width: 230px; }
+.lista-rem tbody tr[data-id] { cursor: pointer; outline: none; }
+@media (hover: hover) and (pointer: fine) { .lista-rem tbody tr[data-id]:hover td { background: var(--superficie-2); } }
+.lista-rem tbody tr.on td { background: var(--azul-fundo); }
+.lista-rem tbody tr.on td:first-child { box-shadow: inset 3px 0 0 var(--azul-2); }
+.painel-rem { position: sticky; top: 124px; max-height: calc(100vh - 140px); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.painel-vazio { padding: 40px 28px; text-align: center; color: var(--texto-2); }
+.painel-vazio svg.ic { width: 34px; height: 34px; opacity: .5; }
+.painel-vazio p { margin: 10px 0 0; }
+.painel-topo { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding: 18px 20px 12px; border-bottom: 1px solid var(--borda); }
+.painel-topo h2 { margin: 0; font-size: 19px; line-height: 1.2; }
+.painel-topo p { margin: 4px 0 0; font-size: 12.5px; }
+.painel-corpo { overflow-y: auto; padding: 4px 20px 16px; }
+.painel-corpo section { padding: 14px 0; border-bottom: 1px solid var(--borda); }
+.painel-corpo section:last-child { border-bottom: 0; }
+.painel-corpo h3 { margin: 0 0 10px; font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--texto-2); }
+.painel-corpo .campos { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.painel-corpo .campos + .chk, .painel-corpo .chk + .campos { margin-top: 10px; }
+.painel-corpo .inteiro { grid-column: 1 / -1; }
+.painel-corpo .chk { display: flex; margin-top: 10px; }
+.com-sufixo { position: relative; }
+.com-sufixo input { padding-right: 30px; }
+.com-sufixo span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--texto-2); pointer-events: none; }
+.botoes-situacao { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.botoes-situacao button { border: 1px solid var(--borda); background: var(--superficie); color: var(--texto-2); padding: 7px 11px; border-radius: 10px; font: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+@media (hover: hover) and (pointer: fine) { .botoes-situacao button:hover:not(.on) { color: var(--texto); border-color: var(--azul-claro); } }
+.botoes-situacao button:active { transform: scale(.97); }
+.botoes-situacao button.on { color: #fff; border-color: transparent; }
+.botoes-situacao .st-pendente.on { background: var(--texto-2); }
+.botoes-situacao .st-reservada.on { background: var(--amarelo); color: #3a2b00; }
+.botoes-situacao .st-concluida.on { background: var(--verde); }
+.botoes-situacao .st-nao_renova.on { background: var(--vermelho); }
+.botoes-situacao .st-transferido.on { background: var(--roxo, var(--azul-2)); }
+.painel-rodape { padding: 10px 20px; border-top: 1px solid var(--borda); font-size: 12.5px; color: var(--texto-2); background: var(--superficie-2); }
+.painel-rodape.ok { color: var(--verde); font-weight: 600; }
+.painel-rodape.erro { color: var(--vermelho); font-weight: 600; }
+.painel-rodape.salvando { opacity: .7; }
+/* Tela estreita: o painel abre por cima da lista */
+@media (max-width: 1100px) {
+  .sala-duo { grid-template-columns: 1fr; }
+  .painel-rem { position: fixed; inset: 12px 12px 12px auto; width: min(460px, calc(100vw - 24px)); max-height: none; z-index: 30; box-shadow: var(--sombra-modal);
+    transform: translateX(110%); transition: transform .22s var(--mola); }
+  .painel-rem.aberto { transform: none; }
+  .painel-rem .so-celular { display: inline-grid !important; }
+}
+@media print { .painel-rem { display: none; } .sala-duo { display: block; } }
+
+/* Importar boletim (5.6.0): janela mais larga para caber a conferência */
+.modal:has(#ib), .modal:has(#ipl) { width: min(900px, 100%); }
+.ib-grade select { width: 200px; text-align: left; }
+.ib-grade select.ib-sem { color: var(--texto-2); border-style: dashed; }
+.ib-grade td.comp { white-space: normal; max-width: 180px; }
+.ib-aviso { background: var(--amarelo-claro); color: var(--aviso-txt); }
+.ib-lendo { padding: 28px 0; text-align: center; }
 .progresso { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .progresso .trilho { width: 90px; height: 8px; background: var(--superficie-2); border-radius: 5px; overflow: hidden; display: inline-block; }
 .progresso .trilho i { display: block; height: 100%; background: var(--verde); border-radius: 5px; }
@@ -530,7 +636,7 @@ details.turma-grupo[open] > summary::before { transform: rotate(90deg); }
 .ano-hist.tem small { color: var(--verde); font-weight: 600; }
 .ano-hist.falta { border-color: color-mix(in srgb, var(--laranja) 45%, var(--borda)); }
 .ano-hist.falta small { color: var(--laranja); font-weight: 600; }
-.ano-hist.agora small { color: var(--azul-2); font-weight: 600; }
+.ano-hist.cursando small { color: var(--azul-2); font-weight: 600; }
 .ano-hist.futuro { opacity: .5; }
 .ano-hist.on { border-color: transparent; background: var(--pri); color: #fff; opacity: 1; }
 .ano-hist.on small { color: rgba(255, 255, 255, .85); }

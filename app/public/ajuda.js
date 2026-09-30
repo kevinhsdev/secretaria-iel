@@ -42,9 +42,21 @@ const AJUDA = {
   },
   rematricula: {
     nome: 'Rematrícula',
-    serve: 'Andamento da rematrícula por série do ano que vem, com vagas ocupadas e quem falta contatar.',
-    passos: ['Clique numa série para ver os alunos dela.', 'Mude a situação direto na lista, sem abrir a ficha.', 'Para lembrar uma família que ainda não começou, abra a ficha do aluno e use o botão WhatsApp.'],
-    dicas: ['As vagas por série são definidas em Configurações › Vagas.'],
+    serve: 'O controle de matrículas e rematrículas do ano que vem, no lugar da planilha do Google: um resumo geral e uma página por sala.',
+    passos: [
+      'Resumo geral: os números de todas as salas (efetivadas, cadastrados, vagas, ocupação, bolsistas…). Clique numa turma para abrir a sala.',
+      'Na sala: clique num aluno da lista. O painel ao lado mostra tudo dele, separado em blocos (situação, desconto, planos, pagamento, recebimento, documentos).',
+      'Mude o que precisar: cada campo grava sozinho quando você sai dele (ou aperta Enter). Embaixo do painel aparece "✓ Salvo".',
+      'Situação: clique no botão. Preencher a data de efetivação deixa o aluno Concluído.',
+      '◀ ▶ (ou as setas ↑ ↓ na lista) passam para o aluno de cima ou de baixo sem fechar o painel.',
+      '"Aluno novo" cadastra quem ainda não está no ACADESC direto na sala e já abre o painel dele.',
+    ],
+    dicas: [
+      'Nos campos com lista (categoria, forma, banco, planos) dá para escolher ou digitar outro valor.',
+      'Duas pessoas ao mesmo tempo: use "Atualizar" para ver o que a outra gravou.',
+      'Importar planilha (administração): traz a planilha do Google uma vez (e os alunos novos dela). Depois, use só o app.',
+      'Listas de opções (administração): muda o que aparece nos campos com lista. As vagas vêm da planilha importada ou de Configurações › Vagas.',
+    ],
   },
   pendencias: {
     nome: 'Pendências de documentos',
@@ -112,6 +124,7 @@ const AJUDA = {
     ],
     dicas: [
       'Nota abaixo da média fica vermelha. A média, a frequência mínima e quem assina ficam em "Disciplinas e regras" (administração).',
+      'Matriz curricular: em "Disciplinas e regras", "Importar matriz" lê o documento oficial (Word, PDF ou Excel). Depois disso, a carga de cada disciplina do Ensino Médio entra sozinha em cada ano do histórico. Mudou a matriz? Importe a nova com o ano em que ela começa a valer.',
       'Para colar do Excel: copie o bloco de notas na mesma ordem das colunas da tela e cole na primeira célula.',
       'Confira sempre com o diário/SED antes de imprimir: o histórico é documento oficial.',
     ],
@@ -125,10 +138,13 @@ const AJUDA = {
       'O ano letivo, a escola e a carga horária já vêm preenchidos quando dá para saber. Confira e troque a escola se o aluno fez aquele ano em outro lugar.',
       'Digite as notas do 1º ao 4º bimestre. Com os 4, a nota final do ano aparece sozinha e a situação (Aprovado/Retido) também.',
       'Ano antigo ou de outra escola, só com a nota final: digite direto na coluna "Nota final do ano".',
+      'Tem o boletim em arquivo? Clique em "Importar boletim" e escolha o arquivo (PDF, Word, Excel, foto ou papel escaneado). Confira na janela a disciplina e as notas de cada linha, escolha o ano e clique em "Colocar no histórico".',
       'Aluno saindo no meio do ano: marque "Este aluno está saindo no meio do ano" e escolha até qual bimestre ele ficou.',
       'Clique em "Salvar". "🖨️ Gerar histórico" salva e já abre o documento.',
     ],
-    dicas: ['"Apagar esta série do histórico" manda tudo daquela série para a Lixeira (dá para desfazer).', 'No Ensino Médio aparecem também a carga de cada disciplina e onde o aluno concluiu o Fundamental.'],
+    dicas: ['O "Importar boletim" só preenche a tela: nada é gravado até você clicar em "Salvar". Foto ou escaneado: confira nota por nota com o papel, porque a leitura da imagem pode errar.',
+      'Foto do boletim: tire de cima, com boa luz e a folha inteira aparecendo. O arquivo não fica guardado no sistema.',
+      '"Apagar esta série do histórico" manda tudo daquela série para a Lixeira (dá para desfazer).', 'No Ensino Médio aparecem também a carga de cada disciplina e onde o aluno concluiu o Fundamental.'],
   },
   vivencias: {
     nome: 'Vivências',

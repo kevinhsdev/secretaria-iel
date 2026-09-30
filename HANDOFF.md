@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **29/09/2026**, versão **5.5.2** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**). O que vem a seguir está em §7.
+> Última atualização: **29/09/2026**, versão **5.8.5** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -360,6 +360,189 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
 
+### Ícone do app: selo redondo da rosa do Luterano (versões 5.8.3 a 5.8.5, 29/09/2026)
+Pedido do Kevin: "crie uma logo .icon pro app". **Duas versões foram reprovadas**: o "S" do SEK em azul (5.8.3) e a rosa com anéis
+sobre um quadrado azul (5.8.4). Na 3ª vez foram feitas **4 opções lado a lado** (coração, rosa solta, selo redondo, fundo branco),
+salvas numa imagem na área de trabalho dele, e ele escolheu o **selo redondo**. Lição: ícone/visual é gosto — mostrar opções antes.
+- **`app/public/icone.ico`** (16, 24, 32, 48, 64, 128, 256 px, PNG dentro do .ico) e `icone-256.png`: o selo da escola em círculo
+  (rosa + anel azul-claro + anel dourado), **sem as letras e sem os pontinhos**, fundo transparente em volta. Aba do navegador em
+  `index.html` e `doc.html`. O anel da arte original não é um círculo perfeito: as margens transparentes ficam entre 3 e 6 px.
+- **`ferramentas/gerar-icone.mjs`**: acha o anel dourado pela cor no `logo.png` (centro 224,215; raio da arte ~159 + folga de 8 px,
+  antes das letras) e reduz em etapas. `--previa <pasta>` salva os PNGs. Apaga a pasta temporária com várias tentativas (o Edge demora a soltá-la).
+- **`ferramentas/criar-atalho.ps1 [-Nome] [-Pasta]`**: atalho "SEK" na área de trabalho → `Iniciar Secretaria.bat`, com o ícone
+  (`.bat` não aceita ícone próprio). No LEIA-ME. Na área de trabalho do Kevin: "Icone SEK - selo Luterano.ico" e "Opcoes de icone SEK.png".
+
+### Resumo geral da rematrícula em painel (versão 5.8.2, 29/09/2026)
+Pedido do Kevin: "deixe o resumo geral mais entendível, em formato de dashboard ou igual a outra tela do app".
+- `painelRematricula` refeito com as peças que o app já usa (cartões `.kpis` do Início, `barras()` das Vivências/Relatórios):
+  4 números (Efetivados x/total, Vagas livres, Faltam efetivar, Não vão renovar) · barra de andamento geral com legenda (cores das
+  etiquetas de situação) · **cartões das salas agrupados por segmento** (Infantil, Fund. I, Fund. II, Médio) com efetivados, barra,
+  vagas/livres, novos e avisos (acima da capacidade, não vão renovar, documento pendente) — clicar abre a sala · quadros de
+  Categorias e Matrículas×Rematrículas · a tabela igual à planilha ficou **recolhida** (`<details>`) no fim.
+- **Vagas livres e ocupação** somam só as salas com vagas definidas (antes comparava as vagas de 3 salas com os alunos de todas
+  e dava "0 livres, 104%"); o cartão avisa quantas salas estão sem vagas. A linha de total da tabela usa a mesma conta.
+- Teste `t-painel-rem` **11 ok** (números batem com o servidor, legenda soma todos, 15 cartões, 4 segmentos, clicar abre a sala,
+  celular 420 px sem rolagem lateral). `t-sala-tela` continua 28 ok.
+
+### Sala da rematrícula: lista + painel lateral (versão 5.8.1, 29/09/2026)
+O Kevin achou a grade de 26 colunas (5.8.0) "difícil de editar, visualizar etc." e escolheu, entre três desenhos, **lista + painel lateral**.
+- `salaRematricula` (app.js) refeita: à esquerda, lista limpa (aluno + tags novo/doc., situação colorida, desconto, categoria, pagamento,
+  efetivação); à direita, **painel do aluno** com campos grandes em blocos (Situação em botões + data de efetivação + sala em 2027 ·
+  Desconto e categoria · Planos · Pagamento da matrícula · 1ª parcela diferente, que só aparece marcada · Recebimento · Documentos e
+  observações). **Cada campo grava ao sair (ou Enter)** pela mesma rota `PUT /api/rematricula/celulas`; rodapé mostra "✓ Salvo às…".
+  ◀ ▶ e ↑ ↓ trocam de aluno. Abaixo de 1100 px o painel abre por cima da lista (fixo à direita, com ×). A grade e o CSS `.grade-rem` saíram.
+- O Resumo geral, o servidor e a importação não mudaram.
+- Teste `t-sala-tela` **28 ok** (cliques e digitação de verdade), num banco novo depois do `t-planilha-rem`. Rodar duas vezes no mesmo
+  banco dá falsas falhas (o aluno já vem com os dados da rodada anterior). O `t-grade-tela` (5.8.0) foi apagado.
+- Detalhe de regra: "Em andamento" mantém a data que o aluno já tinha (é a data da matrícula, usada no prazo de documentos);
+  só "Concluída" conta como efetivado.
+
+### O app no lugar da planilha de controle (versão 5.8.0, 29/09/2026)
+Pedido do Kevin: "a parte resumida como o Resumo Geral da tabela, como um dashboard; a completa dividida por salas e editável como no
+Google Sheets — a intenção é **substituir a planilha e usar apenas o app**". A visão Resumida/Completa da 5.7.1 foi trocada por:
+- **`#/rematricula` = Resumo geral**: os 6 números da aba "Resumo Geral" + "Detalhamento por turma" (13 colunas e linha de total),
+  com as **mesmas fórmulas da planilha** (lidas do .xlsx): efetivada = situação **Concluída** (a planilha conta quem tem Data de
+  Efetivação); Matrícula = aluno novo, Rematrícula = veterano; cadastrados = alunos da sala menos transferidos; vagas disponíveis =
+  máx(0, vagas − cadastrados); % ocupação = cadastrados ÷ vagas; pendentes = cadastrados − efetivadas; bolsistas/filhos por categoria.
+  Função `estatSala` (app.js). Clicar na turma abre a sala.
+- **`#/rematricula/<sala>` (F6, EM1…)**: abas das 15 salas (com contagem), o resumo da sala (os números do alto de cada aba da
+  planilha + "não vão renovar") e a **grade editável** (`salaRematricula`): 26 colunas na ordem da planilha (+ turma atual, sala em
+  2027 e obs. da ficha). Teclado como no Sheets: digitar substitui, Enter grava e desce, Tab vai para o lado, setas, Esc desiste,
+  Delete apaga, espaço marca caixinha, **Ctrl+Z desfaz** (pilha da sessão), Ctrl+C copia, **colar bloco TSV** do Excel/Sheets
+  (situação e sala casam pelo nome; "0,3" vira 30%). Colunas de lista usam `<datalist>` (escolhe ou digita). Ordena pelo título.
+  "Aluno novo" usa `POST /api/alunos` com a sala como `serie_chave`. "Atualizar" rebusca (não há atualização automática entre PCs).
+- **Servidor** (`rotas/planilha-rematricula.js`): `GET /api/rematricula/controle` (salas, vagas, alunos com tudo, listas);
+  `PUT /api/rematricula/celulas` `{alteracoes:[{aluno_id, campo, valor}]}` — uma célula ou um bloco, **numa transação** (se uma
+  falhar, nada grava), auditoria por célula. Regras: data de efetivação preenchida → Concluída; apagada → Não iniciada; situação
+  Concluída sem data → hoje; desconto 0–100; valores "1141,87" → "R$ 1.141,87" (texto como ISENTO fica); datas dd/mm/aaaa.
+  `PUT /api/rematricula/listas` (admin) grava `config.rem_listas` (listas padrão = aba Configurações da planilha 2027).
+- **Importação**: opção "Cadastrar os alunos novos da planilha" (`&novos=1`) — os 4 sem matrícula viram aluno novo da sala.
+- Concluintes (3ª série de hoje, destino `CONC`) ficam fora. Na ficha, o quadro virou **"Controle da matrícula"** e aparece também
+  para quem foi preenchido no app, com link "editar na planilha da sala".
+- Armadilhas: o atalho global "/" (busca) agora respeita `e.defaultPrevented` (senão "/" digitado numa célula pulava para a busca);
+  classes novas conferidas com grep (`.grupos` do menu lateral já tinha mordido na 5.7.1); `<b>` dentro de `.dado` vira bloco — usar `<strong>`.
+- Testes: `t-celulas` **25 ok** (API), `t-grade-tela` **25 ok** (teclado de verdade via `Input.dispatchKeyEvent`: digitar+Enter, Tab,
+  Esc, R$, espaço, data→Concluída, lista de situação, Delete, Ctrl+Z, "/", colar 2×2, ordenar, nome preso, aluno novo),
+  `t-planilha-rem` **22 ok**. Rodar nessa ordem num banco novo: `t-planilha-rem` primeiro (troca a senha e carrega a demonstração).
+  O `t-planilha-tela` (5.7.0) ficou velho: as checagens da lista antiga não valem mais.
+- **Falta para largar a planilha de vez**: importar a planilha real na escola (com os alunos novos), conferir o Resumo geral com o da
+  planilha e decidir as abas que ainda não existem no app: **Dispensa de Material, Transferências e Recreação**.
+
+### Rematrícula "como na planilha" (versão 5.7.1, 29/09/2026)
+Pedido do Kevin: "todas as informações da tabela também na tela de rematrícula, como na planilha", podendo mudar o design.
+- Lista de alunos da Rematrícula com **duas visões** (`#modo`, guardada em `localStorage['iel-rem-modo']`): **Resumida** (a de antes,
+  com categoria/desconto/documento embaixo do nome) e **Completa (como na planilha)**: 23 colunas nos mesmos grupos da planilha
+  (Aluno · Rematrícula · Desconto · Planos de pagamento · Pagamento da matrícula · 1ª parcela diferente · Recebimento · Documentos e
+  observações), nome **preso à esquerda** e cabeçalho preso no alto (a tabela rola dentro de `.rolagem-planilha`, 72vh).
+- Busca por nome ou matrícula (palavras em qualquer ordem), filtros de situação e categoria, **ordenar clicando no título**
+  (números de verdade para %, R$ e datas; vazios sempre no fim) e **faixa de totais** do que está filtrado (alunos, por situação,
+  desconto médio, valor recebido, documento pendente, boletos entregues) — o resumo que a planilha tem no alto de cada aba.
+- A situação continua editável nas duas visões. O resto é só leitura (vem da planilha: mude lá e importe de novo).
+- Rota nova `GET /api/rematricula/detalhes` (em `rotas/planilha-rematricula.js`): data, pagamento, observações de cada aluno.
+- **Armadilha de novo**: a classe `.grupos` já é o menu lateral (flex em coluna) e empilhou os títulos da tabela — as classes da
+  tabela usam prefixo `pr-` (`pr-grupos`, `pr-cols`). E `thead tr.pr-cols th` precisa perder para `thead tr th.fixa` no z-index.
+- Teste `t-rem-completa` **12 ok** (23 colunas, 8 grupos, valores da planilha fictícia, totais, ordenar, busca, nome preso ao rolar,
+  mudar a situação grava, lembra a visão, sem erro de JavaScript), claro e escuro.
+
+### Importar a planilha de controle na Rematrícula (versão 5.7.0, 29/09/2026)
+Pedido do Kevin: puxar "todos os dados" da planilha Google **"Controle de Matrículas e Rematrículas 2027 (IE Luterano)"** para a aba
+Rematrícula. O conector do Google Drive não abriu (planilha de outra conta); o Kevin baixou o .xlsx para a área de trabalho
+(**dados reais: nunca copiar para o Git nem para testes**).
+- **Formato da planilha**: uma aba por série do ano que vem (Maternal … 3ª Série EM) com resumo nas linhas 1–5 e o cabeçalho na
+  linha 6 (24 colunas: ID/Matrícula, Nome do Aluno, Tipo, Porcentagem de Desconto %, planos de pagamento, valor bruto, forma, banco,
+  nº autorização/final do cartão, 1ª parcela diferente (+ forma/banco/autorização), parcelas, valor recebido, Status, Documentos
+  Pendentes, Aluno Novo?, Categoria, Data de Efetivação, Observações, Boletos entregues). Aba **Configurações**: "Turma | Vagas Totais".
+  Abas de resumo (Resumo Geral, Controle de Matrículas 2027), Dispensa de Material, Transferências e Recreação não são lidas.
+- **Regras (decididas pelo Kevin)**: aluno achado pelo **ID/Matrícula = Mat do ACADESC** (518 de 522 casaram; os 4 de fora são
+  alunos novos sem matrícula). Situação: **Efetivada → Concluída** (data = Data de Efetivação), **Inadimplente → Não vai renovar**,
+  **vazio/Pendente → Não iniciada** — mas vazio/Pendente **nunca desfaz** o que já avançou no sistema. A série do ano que vem = a aba.
+  "Não" em Documentos Pendentes = nada pendente. Desconto guardado em % (0,3 → 30).
+- **Banco**: colunas novas em `rematriculas` (`desconto`, `categoria`, `docs_pendentes`, `boletos_entregues`, `pagamento_json`,
+  `obs_planilha`, `planilha_em`). A observação da planilha fica separada da observação do sistema (`obs`), que não é tocada.
+- **Rota** `rotas/planilha-rematricula.js`: `POST /api/rematricula/planilha` (admin) devolve a conferência; `?aplicar=1` grava
+  (transação, auditoria por aluno que muda de situação + um registro geral) e atualiza as **vagas** da aba Configurações.
+- **Tela**: botão "Importar planilha de controle" (admin) na Rematrícula → conferência (encontrados, mudam, não encontrados, mantidos,
+  categorias, vagas) → "Importar N alunos". Lista: categoria/desconto/documento pendente embaixo do nome e filtro "Qualquer categoria"
+  (inclui "Com documento pendente"). Ficha: quadro **"Da planilha de controle"** (só leitura) na rematrícula.
+- Conferido com a planilha real **só em memória** (sem banco): 518 achados, 60 mudam (29 Concluída, 31 Não vai renovar), vagas de
+  14 séries (Jardim II e 2º ano não estão na aba Configurações), 7 com documento pendente. Testes com planilha **fictícia** no mesmo
+  formato: `t-planilha-rem` **22 ok**, `t-planilha-tela` 8 ok (a 1 falha é do teste: rótulo em maiúsculas).
+
+### Botão do ano atual torto no histórico (versão 5.6.2, 29/09/2026)
+- Na tela `#/hist/<id>`, o botão do ano que o aluno está cursando **sem notas ainda** usava a classe `agora` — a mesma da linha
+  vermelha da Linha do dia no Início (`.agora { position: absolute; top: -6px; bottom: 22px … }`). O botão virava um bloco azul de
+  857 px, sem texto, por cima do "1º ano". Com a demonstração quase não aparecia (o ano atual já vem com notas); com dado real, sempre.
+- Trocado para `.ano-hist.cursando`. **Regra**: classe de estado nova precisa ser conferida com `grep` no `app.css` inteiro (já
+  aconteceu com `.trilho` na 5.1.0). Conferido em claro/escuro, 1400/1100/800 px, aluno novo, com ano faltando, Médio e 1º ano.
+
+### Boletim real do ACADESC e matriz curricular (versão 5.6.1, 29/09/2026)
+O Kevin testou a 5.6.0 com um boletim de verdade e vieram notas vazias. Ele deixou exemplos em `Desktop\boletins` (**dados reais:
+nunca copiar para o Git nem para testes**): 2 boletins do ACADESC (Fund I no meio do ano; Médio de 2024 completo, salvo como
+"HISTORICO.pdf"), os modelos de histórico e as matrizes curriculares 2026 (Médio; Fund I e II).
+- **Por que vinham vazias** (todas corrigidas em `lib/pdf-texto.js` / `lib/boletim.js`):
+  - O PDF do ACADESC tem a fonte com `DescendantFonts [ << … >> ]` (escrita ali mesmo) e as larguras em `/W 9 0 R` (objeto que começa
+    com quebra de linha): o leitor pegava a referência errada e perdia a largura das letras → textos sobrepostos.
+  - O ACADESC escreve **letra por letra**: entre letras ~0, entre palavras ~0,28 da altura da letra, entre colunas ≥ 0,44. Corte em 0,36.
+  - A seção **Faltas** também tem colunas "1° B 2° B 3° B 4° B": cada coluna agora pertence ao título de cima que a cobre ou, se nenhum
+    cobre, ao mais perto (até 3 larguras). Embaixo de "Faltas" é falta; embaixo de "Resultado Final", "M.F." é a nota final.
+  - "Méd." (média até agora) só vira nota final se não houver "M.F.". **Boletim do meio do ano** (só até o 2º bimestre, por exemplo):
+    a média é parcial e NÃO entra como nota final (aviso na tela).
+  - "*" antes da nota = abaixo da média (a nota vale). Linha com **0,0 em tudo** = eletiva não cursada: fica de fora, com aviso.
+  - Semelhança de nomes: "lingua" não casa mais com "linguagens"; raiz comum ("biologia" ~ "biológicas"); abreviações do ACADESC
+    ("Ensino Rel.", "Língua Estr. Mod. Inglês", "Língua Port.").
+- **Matriz curricular** (pedido: "no ensino médio as cargas horárias são por disciplina, deveríamos automatizar"):
+  - Tabela `hist_matriz (ano, serie_chave, componente, aulas)` — **aulas anuais** (é o que o modelo do histórico do Médio usa na coluna
+    "Carga Horária": 160, 80, 40…). `ano` = a partir de quando a matriz vale.
+  - `lerMatriz` (`lib/boletim.js`) lê o documento: título "Matriz Curricular – … – 2026" (curso e ano — só o texto depois de "Matriz
+    Curricular", porque o timbre cita "ENSINO MÉDIO" até na do Fundamental), séries no cabeçalho e a coluna "Aulas Anuais"/"C.H." de cada uma.
+    Lê as duas tabelas do documento do Fundamental (I e II).
+  - Rotas: `GET /api/historico/matriz`, `POST /api/historico/ler-matriz` (admin), `PUT /api/historico/matriz` (admin; substitui as séries
+    enviadas daquele ano; mesma disciplina duas vezes na mesma série **soma** — Educação Física está na base e na parte flexível do Médio 2026;
+    disciplina que não existe entra como **nova** se a tela pedir), `DELETE /api/historico/matriz/:ano` (lixeira, tipo `hist_matriz`, só admin).
+  - Tela: "Disciplinas e regras" › **Matriz curricular** (importar com conferência, ver por ano, apagar). Na tela do aluno do Médio a carga
+    de cada disciplina vazia vem da matriz mais nova que já valia no ano letivo (`cargasDaMatriz`); ano mais antigo que todas usa a mais
+    velha e **avisa**. Em "Lançar notas da turma" (Médio) a linha de carga também vem preenchida.
+  - As matrizes 2026 têm disciplinas que o histórico não tinha (Inteligência Artificial, Cálculo, Eletiva, Preparação Enem, Ciências única
+    no Fund…): a importação oferece "incluir como disciplina nova". **Ainda não importamos no banco real**: fazer na escola, conferindo.
+- Testes (só a demonstração + as matrizes, que não têm dado de aluno; boletins reais só lidos no lugar): leitura dos 2 boletins reais
+  certa (todas as notas nas colunas certas, faltas ignoradas); regressão dos 8 formatos fictícios; `t-matriz` **19 ok**;
+  `t-matriz-tela` **10 ok**; `t-boletim` **15 ok**; `t-boletim-tela` **14 ok**.
+
+### Importar boletim no histórico (versão 5.6.0, 29/09/2026)
+Pedido do Kevin: "a tela de histórico escolar ter uma opção para importar notas: recebe um documento com o boletim do aluno e coloca
+automaticamente". O boletim é **do ACADESC** e chega em **qualquer formato** (PDF do sistema, Word, Excel, papel escaneado/foto).
+**Ainda não vimos um boletim de verdade do ACADESC**: tudo foi feito e testado com boletins fictícios em vários layouts. Ver §7.6.
+- **Tela** (`public/historico.js`, `importarBoletim`): botão **"Importar boletim"** no quadro "Notas de cada ano" de `#/hist/<id>`.
+  Passo 1 escolhe o arquivo; passo 2 é a **conferência**: cada linha do boletim → disciplina do histórico (lista para trocar ou
+  "não importar"), notas dos 4 bimestres e final (editáveis), série (achada no boletim, ou a aberta na tela) e ano letivo.
+  "Colocar no histórico" só **preenche a grade** (bimestres; a final só quando não há os 4; ano letivo; escola IEL se vazia) — **quem grava
+  é o Salvar da tela**, com o aviso de edição simultânea de sempre. Série que já tem notas pede confirmação antes de substituir.
+- **Servidor**: `POST /api/historico/ler-boletim?aluno=<id>&arquivo=<nome>` (corpo = o arquivo). Não grava nota e **não guarda o
+  arquivo** (pasta temporária `iel-boletim-*`, apagada no `finally`). Registra na auditoria "leu um boletim…" com o aluno.
+- **`lib/boletim.js`** — transforma qualquer formato em linhas de células `{ t, x, x0, x1 }` e interpreta:
+  - `.xlsx/.csv` → `lib/planilha.js`; `.docx` → tabelas do `word/document.xml` (com `gridSpan`), parágrafos com Tab viram colunas,
+    e Word que só tem a foto do boletim colada tem a imagem lida; `.doc/.rtf/.odt` e `.xls/.ods` → o **Word/Excel da escola** converte.
+  - **PDF com texto** (gerado por sistema) → **`lib/pdf-texto.js`**, leitor próprio sem bibliotecas (objetos, object streams, zlib,
+    fontes ToUnicode/WinAnsi/larguras, comandos Tm/Td/Tj/TJ). **PDF escaneado, foto e imagem** → reconhecimento de texto do **Windows**
+    (`Windows.Media.Ocr`, pt-BR, já vem no Windows 10/11) via **`lib/ler-boletim.ps1`**, que também renderiza as páginas do PDF (`Windows.Data.Pdf`, até 6).
+  - Interpretação: acha o **cabeçalho** (até 3 linhas: "1º Bimestre" em cima de "Nota | Faltas", "Média Final" mesclada) e classifica
+    cada coluna (`papelDaColuna`: b1–b4, final, faltas, aulas, rec). Sem cabeçalho legível, as notas entram na ordem (1º–4º e final) com aviso.
+    Disciplina ↔ histórico por semelhança com abreviações (`APELIDOS`: "L. Port.", "Ed. Fís."…), cada disciplina recebe no máximo uma linha.
+    Acha também a **série** ("E.F. 9 6ª A", "E.M 1° A", "5º ano"), o **ano letivo** e **confere o nome do aluno** (aviso se não aparece).
+    Linha de notas cujo nome a imagem não leu entra como "(nome não lido — veja no papel)" para a pessoa escolher a disciplina.
+- **Armadilhas encontradas** (não repetir):
+  - O OCR do Windows **já devolve as posições com a folha endireitada** — girar pelo `TextAngle` entortava de novo.
+  - O OCR **pula números de um algarismo só** perto das bordas da tabela (em PDF renderizado): por isso PDF com texto NÃO passa pelo OCR.
+  - O OCR lê "1º Bim" como "10 Bim" (tratado em `papelDaColuna`) e "3ª" como "3a".
+  - **Word abrindo PDF pelo COM trava** (janela de aviso invisível) — não usar. Montar tabela no Word célula a célula também trava neste PC.
+  - Word/Excel pelo COM **ficam na memória depois do `Quit()`**: o `.ps1` anota o PID do Office que ele abriu (`<saida>.pid`) e o
+    servidor fecha **só esse** no fim (dando certo ou não). Um Office que a pessoa esteja usando nunca é tocado.
+  - `StorageFile.GetFileFromPathAsync` só aceita caminho com contrabarra (o `.ps1` usa `GetFullPath`). `.ps1` sem acentos (PowerShell 5.1).
+- **Testes** (pasta temporária, só dados fictícios): leitura de **8 formatos** (docx, doc, xlsx, xls, PDF com texto, PDF escaneado, PNG,
+  foto JPG girada 2°) — todas as notas certas; API `t-boletim` **15 ok** (formatos, aviso de nome, arquivo vazio/estranho, aluno inexistente,
+  **não grava nada**, auditoria); tela `t-boletim-tela` **14 ok** no Edge headless (abre, conferência, corrige uma nota, coloca, média
+  calculada, Salvar grava, sem erro de JavaScript). Leitura: planilha/Word/PDF com texto < 0,1 s; imagem ~1–3 s; .doc/.xls ~5–9 s.
+
 ### Logo de letras brancas na entrada (versão 5.5.1, 29/09/2026)
 - A tela de entrada (e as telas de espera, que usam a mesma arte `ARTE_LOGIN`) mostra `logo-escuro.png` direto sobre o
   azul-marinho, sem o disco branco, em 104 px. A tela de bloqueio (5.5.2) troca com o tema como o menu: `.logo-bloqueio.logo-claro` / `.logo-escuro`, sem disco branco.
@@ -561,6 +744,9 @@ SecretariaIEL/
    ├─ lib/prontuario.js       → varre Contratos\<turma>\<aluno>\*.pdf
    ├─ lib/fotos.js            → acha <mat>.jpg / AcaDescMySql.exe00<mat>.jpeg
    ├─ lib/demo.js             → dados FICTÍCIOS (Etapas 1 e 2)
+   ├─ lib/boletim.js          → importar boletim: lê qualquer formato e propõe as notas (5.6.0)
+   ├─ lib/pdf-texto.js        → texto e posição de cada pedaço de um PDF, sem bibliotecas (5.6.0)
+   ├─ lib/ler-boletim.ps1     → OCR do Windows (foto/escaneado/PDF sem texto) e conversão .doc/.xls pelo Office (5.6.0)
    ├─ modelos/                → contrato-2027.xlsx e contrato-atividade-extra.xlsx (JÁ SANITIZADOS)
    └─ public/                 → index.html, app.css, app.js (Etapa 1), etapa2.js, etapa3.js, etapa4.js, telas5.js (5.1), ajuda.js,
                                 historico.js, historico-doc.js (o papel do histórico), vivencias.js (4.9.0/4.10.0),
@@ -674,8 +860,8 @@ respondem **404 "Rota não encontrada"**. Por isso existe `lib/versao.js` com a 
 ### 7.2 Próximos passos, na ordem que eu faria
 1. **Piloto de verdade, com dado real, de um módulo só** — sugestão: *Atendimentos* ou *Portão*, por duas semanas.
    Risco baixo, valor visível no primeiro dia, e é o que ganha a Samara. **Sem isso, o resto é só código.**
-2. ~~**Histórico escolar**~~ — **feito na 4.9.0**, com digitação por aluno ou por turma e colar do Excel. Falta, se der: importar
-   as notas direto de uma exportação da SED ou do ACADESC (quando soubermos o formato) e conferir o modelo com a Samara.
+2. ~~**Histórico escolar**~~ — **feito na 4.9.0**, com digitação por aluno ou por turma e colar do Excel. **Importar boletim** (PDF, Word, Excel,
+   foto) feito na 5.6.0 — falta testar com um boletim de verdade do ACADESC. Falta também conferir o modelo com a Samara.
 3. ~~**Busca global**~~ — **feito na 4.4.0**.
 4. ~~**Conflito entre duas pessoas**~~ — **feito na 4.6.0**.
 5. ~~**Quando o PC servidor cai**~~ — **feito na 4.5.0**.
@@ -738,6 +924,9 @@ observações, e ajuda com prints das telas.
 ### 7.6 Pendências e perguntas para o Kevin
 - Histórico escolar: já segue os modelos Word (4.10.0). **Mostrar à Samara** mesmo assim — nos modelos o fundo da página é azul
   (deixamos branco: parece ser só a cor do Word) e a Samara assina ora "Pereira Silva", ora "Pereira da Silva". Em qual formato dá para exportar as notas (SED ou ACADESC), para importar em vez de digitar?
+- **Importar boletim (5.6.0): testar na escola com 2 ou 3 boletins de verdade do ACADESC** (PDF do sistema e uma foto do papel),
+  sem copiar nada para o Git. Se alguma coluna ou disciplina vier errada, ajustar `papelDaColuna`/`APELIDOS` em `lib/boletim.js`.
+  Conferir também se os PCs da escola têm o OCR do Windows em português (vem com o Windows em pt-BR) e o Word/Excel para .doc/.xls.
 - Histórico: confirmar com a Samara a **regra de arredondamento** da média dos bimestres (hoje 0,5 mais próximo).
 - Vivências: confirmar se o "% de efetivação" deve ser sobre as realizadas (como está) ou sobre o total, e se a escola quer
   sair de vez da planilha do Google (baixar como .xlsx e importar).

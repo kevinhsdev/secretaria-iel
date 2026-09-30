@@ -26,6 +26,15 @@ function mediaDoAno(b, cf) {
   return numBR(Number(r.toFixed(2)));
 }
 
+// Carga de cada disciplina pela matriz curricular (5.6.1): a matriz mais nova que já valia no ano letivo;
+// ano mais antigo que todas as matrizes guardadas usa a mais velha (e a tela avisa de qual ano ela é)
+function cargasDaMatriz(matrizes, serie, ano) {
+  const com = (matrizes || []).filter((m) => m.series[serie]);
+  if (!com.length) return null;
+  const m = com.find((x) => ano && x.ano <= ano) || com[com.length - 1];
+  return { ano: m.ano, cargas: m.series[serie] };
+}
+
 // Grade que se comporta como planilha: Enter desce uma linha e colar um bloco do Excel espalha pelas células.
 // Cada campo tem data-r (linha) e data-c (coluna).
 function comoPlanilha(raiz) {
@@ -164,8 +173,10 @@ async function abaHistTurma(el) {
     const comps = d.componentes;
     const valor = (a, comp) => (bim ? a.ano?.bims?.[comp]?.['b' + bim] : a.ano?.notas?.[comp]) ?? '';
     const cab = comps.map((x) => `<th title="${esc(x.area || '')}" style="white-space:normal;max-width:78px;font-size:10.5px">${esc(x.nome)}</th>`).join('');
+    // Médio: a carga de cada disciplina que a turma ainda não tem vem da matriz curricular do ano letivo
+    const mT = medio ? cargasDaMatriz(d.matrizes, d.serie, +$('#ha', el).value) : null;
     grade.innerHTML = d.alunos.length ? `<table class="grade-notas"><thead><tr><th class="comp">Aluno</th>${cab}<th>${bim ? 'Média do ano' : 'Situação'}</th></tr></thead><tbody>
-      ${medio ? `<tr class="info"><td class="aluno-nome"><b>Carga horária (h)</b></td>${comps.map((x) => `<td><input data-carga="${esc(x.nome)}" value="${esc(d.cargas[x.nome] ?? '')}" aria-label="Carga de ${esc(x.nome)}"></td>`).join('')}<td></td></tr>` : ''}
+      ${medio ? `<tr class="info"><td class="aluno-nome"><b>Carga horária (h)</b>${mT ? `<br><small class="dado">matriz de ${mT.ano}</small>` : ''}</td>${comps.map((x) => `<td><input data-carga="${esc(x.nome)}" value="${esc(d.cargas[x.nome] ?? mT?.cargas[x.nome] ?? '')}" aria-label="Carga de ${esc(x.nome)}"></td>`).join('')}<td></td></tr>` : ''}
       ${d.alunos.map((a, i) => `<tr data-aluno="${a.id}"><td class="aluno-nome"><b>${esc(titulo(a.nome))}</b><br><small class="dado">Mat. ${esc(a.mat || '—')}</small></td>
         ${comps.map((x, j) => `<td><input data-r="${i}" data-c="${j}" data-comp="${esc(x.nome)}" value="${esc(valor(a, x.nome))}" aria-label="${esc(x.nome)} de ${esc(a.nome)}"></td>`).join('')}
         ${bim ? '<td class="dado" data-medias></td>' : `<td><select data-r="${i}" data-c="${comps.length}" data-res data-auto="${a.ano?.resultado ? '0' : '1'}"><option value=""></option>
@@ -225,8 +236,28 @@ async function abaHistTurma(el) {
 }
 
 async function abaHistDisciplinas(el) {
-  const [d, adm] = await Promise.all([api('GET', '/api/historico/componentes'), api('GET', '/api/admin')]);
+  const [d, adm, mz] = await Promise.all([api('GET', '/api/historico/componentes'), api('GET', '/api/admin'), api('GET', '/api/historico/matriz')]);
   const cf = adm.config;
+  // Matriz curricular: uma tabela por curso (disciplinas × séries) com as aulas anuais
+  const tabelaMatriz = (m, curso) => {
+    const series = SERIES_HIST.map(([k]) => k).filter((k) => cursoDaSerie(k) === curso && m.series[k]);
+    if (!series.length) return '';
+    const comps = [...new Set(series.flatMap((s) => Object.keys(m.series[s])))];
+    const ordem = d.componentes.filter((x) => x.curso === curso).map((x) => x.nome);
+    comps.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+    return `<div class="tabela-wrap"><table class="grade-notas"><thead><tr><th class="comp">${curso === 'medio' ? 'Ensino Médio' : 'Ensino Fundamental'}</th>
+      ${series.map((s) => `<th>${esc(SERIES_HIST.find(([k]) => k === s)[1])}</th>`).join('')}</tr></thead><tbody>
+      ${comps.map((c) => `<tr><td class="comp">${esc(c)}</td>${series.map((s) => `<td>${esc(m.series[s][c] ?? '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  };
+  const cartaoMatriz = `<div class="cartao" style="margin-top:14px"><div class="acoes" style="justify-content:space-between">
+      <h2 style="margin:0">Matriz curricular — carga de cada disciplina</h2>
+      <button class="btn" id="mzImp">${icone('importar')}Importar matriz</button></div>
+    <p class="dado" style="margin:8px 0 12px">As <b style="display:inline">aulas anuais</b> de cada disciplina em cada série, do documento oficial da matriz. No Ensino Médio elas entram sozinhas
+      na coluna "Carga" de cada ano do histórico (só onde está vazio). Cada matriz vale a partir do ano dela; se a matriz mudar, importe a nova com o ano novo.</p>
+    ${mz.matrizes.length ? mz.matrizes.map((m) => `<details ${m === mz.matrizes[0] ? 'open' : ''} style="margin-top:8px"><summary><b>Matriz de ${m.ano}</b>
+        <button class="btn peq perigo" data-mzdel="${m.ano}" style="margin-left:10px">Apagar</button></summary>
+        <div class="grade g2" style="margin-top:8px">${tabelaMatriz(m, 'fund')}${tabelaMatriz(m, 'medio')}</div></details>`).join('')
+      : vazio('historico', 'Nenhuma matriz importada', 'Clique em "Importar matriz" e escolha o documento da matriz curricular (Word, PDF ou Excel).')}</div>`;
   el.innerHTML = `<div class="grade g2">${['fund', 'medio'].map((k) => `<div class="cartao"><h2>${esc(d.cursos[k].nome)}</h2>
       <p class="dado">Cada disciplina é uma linha do histórico, nesta ordem. A "área" é o bloco da esquerda no papel (Base Nacional Comum, Parte Diversificada…).
         "Tirar" esconde a linha sem apagar as notas já lançadas.</p>
@@ -239,6 +270,7 @@ async function abaHistDisciplinas(el) {
       </tbody></table>
       <form class="acoes" data-novo="${k}" style="margin-top:10px"><input name="area" placeholder="Área (ex.: Parte Diversificada e Eletivas)" style="width:220px">
         <input name="nome" placeholder="Nova disciplina" required style="flex:1;min-width:140px"><button class="btn">${icone('mais')}Adicionar</button></form></div>`).join('')}</div>
+    ${cartaoMatriz}
     <div class="cartao" style="margin-top:14px"><h2>Regras e assinaturas</h2>
       <form id="regras"><div class="campos">
         <div class="campo"><label>Média para aprovação</label><input id="r_media" value="${esc(numBR(cf.hist_media))}"></div>
@@ -271,6 +303,13 @@ async function abaHistDisciplinas(el) {
     await api('POST', '/api/historico/componentes', { curso: f.dataset.novo, area: f.area.value, nome: f.nome.value });
     toast('Disciplina incluída'); rotear();
   })));
+  $('#mzImp', el).onclick = () => importarMatriz(d.componentes);
+  $$('[data-mzdel]', el).forEach((b) => (b.onclick = tentar(async (e) => {
+    e.preventDefault();
+    if (!(await confirmar(`Apagar a matriz de ${b.dataset.mzdel}? As cargas já lançadas nos históricos continuam. Vai para a Lixeira.`, 'Apagar'))) return;
+    await api('DELETE', '/api/historico/matriz/' + b.dataset.mzdel);
+    rotear();
+  })));
   $('#regras', el).onsubmit = tentar(async (e) => {
     e.preventDefault();
     const media = Number($('#r_media', el).value.replace(',', '.'));
@@ -279,6 +318,76 @@ async function abaHistDisciplinas(el) {
       hist_secretario: $('#r_sec', el).value.trim(), hist_diretor: $('#r_dir', el).value.trim() });
     toast('Regras salvas');
   });
+}
+
+// Importar a matriz curricular (5.6.1): escolher o documento, conferir cada linha (para qual disciplina do histórico vai,
+// ou incluir como disciplina nova) e as aulas anuais de cada série, e gravar.
+function importarMatriz(componentes) {
+  const AREAS = { fund: ['Base Nacional Comum', 'Parte Diversificada e Eletivas'], medio: ['Base Nacional Comum', 'Itinerário Formativo e Eletivas'] };
+  modal('Importar matriz curricular', '<div id="ib"></div>', { onAbrir: (m, fechar) => {
+    const caixa = $('#ib', m);
+    const passo1 = (erroTxt = '') => {
+      caixa.innerHTML = `<p>Escolha o documento da <b>matriz curricular</b> (Word, PDF ou Excel). Pode ser o do Médio ou o do Fundamental I e II juntos.</p>
+        ${erroTxt ? `<div class="dica ib-aviso">${esc(erroTxt)}</div>` : ''}
+        <div class="campo" style="margin-top:10px"><input type="file" id="ib_arq" accept=".docx,.doc,.pdf,.xlsx,.xls,.odt"></div>
+        <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri" id="ib_ler">Ler a matriz</button></div>`;
+      $('#ib_ler', m).onclick = async () => {
+        const f = $('#ib_arq', m).files[0];
+        if (!f) return toast('Escolha o arquivo da matriz', true);
+        caixa.innerHTML = `<p class="ib-lendo" role="status">Lendo <b>${esc(f.name)}</b>…</p>`;
+        try { passo2(await api('POST', '/api/historico/ler-matriz?arquivo=' + encodeURIComponent(f.name), undefined, f)); } catch (e) { passo1(e.message); }
+      };
+    };
+    const passo2 = (r) => {
+      const rot = (s) => SERIES_HIST.find(([k]) => k === s)[1];
+      const opcoes = (l) => {
+        const comps = componentes.filter((x) => x.curso === l.curso).map((x) => x.nome);
+        const escolha = l.sugestao ? l.sugestao.nome : '__nova__';
+        return `<option value="">— não usar —</option><option value="__nova__" ${escolha === '__nova__' ? 'selected' : ''}>+ incluir como disciplina nova</option>
+          ${comps.map((n) => `<option ${n === escolha ? 'selected' : ''}>${esc(n)}</option>`).join('')}`;
+      };
+      caixa.innerHTML = `<p class="dado" style="margin-top:0">Lido de: ${esc(r.origem)}. Confira para qual disciplina do histórico vai cada linha. Linha que não existe no histórico
+        vem marcada para <b style="display:inline">incluir como disciplina nova</b>; troque para "não usar" se não deve aparecer no histórico.</p>
+        ${r.avisos.map((x) => `<div class="dica ib-aviso">${esc(x)}</div>`).join('')}<div id="mz_dup"></div>
+        <div class="campos" style="margin-top:8px"><div class="campo"><label for="mz_ano">Vale a partir do ano letivo</label><input id="mz_ano" type="number" value="${esc(r.ano || '')}"></div></div>
+        ${r.linhas.length ? `<div class="tabela-wrap" style="margin-top:12px"><table class="grade-notas ib-grade"><thead><tr><th class="comp">Na matriz</th><th>Vai para</th>
+          ${r.series.map((s) => `<th>${esc(rot(s))}</th>`).join('')}</tr></thead><tbody id="mz_tb">
+          ${r.linhas.map((l, i) => `<tr data-i="${i}"><td class="comp">${esc(l.texto)}${l.area ? `<br><small class="dado">${esc(l.area.slice(0, 40))}</small>` : ''}</td>
+            <td><select data-comp aria-label="Disciplina do histórico para ${esc(l.texto)}">${opcoes(l)}</select></td>
+            ${r.series.map((s) => `<td>${l.aulas[s] != null || cursoDaSerie(s) === l.curso ? `<input data-s="${s}" value="${esc(l.aulas[s] ?? '')}" aria-label="${esc(l.texto)} no ${esc(rot(s))}">` : ''}</td>`).join('')}</tr>`).join('')}
+          </tbody></table></div>` : ''}
+        <div class="rodape"><button type="button" class="btn" id="ib_outro">Escolher outro arquivo</button><button type="button" class="btn" data-fechar>Cancelar</button>
+          ${r.linhas.length ? '<button class="btn pri" id="mz_ok">Gravar a matriz</button>' : ''}</div>`;
+      $('#ib_outro', m).onclick = () => passo1();
+      if (!r.linhas.length) return;
+      const tb = $('#mz_tb', m);
+      const nomeDe = (tr) => { const v = $('[data-comp]', tr).value; return v === '__nova__' ? r.linhas[+tr.dataset.i].texto : v; };
+      // A mesma disciplina duas vezes na mesma série (ex.: Educação Física na base e na parte flexível): avisa que vai somar
+      const conferir = () => {
+        const vistos = new Map(), dup = new Set();
+        for (const tr of $$('tr[data-i]', tb)) {
+          if (!$('[data-comp]', tr).value) continue;
+          for (const inp of $$('[data-s]', tr)) if (inp.value.trim()) { const k = nomeDe(tr) + '|' + inp.dataset.s; if (vistos.has(k)) dup.add(nomeDe(tr)); vistos.set(k, 1); }
+          $('[data-comp]', tr).classList.toggle('ib-sem', $('[data-comp]', tr).value === '__nova__');
+        }
+        $('#mz_dup', m).innerHTML = dup.size ? `<div class="dica ib-aviso">${esc([...dup].join(', '))} aparece mais de uma vez na mesma série: as aulas vão ser somadas.
+          Se não for para somar, deixe uma das linhas como "não usar".</div>` : '';
+      };
+      tb.addEventListener('change', conferir); tb.addEventListener('input', conferir); conferir();
+      $('#mz_ok', m).onclick = tentar(async () => {
+        const linhas = $$('tr[data-i]', tb).filter((tr) => $('[data-comp]', tr).value).map((tr) => {
+          const l = r.linhas[+tr.dataset.i], nova = $('[data-comp]', tr).value === '__nova__';
+          const area = AREAS[l.curso][/flex|diversif|eletiv|projeto|itiner/i.test(l.area) ? 1 : 0];
+          return { comp: nomeDe(tr), nova: nova ? { area } : undefined, aulas: Object.fromEntries($$('[data-s]', tr).filter((x) => x.value.trim()).map((x) => [x.dataset.s, x.value.trim()])) };
+        });
+        const res = await api('PUT', '/api/historico/matriz', { ano: $('#mz_ano', m).value, linhas });
+        fechar();
+        toast(`Matriz de ${$('#mz_ano', m).value} gravada: ${res.cargas} cargas${res.novas ? ` e ${plural(res.novas, 'disciplina nova', 'disciplinas novas')} no histórico` : ''}`);
+        rotear();
+      });
+    };
+    passo1();
+  } });
 }
 
 // ───────────── Notas de um aluno ─────────────
@@ -386,7 +495,8 @@ TELAS.hist = async (c, id) => {
       <select id="b_serie" hidden aria-hidden="true" tabindex="-1"></select>
       <div class="acoes" style="margin:14px 0 8px;justify-content:space-between">
         <h3 id="b_titulo" style="margin:0;font-size:15px"></h3>
-        <button type="button" class="btn peq perigo" id="b_apagar" hidden>Apagar este ano do histórico</button></div>
+        <span class="acoes"><button type="button" class="btn peq" id="b_importar" title="Ler as notas de um boletim (Excel, Word, PDF, foto ou papel escaneado)">${icone('importar')}Importar boletim</button>
+        <button type="button" class="btn peq perigo" id="b_apagar" hidden>Apagar este ano do histórico</button></span></div>
       <p style="margin:0 0 10px;font-size:12.5px;color:var(--texto-2)">Com os <b>4 bimestres</b>, a <b>nota final do ano</b> é calculada sozinha
         (média arredondada para ${cf.arredonda === 0.5 ? '0,5' : 'uma casa decimal'}) e é ela que sai no histórico. Ano antigo sem as notas de cada bimestre: digite direto a nota final.
         Nota abaixo de ${numBR(cf.media)} fica vermelha; <b>Enter</b> desce; colar um bloco do Excel espalha pelas células.</p>
@@ -432,7 +542,8 @@ TELAS.hist = async (c, id) => {
       const tem = temDados(k), eAtual = k === a.serie_chave, futuro = idxAtual >= 0 && i > idxAtual, cursado = idxAtual >= 0 && i < idxAtual;
       // Aluno novo está cadastrado na série do ano que vem: a anterior ele ainda está cursando na outra escola
       const naOutra = a.novo && idxAtual >= 0 && i === idxAtual - 1;
-      const estado = tem ? 'tem' : eAtual ? 'agora' : naOutra ? '' : cursado ? 'falta' : futuro ? 'futuro' : '';
+      // (não usar "agora": é a linha vermelha da Linha do dia no Início, com position:absolute — deixava o botão torto)
+      const estado = tem ? 'tem' : eAtual ? 'cursando' : naOutra ? '' : cursado ? 'falta' : futuro ? 'futuro' : '';
       const sub = tem ? '✓ com notas' : eAtual ? 'cursando' : naOutra ? 'na outra escola' : cursado ? 'falta lançar' : futuro ? 'ainda não' : '';
       return `<button type="button" role="tab" class="ano-hist ${estado} ${k === atual ? 'on' : ''}" data-serie="${k}" aria-selected="${k === atual}"
         ${futuro ? 'title="O aluno ainda não chegou a este ano"' : ''}><b>${esc(r)}</b><small>${sub}</small></button>`;
@@ -456,11 +567,23 @@ TELAS.hist = async (c, id) => {
     // Aluno novo fez os anos anteriores em outra escola: a escola fica para digitar
     if (!a.novo) { por('escola', d.escola.escola); por('cidade', d.escola.cidade); por('uf', d.escola.uf); }
     if (s.ano_provavel === d.ano_atual) por('resultado', 'Cursando');
+    preencherCargas(ch);
+  }
+  // Ensino Médio: a carga de cada disciplina vem da matriz curricular (só nas que estão vazias; o que foi digitado vale)
+  function preencherCargas(ch) {
+    if (cursoDaSerie(ch) !== 'medio') return;
+    const m = cargasDaMatriz(d.matrizes, ch, +ler(ch, 'ano_letivo'));
+    if (!m) return;
+    for (const comp of d.cursos.medio.componentes) {
+      const v = m.cargas[comp.nome];
+      if (v != null && !ler(ch, 'h:' + comp.nome)) V.set(`${ch}|h:${comp.nome}`, String(v));
+    }
   }
 
   const desenharSerie = () => {
     const ch = selSerie.value, k = cursoDaSerie(ch), medio = k === 'medio';
     preencherSozinho(ch);
+    preencherCargas(ch); // também quando o ano não é "provável" (aluno novo, ano vindo de um boletim importado)
     $('#blocoFundConc', c).hidden = !medio;
     $('#b_apagar', c).hidden = !doBanco.has(ch);
     const res = ler(ch, 'resultado');
@@ -479,11 +602,21 @@ TELAS.hist = async (c, id) => {
           value="${esc(ler(ch, `b:${comp.nome}|${b}`))}" aria-label="${j + 1}º bimestre de ${esc(comp.nome)}"></td>`).join('')}
           <td><input data-r="${i}" data-c="4" data-f="n:${esc(comp.nome)}" data-comp="${esc(comp.nome)}" value="${esc(ler(ch, 'n:' + comp.nome))}" aria-label="Nota final de ${esc(comp.nome)}"></td>
           ${medio ? `<td><input class="ch" data-r="${i}" data-c="5" data-f="h:${esc(comp.nome)}" value="${esc(ler(ch, 'h:' + comp.nome))}" aria-label="Carga horária de ${esc(comp.nome)}"></td>` : ''}</tr>`;
-      }).join('')}</tbody></table>`;
+      }).join('')}</tbody></table>${medio ? notaMatriz(ch) : ''}`;
     comps.forEach((comp) => recalcular(ch, comp.nome));
     atualizarSituacao(ch);
     desenharOpcoes();
   };
+
+  // De onde veio a carga de cada disciplina (e aviso quando o ano é mais antigo que a matriz guardada)
+  function notaMatriz(ch) {
+    const ano = +ler(ch, 'ano_letivo'), m = cargasDaMatriz(d.matrizes, ch, ano);
+    if (!m) return `<p class="dado" style="margin-top:8px">A carga de cada disciplina pode vir sozinha da matriz curricular: ${EU.perfil === 'admin'
+      ? 'importe a matriz em <a href="#/historico/disciplinas">Disciplinas e regras</a>' : 'peça à administração para importar a matriz'}.</p>`;
+    const velha = ano && m.ano > ano;
+    return `<p class="dado" style="margin-top:8px">Carga de cada disciplina (aulas anuais) preenchida pela <b style="display:inline">matriz curricular de ${m.ano}</b>
+      nas que estavam vazias.${velha ? ` <span style="color:var(--aviso-txt)">Este ano é de ${ano}, antes dessa matriz: confira se a carga era a mesma.</span>` : ''}</p>`;
+  }
 
   // Nota final = média dos 4 bimestres (fica travada, porque é calculada); sem os 4, pode ser digitada
   function recalcular(ch, comp) {
@@ -529,6 +662,25 @@ TELAS.hist = async (c, id) => {
     if (!x || !(await confirmar(`Apagar tudo do ${serieInfo(ch).rotulo} deste aluno (notas, bimestres, cargas)? Vai para a Lixeira e dá para desfazer.`, 'Apagar'))) return;
     await api('DELETE', '/api/historico/ano/' + x.id);
     rotear();
+  });
+
+  // ── Importar boletim (5.6.0): o servidor lê o arquivo e devolve uma proposta; aqui a pessoa confere e as notas
+  // entram na grade da série escolhida. Nada é salvo até ela clicar em "Salvar".
+  $('#b_importar', c).onclick = () => importarBoletim({
+    aluno: a, cursos: d.cursos, serieAtual: selSerie.value,
+    temNotas: (ch) => temDados(ch),
+    colocar: (ch, ano, linhas) => {
+      if (ano) V.set(`${ch}|ano_letivo`, String(ano));
+      // Boletim do ACADESC é desta escola: a escola do ano vem preenchida quando ainda está vazia
+      for (const [f, v] of [['escola', d.escola.escola], ['cidade', d.escola.cidade], ['uf', d.escola.uf]]) if (!ler(ch, f)) V.set(`${ch}|${f}`, v);
+      for (const l of linhas) {
+        for (const b of BIMS) if (l[b]) V.set(`${ch}|b:${l.comp}|${b}`, l[b]);
+        // Nota final do boletim só entra quando não dá para calcular pelos 4 bimestres
+        if (l.final && !BIMS.every((b) => ler(ch, `b:${l.comp}|${b}`))) V.set(`${ch}|n:${l.comp}`, l.final);
+      }
+      selSerie.value = ch;
+      desenharSerie();
+    },
   });
 
   // ── Grade da transferência: disciplinas da série escolhida × 4 bimestres + faltas e aulas dadas ──
@@ -589,6 +741,92 @@ TELAS.hist = async (c, id) => {
     if (mudou) { toast('Salvo e aberto para imprimir'); rotear(); }
   });
 };
+
+// ───────────── Importar boletim (5.6.0) ─────────────
+// Passo 1: escolher o arquivo. Passo 2: conferir o que foi lido (disciplina do histórico, notas de cada bimestre, série e ano)
+// e colocar na grade. A janela nunca salva: quem salva é o botão "Salvar" da tela, depois de a pessoa conferir.
+function importarBoletim({ aluno, cursos, serieAtual, temNotas, colocar }) {
+  const TIPOS = '.pdf,.doc,.docx,.rtf,.odt,.xls,.xlsx,.ods,.csv,.jpg,.jpeg,.png,.bmp,.gif,.tif,.tiff,.heic';
+  modal('Importar boletim', `<div id="ib"></div>`, { onAbrir: (m, fechar) => {
+    const caixa = $('#ib', m);
+    const passo1 = (erroTxt = '') => {
+      caixa.innerHTML = `<p>Escolha o boletim de <b>${esc(titulo(aluno.nome))}</b>. O sistema lê as notas de cada disciplina e mostra tudo para você conferir antes de colocar no histórico.</p>
+        <p class="dado">Serve PDF, Word, Excel e também foto ou papel escaneado (JPG, PNG). Foto: de cima, com boa luz e a folha inteira aparecendo.
+          O arquivo não fica guardado no sistema.</p>
+        ${erroTxt ? `<div class="dica ib-aviso">${esc(erroTxt)}</div>` : ''}
+        <div class="campo" style="margin-top:10px"><input type="file" id="ib_arq" accept="${TIPOS}"></div>
+        <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri" id="ib_ler">Ler o boletim</button></div>`;
+      $('#ib_ler', m).onclick = async () => {
+        const f = $('#ib_arq', m).files[0];
+        if (!f) return toast('Escolha o arquivo do boletim', true);
+        const lento = !/\.(xlsx|csv|docx)$/i.test(f.name);
+        caixa.innerHTML = `<p class="ib-lendo" role="status">Lendo <b>${esc(f.name)}</b>…${lento ? '<br><small class="dado">Foto, PDF ou arquivo antigo pode levar até meio minuto.</small>' : ''}</p>`;
+        try {
+          passo2(await api('POST', `/api/historico/ler-boletim?aluno=${aluno.id}&arquivo=${encodeURIComponent(f.name)}`, undefined, f));
+        } catch (e) { passo1(e.message); }
+      };
+    };
+
+    const passo2 = (r) => {
+      const serie0 = SERIES_HIST.some(([k]) => k === r.serie) ? r.serie : serieAtual;
+      caixa.innerHTML = `<p class="dado" style="margin-top:0">Lido de: ${esc(r.origem)}. Confira com o papel — dá para corrigir qualquer nota aqui. Nada é salvo até você clicar em "Salvar" na tela.</p>
+        ${r.avisos.map((x) => `<div class="dica ib-aviso">${esc(x)}</div>`).join('')}
+        <div class="campos" style="margin-top:8px">
+          <div class="campo"><label for="ib_serie">Colocar no ano</label><select id="ib_serie">${SERIES_HIST.map(([k, rot]) => `<option value="${k}" ${k === serie0 ? 'selected' : ''}>${rot}</option>`).join('')}</select>
+            ${r.serie ? '<small class="dado">achado no boletim</small>' : '<small class="dado">o boletim não diz: confira</small>'}</div>
+          <div class="campo"><label for="ib_ano">Ano letivo</label><input id="ib_ano" type="number" value="${esc(r.ano_letivo || '')}"></div>
+        </div>
+        ${r.linhas.length ? `<div class="tabela-wrap" style="margin-top:12px"><table class="grade-notas ib-grade"><thead><tr><th class="comp">No boletim</th><th>Vai para</th>
+          ${BIMS.map((b, i) => `<th>${i + 1}º bim</th>`).join('')}<th>Final</th></tr></thead><tbody id="ib_tb"></tbody></table></div>
+          <p class="dado" id="ib_faltam" style="margin-top:8px"></p>` : ''}
+        <div class="rodape"><button type="button" class="btn" id="ib_outro">Escolher outro arquivo</button><button type="button" class="btn" data-fechar>Cancelar</button>
+          ${r.linhas.length ? '<button class="btn pri" id="ib_ok">Colocar no histórico</button>' : ''}</div>`;
+      $('#ib_outro', m).onclick = () => passo1();
+      if (!r.linhas.length) return;
+      const tb = $('#ib_tb', m);
+      const desenhar = () => {
+        const curso = cursoDaSerie($('#ib_serie', m).value), comps = cursos[curso].componentes.map((x) => x.nome);
+        tb.innerHTML = r.linhas.map((l, i) => {
+          const s = l.sugestao?.[curso];
+          return `<tr data-i="${i}"><td class="comp">${esc(l.texto)}</td>
+            <td><select data-comp aria-label="Disciplina do histórico para ${esc(l.texto)}" class="${s ? '' : 'ib-sem'}"><option value="">— não importar —</option>
+              ${comps.map((n) => `<option ${s && s.nome === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td>
+            ${[...BIMS, 'final'].map((k) => `<td><input data-k="${k}" value="${esc(l[k] || '')}" aria-label="${k === 'final' ? 'Nota final' : k[1] + 'º bimestre'} de ${esc(l.texto)}"></td>`).join('')}</tr>`;
+        }).join('');
+        conferir();
+      };
+      // Mostra quais disciplinas do histórico ficaram sem nota e pinta a nota baixa, como na grade
+      const conferir = () => {
+        const curso = cursoDaSerie($('#ib_serie', m).value);
+        const escolhidas = $$('[data-comp]', tb).map((s) => s.value).filter(Boolean);
+        const faltam = cursos[curso].componentes.map((x) => x.nome).filter((n) => !escolhidas.includes(n));
+        $('#ib_faltam', m).textContent = faltam.length ? `Ficam sem nota do boletim: ${faltam.join(', ')}.` : 'Todas as disciplinas do histórico receberam nota.';
+        $$('[data-comp]', tb).forEach((s) => s.classList.toggle('ib-sem', !s.value));
+      };
+      tb.addEventListener('change', conferir);
+      $('#ib_serie', m).onchange = desenhar;
+      desenhar();
+      $('#ib_ok', m).onclick = tentar(async () => {
+        const ch = $('#ib_serie', m).value, ano = $('#ib_ano', m).value.trim();
+        const linhas = $$('tr[data-i]', tb).map((tr) => ({ comp: $('[data-comp]', tr).value, ...Object.fromEntries($$('[data-k]', tr).map((x) => [x.dataset.k, x.value.trim()])) }))
+          .filter((l) => l.comp);
+        if (!linhas.length) throw new Error('Escolha para qual disciplina do histórico vai pelo menos uma linha');
+        const repetida = linhas.map((l) => l.comp).find((n, i, t) => t.indexOf(n) !== i);
+        if (repetida) throw new Error(`"${repetida}" foi escolhida em duas linhas. Deixe uma delas como "não importar".`);
+        for (const l of linhas) for (const k of [...BIMS, 'final']) {
+          if (l[k] && !/^\d{1,2}([.,]\d{1,2})?$/.test(l[k]) && l[k].length > 12) throw new Error(`"${l[k]}" em ${l.comp} não parece uma nota`);
+          if (notaNum(l[k]) != null && notaNum(l[k]) > 10) throw new Error(`Nota ${l[k]} em ${l.comp}: as notas vão de 0 a 10`);
+        }
+        const rot = SERIES_HIST.find(([k]) => k === ch)[1];
+        if (temNotas(ch) && !(await confirmar(`O ${rot} já tem notas. As notas do boletim vão substituir as dessas disciplinas. Continuar?`, 'Substituir'))) return;
+        fechar();
+        colocar(ch, ano, linhas);
+        toast(`${plural(linhas.length, 'disciplina colocada', 'disciplinas colocadas')} no ${rot}. Confira e clique em Salvar.`);
+      });
+    };
+    passo1();
+  } });
+}
 
 // Bimestre em que a escola está hoje (sugestão para a transferência)
 function bimestreAtual() { const m = new Date().getMonth() + 1; return m <= 4 ? 1 : m <= 7 ? 2 : m <= 9 ? 3 : 4; }

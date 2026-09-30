@@ -7,9 +7,10 @@ const TIPOS = {
   tarefa: 'Tarefa do dia', lembrete: 'Lembrete do calendário', interessado: 'Interessado (SIG)', modelo: 'Modelo de mensagem',
   remessa: 'Remessa de boletos', bolsa: 'Processo de bolsa', inscricao: 'Inscrição em atividade extra', evento: 'Evento',
   feriado: 'Feriado', hist_ano: 'Ano do histórico escolar', hist_transf: 'Transferência no meio do ano (histórico)', vivencia: 'Vivência',
+  hist_matriz: 'Matriz curricular (histórico)',
 };
 // Só a administração vê e restaura estes (são de telas que a aprendiz não acessa)
-const SO_ADMIN = new Set(['bolsa']);
+const SO_ADMIN = new Set(['bolsa', 'hist_matriz']);
 
 module.exports = function criarLixeira({ db, transacao, agoraIso }) {
   const colunas = (tabela) => new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));

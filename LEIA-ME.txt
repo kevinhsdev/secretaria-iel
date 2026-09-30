@@ -6,6 +6,11 @@ COMO ABRIR
   Uma janela preta vai abrir. Ela é o "motor" do sistema; deixe-a aberta (pode minimizar).
   O navegador abre sozinho em http://localhost:3000
 
+ATALHO NA ÁREA DE TRABALHO (com o ícone da rosa do Luterano)
+  Na pasta "ferramentas", clique com o botão direito em "criar-atalho.ps1" > "Executar com o PowerShell".
+  Aparece o atalho "SEK" na área de trabalho, que faz o mesmo que "Iniciar Secretaria.bat".
+  Faça isso uma vez em cada computador. O ícone é app\public\icone.ico (refazer: node ferramentas\gerar-icone.mjs).
+
 ATUALIZAR O SISTEMA (Configuracoes > Atualizacoes)
   Clique em "Verificar se ha atualizacao". Se houver, o app mostra o que mudou e, ao confirmar,
   faz uma copia de seguranca, baixa a versao nova e reinicia sozinho. Nao precisa de terminal.
@@ -91,15 +96,8 @@ MEU DIA, CALENDÁRIO E ATENDIMENTOS
   "Calendário" traz os lembretes do ano (boletos, SED, CEBAS, festa junina, matrículas...). A marcação vale por ano.
   "Atendimentos" registra balcão, telefone e WhatsApp: quem procurou, o assunto e se ficou resolvido.
 
-USAR NO CELULAR OU NOS 3 PCs DA SECRETARIA
-  Jeito fácil (versão 5.5.0): Configurações › Celular e rede › "Liberar para o celular". O sistema reinicia e mostra
-  um QR Code: com o celular no MESMO Wi-Fi, aponte a câmera e entre com usuário e senha. Os outros PCs usam o
-  endereço que aparece na mesma tela. Só na rede da secretaria, nunca no Wi-Fi de visitantes.
-
-  Jeito antigo (continua valendo, e aí o botão da tela não desliga):
-  1. No PC que ficará como "servidor", edite "Iniciar Secretaria.bat" e, logo ANTES da linha
-       "%~dp0node\node.exe" --no-warnings server.js
-     acrescente uma linha com:
-       set "IEL_REDE=1"
-  2. Libere a porta 3000 no Firewall do Windows (o Windows pergunta na primeira vez; clique "Permitir" em rede privada).
-  3. Nos outros PCs, abra no navegador: http://IP-DO-SERVIDOR:3000  (o IP aparece em "ipconfig").
+USAR NOS 3 PCs DA SECRETARIA (E NO CELULAR)
+  Passo a passo completo, com lista para marcar: arquivo "INSTALAR NOS 3 PCs.txt", nesta mesma pasta.
+  Resumo: UM PC é o servidor (roda o "Iniciar Secretaria.bat"); nele, Configurações › Celular e rede ›
+  "Liberar para o celular". Os outros PCs e o celular só abrem o endereço que aparece nessa tela no navegador.
+  NUNCA rode o "Iniciar Secretaria.bat" nos outros PCs: cada um teria um banco separado.

@@ -6,7 +6,8 @@
 'use strict';
 
 module.exports = function historico(ctx) {
-  const { rota, db, cfg, registrar, falha, conferirVersao, json, corpoJson, exigirAdmin, agoraIso, S, turmaRotulo, transacao, L } = ctx;
+  const { rota, db, cfg, registrar, falha, conferirVersao, json, corpoJson, lerCorpo, exigirAdmin, agoraIso, S, turmaRotulo, transacao, L } = ctx;
+  const B = require('../lib/boletim');
 
   const CURSOS = {
     fund: { nome: 'Ensino Fundamental', series: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'] },
@@ -261,7 +262,7 @@ module.exports = function historico(ctx) {
       aluno: { id: a.id, mat: a.mat, nome: a.nome, dt_nasc: a.dt_nasc, ra: a.ra, rg: a.rg, cpf: a.cpf, nome_mae: a.nome_mae, nome_pai: a.nome_pai,
         serie_chave: a.serie_chave, turma: a.turma, turno: a.turno, novo: !!a.novo, turma_rotulo: turmaRotulo(a), cidade: a.cidade, uf: a.uf },
       dados, curso: cursoDe(a.serie_chave) || 'fund', cursos, anos: anos.map((x) => ({ ...x, sugestao: sugerirResultado(x.notas, x.frequencia, c) })),
-      transf: transfDoAluno(a.id), fund_conclusao: fundConclusao,
+      transf: transfDoAluno(a.id), fund_conclusao: fundConclusao, matrizes: matrizes(),
       resultados: RESULTADOS, escola: { ...ESCOLA, inep: c.inep }, config: configHist(c), ano_atual: anoAtual(),
       atualizado_em: dados.atualizado_em || null, atualizado_por: dados.atualizado_por || null,
     });
@@ -295,6 +296,81 @@ module.exports = function historico(ctx) {
     json(res, 200, { ok: true });
   });
 
+  // 5.6.0 — Importar boletim: lê o arquivo (Excel, Word, PDF, foto…) e devolve a PROPOSTA de notas para a tela conferir.
+  // Não grava nota nenhuma e não guarda o arquivo (só passa por uma pasta temporária). Quem grava é o "Salvar" da tela.
+  rota('POST', '/api/historico/ler-boletim', async (req, res, { u, url }) => {
+    const a = db.prepare('SELECT id, nome FROM alunos WHERE id = ?').get(+url.searchParams.get('aluno')) || falha(404, 'Aluno não encontrado');
+    const arquivo = String(url.searchParams.get('arquivo') || '').slice(0, 200);
+    const doc = await B.lerDocumento(await lerCorpo(req), arquivo);
+    const r = B.interpretar(doc, { fund: componentes('fund').map((c) => c.nome), medio: componentes('medio').map((c) => c.nome) }, { nome: a.nome, anoMax: anoAtual() + 1 });
+    registrar(u.login, 'leu um boletim para o histórico (o arquivo não fica guardado)', { aluno_id: a.id, nome: a.nome, arquivo, origem: r.origem, disciplinas: r.linhas.length });
+    json(res, 200, r);
+  });
+
+  // ── 5.6.1: matriz curricular oficial → carga (aulas anuais) de cada disciplina, por série e ano de vigência ──
+  // Todas as matrizes guardadas: [{ ano, series: { EM1: { "Química": 120, … } } }], da mais nova para a mais velha
+  function matrizes() {
+    const por = new Map();
+    for (const r of db.prepare('SELECT ano, serie_chave, componente, aulas FROM hist_matriz ORDER BY ano DESC').all()) {
+      if (!por.has(r.ano)) por.set(r.ano, { ano: r.ano, series: {} });
+      (por.get(r.ano).series[r.serie_chave] ||= {})[r.componente] = r.aulas;
+    }
+    return [...por.values()];
+  }
+  rota('GET', '/api/historico/matriz', async (req, res) => json(res, 200, { matrizes: matrizes() }));
+  rota('POST', '/api/historico/ler-matriz', async (req, res, { u, url }) => {
+    exigirAdmin(u);
+    const doc = await B.lerDocumento(await lerCorpo(req), String(url.searchParams.get('arquivo') || '').slice(0, 200));
+    json(res, 200, B.lerMatriz(doc, { fund: componentes('fund', true).map((c) => c.nome), medio: componentes('medio', true).map((c) => c.nome) }));
+  });
+  // Grava a matriz de um ano: substitui o que havia daquele ano nas séries enviadas.
+  // linhas: [{ comp, nova: { area } (incluir como disciplina nova), aulas: { EM1: 120, … } }]
+  rota('PUT', '/api/historico/matriz', async (req, res, { u }) => {
+    exigirAdmin(u);
+    const b = await corpoJson(req);
+    const ano = inteiro(b.ano);
+    if (!(ano >= 1990 && ano <= anoAtual() + 2)) falha(400, 'Informe o ano da matriz (ex.: 2026)');
+    const linhas = (Array.isArray(b.linhas) ? b.linhas : []).filter((l) => l && String(l.comp || '').trim());
+    if (!linhas.length) falha(400, 'Escolha a disciplina do histórico de pelo menos uma linha');
+    let novas = 0, n = 0;
+    transacao(() => {
+      const series = new Set();
+      const grava = db.prepare('INSERT INTO hist_matriz (ano, serie_chave, componente, aulas) VALUES (?,?,?,?) ON CONFLICT(ano, serie_chave, componente) DO UPDATE SET aulas = excluded.aulas');
+      for (const l of linhas) for (const s of Object.keys(l.aulas || {})) { if (!cursoDe(s)) falha(400, 'Série inválida: ' + s); series.add(s); }
+      for (const s of series) db.prepare('DELETE FROM hist_matriz WHERE ano = ? AND serie_chave = ?').run(ano, s);
+      for (const l of linhas) {
+        const comp = String(l.comp).trim();
+        const cursos = [...new Set(Object.keys(l.aulas || {}).map(cursoDe))];
+        for (const curso of cursos) {
+          if (!db.prepare('SELECT 1 FROM hist_componentes WHERE curso = ? AND nome = ?').get(curso, comp)) {
+            if (!l.nova) falha(400, `"${comp}" não é disciplina do histórico. Marque "incluir como nova" ou escolha outra.`);
+            const ordem = (db.prepare('SELECT MAX(ordem) m FROM hist_componentes WHERE curso = ?').get(curso).m || 0) + 1;
+            db.prepare('INSERT INTO hist_componentes (curso, area, nome, ordem) VALUES (?,?,?,?)').run(curso, String(l.nova.area || '').trim() || null, comp, ordem);
+            novas++;
+          }
+        }
+        for (const [s, v] of Object.entries(l.aulas || {})) {
+          const aulas = inteiro(v);
+          if (aulas == null) continue;
+          if (!(aulas > 0 && aulas <= 2000)) falha(400, `Carga "${v}" de ${comp} (${rotuloSerie(s)}) não parece certa`);
+          // A mesma disciplina duas vezes na mesma série (ex.: Educação Física na base e na parte flexível): soma
+          const ja = db.prepare('SELECT aulas FROM hist_matriz WHERE ano = ? AND serie_chave = ? AND componente = ?').get(ano, s, comp);
+          grava.run(ano, s, comp, (ja ? ja.aulas : 0) + aulas); n++;
+        }
+      }
+    });
+    registrar(u.login, 'gravou a matriz curricular do histórico', { ano, cargas: n, disciplinas_novas: novas });
+    json(res, 200, { ok: true, cargas: n, novas });
+  });
+  rota('DELETE', '/api/historico/matriz/:ano', async (req, res, { u, p }) => {
+    exigirAdmin(u);
+    const ano = +p.ano;
+    if (!db.prepare('SELECT 1 FROM hist_matriz WHERE ano = ?').get(ano)) falha(404, 'Não há matriz desse ano');
+    const lixeira_id = L.excluir({ tipo: 'hist_matriz', rotulo: `Matriz curricular de ${ano}`, usuario: u.login, tabela: 'hist_matriz', onde: 'ano = ?', params: [ano] });
+    registrar(u.login, 'apagou a matriz curricular do histórico (foi para a lixeira)', { ano });
+    json(res, 200, { ok: true, lixeira_id });
+  });
+
   // Limpar um ano inteiro (vai para a lixeira, com as notas)
   rota('DELETE', '/api/historico/ano/:id', async (req, res, { u, p }) => {
     const h = db.prepare('SELECT h.*, a.nome FROM hist_anos h JOIN alunos a ON a.id = h.aluno_id WHERE h.id = ?').get(+p.id) || falha(404, 'Esse ano não está no histórico');
@@ -323,7 +399,7 @@ module.exports = function historico(ctx) {
     for (const l of lista) for (const [k, v] of Object.entries(l.ano?.cargas || {})) if (cargas[k] == null) cargas[k] = v;
     json(res, 200, {
       serie, turma, rotulo: `${S.porChave(serie).rotulo}${turma ? ' ' + turma : ''}`, curso, ano_letivo: anoAtual(),
-      componentes: componentes(curso), resultados: RESULTADOS, config: configHist(c), cargas, alunos: lista,
+      componentes: componentes(curso), resultados: RESULTADOS, config: configHist(c), cargas, alunos: lista, matrizes: matrizes(),
     });
   });
 

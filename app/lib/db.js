@@ -187,6 +187,12 @@ CREATE TABLE IF NOT EXISTS hist_transf (
   aluno_id INTEGER PRIMARY KEY REFERENCES alunos(id) ON DELETE CASCADE, serie_chave TEXT NOT NULL, ano_letivo INTEGER,
   periodo TEXT, turma TEXT, turno TEXT, faltas TEXT, dias_letivos TEXT, notas_json TEXT, atualizado_em TEXT, atualizado_por TEXT
 );
+-- 5.6.1: matriz curricular oficial (aulas anuais de cada disciplina em cada série), por ano de vigência.
+-- Preenche sozinha a carga de cada disciplina no histórico (Ensino Médio). ano = a partir de quando vale.
+CREATE TABLE IF NOT EXISTS hist_matriz (
+  ano INTEGER NOT NULL, serie_chave TEXT NOT NULL, componente TEXT NOT NULL, aulas INTEGER NOT NULL,
+  PRIMARY KEY (ano, serie_chave, componente)
+);
 -- ── 4.9.0: vivências (a criança passa um dia na escola antes de decidir a matrícula) ──
 CREATE TABLE IF NOT EXISTS vivencias (
   id INTEGER PRIMARY KEY, aluno TEXT NOT NULL, responsavel TEXT, telefone TEXT, ano_escolar TEXT, classe TEXT,
@@ -209,6 +215,13 @@ for (const c of ['ra', 'rg', 'endereco', 'bairro', 'cidade', 'uf', 'cep', 'cpf_r
 }
 // Etapa 4: marca de aluno cujos dados pessoais já foram descartados (LGPD)
 if (!colunasAluno.has('anonimizado')) db.exec('ALTER TABLE alunos ADD COLUMN anonimizado TEXT');
+// 5.7.0: o que vem da planilha "Controle de Matrículas e Rematrículas" do Google (importação na aba Rematrícula).
+// desconto em % (30 = 30%); pagamento_json guarda planos, forma, banco, valores e parcelas; planilha_em = quando foi importado.
+{
+  const tem = new Set(db.prepare('PRAGMA table_info(rematriculas)').all().map((c) => c.name));
+  for (const [c, tipo] of [['desconto', 'REAL'], ['categoria', 'TEXT'], ['docs_pendentes', 'TEXT'], ['boletos_entregues', 'INTEGER'],
+    ['pagamento_json', 'TEXT'], ['obs_planilha', 'TEXT'], ['planilha_em', 'TEXT']]) if (!tem.has(c)) db.exec(`ALTER TABLE rematriculas ADD COLUMN ${c} ${tipo}`);
+}
 // 4.6.0: quem alterou por último e quando (aviso quando duas pessoas editam a mesma coisa)
 for (const [tabela, cols] of [['alunos', ['atualizado_por']], ['interessados', ['atualizado_em', 'atualizado_por']], ['atendimentos', ['atualizado_em', 'atualizado_por']]]) {
   const tem = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));

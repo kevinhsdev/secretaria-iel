@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.5.2';
+const VERSAO = '5.8.5';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -382,7 +382,8 @@ function ligarAtalhos() {
   atalhosLigados = true;
   // Barra "/" leva o cursor para a busca de alunos (só quando não se está digitando em outro campo)
   document.addEventListener('keydown', (e) => {
-    if (e.key !== '/' || e.ctrlKey || e.altKey || e.metaKey) return;
+    // (defaultPrevented: a grade da Rematrícula já usou a tecla — digitar "/" numa célula não pula para a busca)
+    if (e.key !== '/' || e.ctrlKey || e.altKey || e.metaKey || e.defaultPrevented) return;
     const alvo = e.target;
     if (alvo.isContentEditable || (alvo.matches && alvo.matches('input, textarea, select'))) return;
     const busca = $('#busca');
@@ -1044,6 +1045,7 @@ TELAS.aluno = async (c, id) => {
         ${a.novo ? `<div class="campo"><label>Consulta SPC/SERASA</label><select id="spc"><option value="">Não consultado</option>${['Nada consta', 'Com restrição'].map((o) => `<option ${r.spc === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>` : ''}
       </div>
       <div class="campo" style="margin-top:12px"><label>Observações da rematrícula</label><input id="robs" value="${esc(r.obs || '')}" placeholder="Ex.: pediu para pagar dia 15; aguardando pai assinar…"></div>
+      ${quadroPlanilha(r, r.serie_destino || (a.novo ? a.serie_chave : ''))}
       ${matriculado ? `<p style="margin:12px 0 0">Prazo para documentos: <b>${dataBR(f.prazo)}</b> ${sit ? `<span class="tag t-${sit}">${diasPrazo < 0 ? `venceu há ${plural(-diasPrazo, 'dia', 'dias')}` : diasPrazo === 0 ? 'vence hoje' : `${diasPrazo === 1 ? 'falta' : 'faltam'} ${plural(diasPrazo, 'dia', 'dias')}`}</span>` : ''}</p>` : '<p class="dica">Quando a família pagar a matrícula, clique em <b>Em andamento</b>. O prazo de ' + esc(EU.config.prazo_dias) + ' dias para os documentos começa a contar nesse dia.</p>'}
       ${r.atualizado_por ? `<p class="dado" style="margin-top:10px">Última alteração por ${esc(r.atualizado_por)} em ${dataBR(r.atualizado_em)}</p>` : ''}
     </div>
@@ -1110,50 +1112,408 @@ TELAS.aluno = async (c, id) => {
 };
 
 // ───────────── Rematrícula ─────────────
-TELAS.rematricula = async (c) => {
-  const [dados, lista] = await Promise.all([api('GET', '/api/rematricula'), (invalidar(), alunosBusca())]);
-  c.innerHTML = `<h1>Rematrícula ${dados.ano}</h1><p class="sub">Por série que o aluno vai cursar em ${dados.ano}. Clique numa série para ver os alunos.</p>
-  <div class="grade g4" id="series">${dados.grupos.map((g) => {
-    const ocup = g.reservada + g.concluida;
-    const base = g.capacidade || ocup + g.pendente || 1;
-    const p = (n) => Math.min(100, (100 * n) / base).toFixed(1) + '%';
-    return `<div class="cartao kpi clic" data-serie="${g.chave}" style="cursor:pointer" tabindex="0">
-      <div class="rot">${esc(g.rotulo)}</div>
-      <div class="val" style="font-size:22px">${ocup}${g.capacidade ? `<small style="font-size:13px;color:var(--texto-2)"> / ${g.capacidade} vagas</small>` : ''}</div>
-      <div class="det">${g.concluida} concluídas · ${g.reservada} em andamento · ${g.pendente} a contatar${g.novos ? ` · ${g.novos} novos` : ''}</div>
-      <div class="barra"><i class="b-concl" style="width:${p(g.concluida)}"></i><i class="b-and" style="width:${p(g.reservada)}"></i></div>
-      ${g.capacidade && ocup > g.capacidade ? '<div class="det" style="color:var(--vermelho);margin-top:6px">acima da capacidade</div>' : ''}
-    </div>`;
-  }).join('')}</div>
-  ${EU.perfil === 'admin' ? '<p class="dado" style="margin-top:8px">As vagas por série são definidas em Configurações › Vagas (copie da planilha de controle do Google).</p>' : ''}
-  <div class="cartao" style="margin-top:16px">
-    <div class="filtros"><h2 style="margin:0;flex:1" id="tl">Todos os alunos</h2>
-      <select id="fs"><option value="">Qualquer situação</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-      <button class="btn peq" id="todas">Mostrar todas as séries</button></div>
-    <div class="tabela-wrap"><table><thead><tr><th>Aluno</th><th>Turma atual</th><th>Vai para</th><th>Situação</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
-  </div>`;
-  let serie = '';
-  const rotulos = Object.fromEntries(dados.grupos.map((g) => [g.chave, g.rotulo]));
-  const desenhar = () => {
-    const fs = $('#fs').value;
-    $('#tl').textContent = serie ? 'Vão para ' + rotulos[serie] : 'Todos os alunos';
-    const f = lista.filter((a) => (!serie || a.destino === rotulos[serie]) && (!fs || a.status === fs) && a.destino && !a.destino.startsWith('Concluinte'));
-    emPartes($('#tb'), f.map((a) => `<tr><td><a href="#/aluno/${a.id}"><b>${esc(titulo(a.nome))}</b></a> ${a.novo ? '<span class="tag t-novo">novo</span>' : ''}</td>
-      <td>${esc(a.novo ? '—' : a.turma_rotulo)}</td><td>${esc(a.destino)}</td>
-      <td><select data-id="${a.id}" aria-label="Situação">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${a.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
-      <td><span class="tag t-${a.status}">${STATUS[a.status]}</span></td></tr>`), {
-      colunas: 5, vazio: '<tr><td colspan="5" class="vazio">Nenhum aluno</td></tr>',
-      ligar: (tb) => $$('select', tb).forEach((s) => (s.onchange = tentar(async () => {
-        await api('PUT', `/api/alunos/${s.dataset.id}/rematricula`, { status: s.value });
-        const al = lista.find((x) => x.id === +s.dataset.id); al.status = s.value;
-        toast('Atualizado: ' + titulo(al.nome)); desenhar();
-      }))) });
+// ───────────── Rematrícula (5.8.0): o app no lugar da planilha "Controle de Matrículas e Rematrículas" ─────────────
+// #/rematricula          → Painel geral, igual à aba "Resumo Geral" da planilha
+// #/rematricula/<sala>   → uma aba por sala (F6, EM1…), com o resumo da sala e a grade editável como no Google Sheets
+// Regras dos números (as mesmas fórmulas da planilha): efetivada = situação "Concluída" (tem data de efetivação);
+// Matrícula = aluno novo, Rematrícula = veterano; cadastrados = alunos da sala (menos transferidos);
+// vagas disponíveis = vagas − cadastrados; % ocupação = cadastrados ÷ vagas; pendentes = cadastrados − efetivadas.
+const pctBR = (n) => String(Math.round(n * 10) / 10).replace('.', ',') + '%';
+function estatSala(alunos, capacidade) {
+  const cad = alunos.filter((a) => a.status !== 'transferido');
+  const efet = cad.filter((a) => a.status === 'concluida');
+  const comDesc = cad.filter((a) => a.desconto > 0);
+  const cat = (k) => cad.filter((a) => S_norm(a.categoria) === S_norm(k)).length;
+  return {
+    vagas: capacidade, cadastrados: cad.length, mat: efet.filter((a) => a.novo).length, remat: efet.filter((a) => !a.novo).length, efetivadas: efet.length,
+    desconto: comDesc.length ? comDesc.reduce((s, a) => s + a.desconto, 0) / comDesc.length : null,
+    disponiveis: capacidade != null ? Math.max(0, capacidade - cad.length) : null, ocupacao: capacidade ? cad.length / capacidade : null,
+    novos: cad.filter((a) => a.novo).length, ff: cat('Filho de Funcionário'), b50: cat('Bolsista 50%'), b100: cat('Bolsista 100%'),
+    pendentes: Math.max(0, cad.length - efet.length), nao_renova: cad.filter((a) => a.status === 'nao_renova').length,
+    andamento: cad.filter((a) => a.status === 'reservada').length,
   };
-  $$('[data-serie]').forEach((el) => (el.onclick = el.onkeydown = (e) => { if (e.type === 'keydown' && e.key !== 'Enter') return; serie = el.dataset.serie; desenhar(); $('#tl').scrollIntoView({ behavior: 'smooth' }); }));
-  $('#todas').onclick = () => { serie = ''; desenhar(); };
-  $('#fs').onchange = desenhar;
-  desenhar();
+}
+const S_norm = (s) => norm(String(s || '')).trim();
+
+TELAS.rematricula = async (c, arg) => {
+  const d = await api('GET', '/api/rematricula/controle');
+  const sala = d.series.find((s) => s.chave === arg) || null;
+  const porSala = (ch) => d.alunos.filter((a) => a.destino === ch);
+  c.innerHTML = `<div class="acoes" style="justify-content:space-between;align-items:flex-start"><div>
+      <h1>${sala ? esc(sala.rotulo) : 'Rematrícula'} ${d.ano}</h1>
+      <p class="sub">${sala ? `Matrículas e rematrículas de quem vai para ${esc(sala.rotulo)} em ${d.ano}. Clique num aluno para ver e editar no painel ao lado.`
+        : `Resumo geral de ${d.ano}, calculado sozinho a partir das salas. Clique numa sala para ver e editar os alunos.`}</p></div>
+    <div class="acoes">${EU.perfil === 'admin' ? `<button class="btn" id="remListas">Listas de opções</button><button class="btn" id="impPlan">${icone('importar')}Importar planilha</button>` : ''}</div></div>
+    <nav class="abas abas-salas" aria-label="Salas">
+      <a href="#/rematricula" class="${sala ? '' : 'on'}">Resumo geral</a>
+      ${d.series.map((s) => `<a href="#/rematricula/${s.chave}" class="${sala && sala.chave === s.chave ? 'on' : ''}">${esc(s.rotulo.replace(/ Fund\. I+$/, ''))}<small>${porSala(s.chave).filter((a) => a.status !== 'transferido').length}</small></a>`).join('')}
+    </nav>
+    <div id="remCorpo"></div>`;
+  if ($('#impPlan')) $('#impPlan').onclick = importarPlanilhaRematricula;
+  if ($('#remListas')) $('#remListas').onclick = () => editarListasRem(d.listas);
+  if (sala) salaRematricula($('#remCorpo'), d, sala); else painelRematricula($('#remCorpo'), d);
 };
+
+// ── Resumo geral (5.8.2): painel no estilo das outras telas do app (Início, Vivências, Relatórios) ──
+// Os números são os mesmos da aba "Resumo Geral" da planilha (estatSala); a tabela da planilha continua, recolhida, no fim.
+function painelRematricula(el, d) {
+  const SEGMENTOS = [['Educação Infantil', /^(MAT|JD)/], ['Fundamental I', /^F[1-5]$/], ['Fundamental II', /^F[6-9]$/], ['Ensino Médio', /^EM/]];
+  const doSala = (ch) => d.alunos.filter((a) => a.destino === ch);
+  const salas = d.series.map((s) => ({ s, alunos: doSala(s.chave), e: estatSala(doSala(s.chave), s.capacidade) }));
+  const todos = d.alunos.filter((a) => a.status !== 'transferido');
+  const g = estatSala(todos, salas.some((x) => x.s.capacidade != null) ? salas.reduce((t, x) => t + (x.s.capacidade || 0), 0) : null);
+  const conta = (lista, st) => lista.filter((a) => a.status === st).length;
+  const pct = (n, total) => (total ? (100 * n) / total : 0);
+  const n = (v) => (v == null ? '—' : v);
+  // Barra de andamento (mesmas cores das etiquetas de situação) e a legenda com os números
+  const andamento = (lista, legenda = true) => {
+    const cad = lista.filter((a) => a.status !== 'transferido');
+    const partes = [['concluida', 'Concluída'], ['reservada', 'Em andamento'], ['nao_renova', 'Não vai renovar'], ['pendente', 'Não iniciada']];
+    return `<div class="andamento-rem" role="img" aria-label="${partes.map(([k, r]) => `${r}: ${conta(cad, k)}`).join(', ')}">
+        ${partes.filter(([k]) => k !== 'pendente').map(([k]) => `<i class="a-${k}" style="width:${pct(conta(cad, k), cad.length)}%"></i>`).join('')}</div>
+      ${legenda ? `<div class="legenda-rem">${partes.map(([k, r]) => `<span><i class="a-${k}"></i>${r} <b>${conta(cad, k)}</b></span>`).join('')}</div>` : ''}`;
+  };
+  const kpi = (rot, val, det, cls = '') => `<div class="cartao kpi ${cls}"><div class="rot">${rot}</div><div class="val">${val}</div><div class="det">${det}</div></div>`;
+  const cartaoSala = ({ s, alunos, e }) => {
+    const docs = alunos.filter((a) => a.docs_pendentes).length;
+    const avisos = [e.ocupacao > 1 ? '<span class="tag t-nao_renova">acima da capacidade</span>' : '', e.nao_renova ? `<span class="tag t-nao_renova">${e.nao_renova} não ${e.nao_renova > 1 ? 'vão' : 'vai'} renovar</span>` : '',
+      docs ? `<span class="tag t-reservada">${docs} com documento pendente</span>` : ''].filter(Boolean).join('');
+    return `<a class="cartao sala-rem" href="#/rematricula/${s.chave}">
+      <div class="sala-rem-topo"><b>${esc(s.rotulo)}</b><span class="dado">${e.cadastrados} aluno${e.cadastrados === 1 ? '' : 's'}</span></div>
+      <div class="sala-rem-num"><b>${e.efetivadas}</b> <span>de ${e.cadastrados} efetivados</span></div>
+      ${andamento(alunos, false)}
+      <div class="sala-rem-rodape"><span>${s.capacidade != null ? `${e.cadastrados}/${s.capacidade} vagas · <b>${e.disponiveis}</b> livre${e.disponiveis === 1 ? '' : 's'}` : 'vagas não definidas'}</span>
+        ${e.novos ? `<span>${e.novos} novo${e.novos > 1 ? 's' : ''}</span>` : ''}</div>
+      ${avisos ? `<div class="sala-rem-avisos">${avisos}</div>` : ''}</a>`;
+  };
+  const categorias = Object.entries(todos.reduce((m, a) => { const k = a.categoria || 'Sem categoria'; m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
+
+  // Vagas: só as salas que têm vagas definidas entram na conta (senão os alunos de sala sem vaga "ocupam" vagas de outra)
+  const comVagas = salas.filter((x) => x.s.capacidade != null), semVagas = salas.length - comVagas.length;
+  const livres = comVagas.reduce((t, x) => t + x.e.disponiveis, 0), vagasTot = comVagas.reduce((t, x) => t + x.s.capacidade, 0);
+  const ocup = vagasTot ? pct(comVagas.reduce((t, x) => t + x.e.cadastrados, 0), vagasTot) : null;
+  el.innerHTML = `<div class="grade g4 kpis">
+      ${kpi('Efetivados', `${g.efetivadas}<small> / ${g.cadastrados}</small>`, `${pctBR(pct(g.efetivadas, g.cadastrados))} dos alunos já efetivaram`, 'destaque')}
+      ${kpi('Vagas livres', comVagas.length ? livres : '—', comVagas.length ? `de ${vagasTot} vagas · ocupação ${pctBR(ocup)}${semVagas ? ` · ${semVagas} sala${semVagas > 1 ? 's' : ''} sem vagas definidas` : ''}`
+        : 'defina as vagas em Configurações › Vagas', 'ok')}
+      ${kpi('Faltam efetivar', g.pendentes, `${g.andamento} em andamento · ${conta(todos, 'pendente')} não iniciadas`, g.pendentes ? 'alerta' : '')}
+      ${kpi('Não vão renovar', g.nao_renova, g.nao_renova ? 'confira com a família e o financeiro' : 'ninguém até agora', g.nao_renova ? 'alerta' : '')}
+    </div>
+    <div class="cartao" style="margin-top:14px"><div class="acoes" style="justify-content:space-between;align-items:baseline">
+      <h2 style="margin:0">Como está a rematrícula de ${d.ano}</h2><span class="dado">${g.mat} matrículas e ${g.remat} rematrículas efetivadas</span></div>
+      ${andamento(todos)}</div>
+    ${SEGMENTOS.map(([nome, re]) => {
+      const doSeg = salas.filter((x) => re.test(x.s.chave));
+      const es = estatSala(doSeg.flatMap((x) => x.alunos), null);
+      return `<div class="acoes titulo-secao" style="justify-content:space-between;margin-top:20px"><span>${nome}</span>
+          <span class="dado">${es.efetivadas} de ${es.cadastrados} efetivados</span></div>
+        <div class="grade salas-rem">${doSeg.map(cartaoSala).join('')}</div>`;
+    }).join('')}
+    <div class="grade g2" style="margin-top:20px">
+      <div class="cartao"><h2>Categorias</h2>${barras(categorias, 'var(--azul-2)')}
+        <p class="dado" style="margin-top:10px">Desconto médio: <b style="display:inline">${g.desconto == null ? '—' : pctBR(g.desconto)}</b> (de quem tem desconto)</p></div>
+      <div class="cartao"><h2>Matrículas e rematrículas</h2>${barras([['Rematrículas efetivadas', g.remat], ['Matrículas efetivadas (alunos novos)', g.mat],
+        ['Alunos novos cadastrados', g.novos], ['Veteranos ainda não efetivados', todos.filter((a) => !a.novo && a.status !== 'concluida').length]], 'var(--verde)')}</div>
+    </div>
+    <details class="cartao" style="margin-top:14px"><summary><b>Tabela completa por turma</b> <span class="dado">(igual à aba "Resumo Geral" da planilha)</span></summary>
+    <div class="tabela-wrap" style="margin-top:10px"><table class="tab-resumo"><thead><tr><th>Turma</th><th>Vagas totais</th><th>Alunos cadastrados</th><th>Matrículas efetivadas</th>
+      <th>Rematrículas efetivadas</th><th>Total efetivadas</th><th>Vagas disponíveis</th><th>% Ocupação</th><th>Alunos novos</th><th>Filhos de funcionário</th>
+      <th>Bolsistas 50%</th><th>Bolsistas 100%</th><th>Pendentes</th></tr></thead><tbody>
+      ${salas.map(({ s, e }) => `<tr data-sala="${s.chave}" tabindex="0" title="Abrir ${esc(s.rotulo)}"><td><a href="#/rematricula/${s.chave}"><b>${esc(s.rotulo)}</b></a></td>
+        <td>${n(e.vagas)}</td><td>${e.cadastrados}</td><td>${e.mat}</td><td>${e.remat}</td><td><b>${e.efetivadas}</b></td><td>${n(e.disponiveis)}</td>
+        <td>${e.ocupacao == null ? '—' : pctBR(e.ocupacao * 100)}</td><td>${e.novos}</td><td>${e.ff}</td><td>${e.b50}</td><td>${e.b100}</td><td>${e.pendentes}</td></tr>`).join('')}
+      <tr class="total"><td><b>Total</b></td><td>${comVagas.length ? vagasTot : '—'}</td><td>${g.cadastrados}</td><td>${g.mat}</td><td>${g.remat}</td><td>${g.efetivadas}</td>
+        <td>${comVagas.length ? livres : '—'}</td><td>${ocup == null ? '—' : pctBR(ocup)}</td><td>${g.novos}</td><td>${g.ff}</td><td>${g.b50}</td><td>${g.b100}</td><td>${g.pendentes}</td></tr>
+    </tbody></table></div>
+    <p class="dado" style="margin-top:8px">Efetivado = situação "Concluída" (com data de efetivação). Vagas: planilha importada ou Configurações › Vagas.</p></details>`;
+  $$('tr[data-sala]', el).forEach((tr) => (tr.onclick = tr.onkeydown = (e) => {
+    if (e.type === 'keydown' && e.key !== 'Enter') return;
+    location.hash = '#/rematricula/' + tr.dataset.sala;
+  }));
+}
+
+// ── Uma sala (5.8.1): lista limpa à esquerda + painel do aluno à direita (escolhido pelo Kevin no lugar da grade de 26 colunas) ──
+// Cada campo do painel grava sozinho ao sair dele (PUT /api/rematricula/celulas, a mesma rota da grade). ◀ ▶ ou ↑ ↓ trocam de aluno.
+function salaRematricula(el, d, sala) {
+  const L = d.listas;
+  let lista = d.alunos.filter((a) => a.destino === sala.chave);
+  let vis = [], atual = null;
+  const STATUS_CURTO = { pendente: 'Não iniciada', reservada: 'Em andamento', concluida: 'Concluída', nao_renova: 'Não vai renovar', transferido: 'Transferido' };
+  el.innerHTML = `<div class="resumo-rem" id="remTotais" aria-live="polite"></div>
+    <div class="filtros" style="margin-bottom:12px">
+      <input id="rq" type="search" placeholder="Buscar aluno ou matrícula…" style="flex:1;min-width:200px">
+      <select id="rs"><option value="">Qualquer situação</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <select id="rc"><option value="">Qualquer categoria</option>${L.categoria.map((k) => `<option>${esc(k)}</option>`).join('')}<option value="__docs">Com documento pendente</option></select>
+      <button class="btn peq" id="rNovo">${icone('mais')}Aluno novo</button>
+      <button class="btn peq" id="rAtual" title="Buscar de novo o que outras pessoas gravaram">Atualizar</button>
+    </div>
+    <div class="sala-duo">
+      <div class="cartao sala-lista"><div class="tabela-wrap"><table class="lista-rem"><thead><tr><th>Aluno</th><th>Situação</th><th>Desconto</th><th>Categoria</th><th>Pagamento</th><th>Efetivação</th></tr></thead>
+        <tbody id="lb"></tbody></table></div></div>
+      <aside class="cartao painel-rem" id="painel" aria-live="polite"></aside>
+    </div>
+    ${Object.entries(L).map(([k, ops]) => `<datalist id="dl-${k}">${ops.map((o) => `<option value="${esc(o)}">`).join('')}</datalist>`).join('')}`;
+  const lb = $('#lb', el), painel = $('#painel', el);
+
+  function totais() {
+    const e = estatSala(lista, sala.capacidade);
+    const item = (rot, val, cls = '') => `<div class="${cls}"><span>${rot}</span><b>${val}</b></div>`;
+    $('#remTotais', el).innerHTML = [item('Vagas', e.vagas ?? '—'), item('Cadastrados', e.cadastrados), item('Efetivados', e.efetivadas, 'ok'),
+      item('Matrículas', e.mat), item('Rematrículas', e.remat), item('Pendentes', e.pendentes), item('Não vão renovar', e.nao_renova, e.nao_renova ? 'alerta' : ''),
+      item('Desconto médio', e.desconto == null ? '—' : pctBR(e.desconto)), item('Vagas livres', e.disponiveis ?? '—'),
+      item('Ocupação', e.ocupacao == null ? '—' : pctBR(e.ocupacao * 100), e.ocupacao > 1 ? 'alerta' : '')].join('');
+  }
+  const linhaHtml = (a) => `<tr data-id="${a.id}" class="${atual && atual.id === a.id ? 'on' : ''}" tabindex="-1">
+    <td><b>${esc(titulo(a.nome))}</b>${a.novo ? ' <span class="tag t-novo">novo</span>' : ''}${a.docs_pendentes ? ` <span class="tag t-vencendo" title="Falta: ${esc(a.docs_pendentes)}">doc.</span>` : ''}
+      <small class="dado">${a.mat ? 'Mat. ' + esc(a.mat) : 'sem matrícula'}</small></td>
+    <td><span class="tag t-${a.status}">${esc(STATUS_CURTO[a.status] || a.status)}</span></td>
+    <td class="num">${a.desconto != null ? pctBR(a.desconto) : '<span class="dado">—</span>'}</td>
+    <td>${a.categoria ? esc(a.categoria) : '<span class="dado">—</span>'}</td>
+    <td>${a.pag.forma ? esc(a.pag.forma) + (a.pag.valor_bruto ? ` <small class="dado">${esc(a.pag.valor_bruto)}</small>` : '') : '<span class="dado">—</span>'}</td>
+    <td>${a.data_matricula ? dataBR(a.data_matricula) : '<span class="dado">—</span>'}</td></tr>`;
+  function desenharLista() {
+    const q = norm($('#rq', el).value).trim(), fs = $('#rs', el).value, fc = $('#rc', el).value;
+    vis = lista.filter((a) => (!q || q.split(/\s+/).every((w) => norm(a.nome + ' ' + (a.mat || '')).includes(w))) && (!fs || a.status === fs)
+      && (!fc || (fc === '__docs' ? a.docs_pendentes : S_norm(a.categoria) === S_norm(fc)))).sort((x, y) => x.nome.localeCompare(y.nome));
+    lb.innerHTML = vis.length ? vis.map(linhaHtml).join('')
+      : `<tr><td colspan="6" class="vazio">${lista.length ? 'Ninguém com esse filtro.' : 'Nenhum aluno nesta sala ainda. Use "Aluno novo" ou importe a planilha.'}</td></tr>`;
+    totais();
+  }
+  function atualizarLinha(a) {
+    const tr = lb.querySelector(`tr[data-id="${a.id}"]`);
+    if (tr) tr.outerHTML = linhaHtml(a);
+    totais();
+  }
+
+  // ── Painel do aluno ──
+  const campo = (k, rot, tipo = 'texto', extra = {}) => {
+    const v = k.startsWith('pag.') ? atual.pag[k.slice(4)] ?? '' : atual[k] ?? '';
+    const id = 'pc-' + k.replace('.', '-');
+    if (tipo === 'area') return `<div class="campo ${extra.largo ? 'inteiro' : ''}"><label for="${id}">${rot}</label><textarea id="${id}" data-k="${k}" rows="2">${esc(v)}</textarea></div>`;
+    if (tipo === 'check') return `<label class="chk ${extra.largo ? 'inteiro' : ''}"><input type="checkbox" id="${id}" data-k="${k}" ${v === 1 || v === 'Sim' ? 'checked' : ''}> ${rot}</label>`;
+    const valor = tipo === 'pct' ? (v === '' || v == null ? '' : String(v).replace('.', ',')) : v;
+    return `<div class="campo ${extra.largo ? 'inteiro' : ''}"><label for="${id}">${rot}</label>
+      <div class="${tipo === 'pct' ? 'com-sufixo' : ''}"><input id="${id}" data-k="${k}" value="${esc(valor)}" ${tipo === 'data' ? 'type="date"' : ''}
+        ${extra.lista ? `list="dl-${extra.lista}"` : ''} ${tipo === 'pct' ? 'inputmode="decimal"' : ''} ${tipo === 'dinheiro' ? 'inputmode="decimal" placeholder="0,00"' : ''} placeholder="${esc(extra.ph || '')}">${tipo === 'pct' ? '<span>%</span>' : ''}</div></div>`;
+  };
+  function desenharPainel() {
+    if (!atual) {
+      painel.classList.remove('aberto');
+      painel.innerHTML = `<div class="painel-vazio">${icone('alunos')}<p><b>Clique num aluno</b> para ver e editar os dados da matrícula dele.</p>
+        <p class="dado">Tudo grava sozinho quando você sai do campo. As setas ↑ ↓ passam para o aluno de cima ou de baixo.</p></div>`;
+      return;
+    }
+    const a = atual, i = vis.findIndex((x) => x.id === a.id);
+    painel.classList.add('aberto');
+    painel.innerHTML = `<div class="painel-topo">
+        <div><h2>${esc(titulo(a.nome))}</h2><p class="dado">${a.mat ? 'Mat. ' + esc(a.mat) + ' · ' : ''}${a.novo ? 'Matrícula (aluno novo)' : 'Rematrícula · hoje em ' + esc(a.turma_rotulo)}
+          · <a href="#/aluno/${a.id}">abrir a ficha</a></p></div>
+        <div class="acoes" style="flex-wrap:nowrap"><button class="btn peq" id="pAnt" ${i <= 0 ? 'disabled' : ''} title="Aluno anterior (↑)" aria-label="Aluno anterior">◀</button>
+          <button class="btn peq" id="pProx" ${i < 0 || i >= vis.length - 1 ? 'disabled' : ''} title="Próximo aluno (↓)" aria-label="Próximo aluno">▶</button>
+          <button class="btn peq so-celular" id="pFechar" aria-label="Fechar">×</button></div></div>
+      <div class="painel-corpo">
+        <section><h3>Situação</h3>
+          <div class="botoes-situacao" role="radiogroup" aria-label="Situação">${Object.entries(STATUS_CURTO).map(([k, v]) =>
+            `<button type="button" role="radio" aria-checked="${a.status === k}" data-st="${k}" class="st-${k} ${a.status === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+          <div class="campos">${campo('data_matricula', 'Data de efetivação', 'data')}
+            <div class="campo"><label for="pc-serie">Sala em ${d.ano}</label><select id="pc-serie" data-k="serie_destino">${d.series.map((s) => `<option value="${s.chave}" ${a.destino === s.chave ? 'selected' : ''}>${esc(s.rotulo)}</option>`).join('')}</select></div></div>
+          <p class="dado" style="margin:6px 0 0">Com data de efetivação o aluno conta como efetivado (Concluída).</p></section>
+        <section><h3>Desconto e categoria</h3><div class="campos">${campo('desconto', 'Desconto', 'pct')}${campo('categoria', 'Categoria', 'texto', { lista: 'categoria' })}</div></section>
+        <section><h3>Planos de pagamento</h3><div class="campos">
+          ${campo('pag.plano_mensalidade', 'Mensalidade', 'texto', { lista: 'plano_mensalidade' })}${campo('pag.plano_material', 'Material didático', 'texto', { lista: 'plano_material' })}
+          ${campo('pag.plano_matricula', 'Matrícula / rematrícula', 'texto', { lista: 'plano_matricula' })}</div></section>
+        <section><h3>Pagamento da matrícula</h3><div class="campos">
+          ${campo('pag.valor_bruto', 'Valor bruto', 'dinheiro')}${campo('pag.forma', 'Forma de pagamento', 'texto', { lista: 'forma' })}
+          ${campo('pag.banco', 'Banco / instituição', 'texto', { lista: 'banco' })}${campo('pag.autorizacao', 'Nº autorização / final do cartão')}</div>
+          ${campo('pag.p1_diferente', '1ª parcela com forma de pagamento diferente', 'check', { largo: true })}
+          <div class="campos" id="p1" ${a.pag.p1_diferente ? '' : 'hidden'}>${campo('pag.p1_forma', 'Forma (1ª parcela)', 'texto', { lista: 'forma' })}
+            ${campo('pag.p1_banco', 'Banco (1ª parcela)', 'texto', { lista: 'banco' })}${campo('pag.p1_autorizacao', 'Nº autorização (1ª parcela)')}</div></section>
+        <section><h3>Recebimento</h3><div class="campos">
+          ${campo('pag.parcelas', 'Parcelas / boletos + data', 'texto', { ph: 'Ex.: 3x (30/11 a 30/01)' })}${campo('pag.valor_recebido', 'Valor recebido', 'dinheiro')}</div>
+          ${campo('boletos_entregues', 'Boletos entregues', 'check', { largo: true })}</section>
+        <section><h3>Documentos e observações</h3><div class="campos">
+          ${campo('docs_pendentes', 'Documentos pendentes', 'texto', { largo: true, ph: 'Vazio = nada pendente' })}
+          ${campo('obs_planilha', 'Observações', 'area', { largo: true })}${campo('obs', 'Observação da ficha', 'area', { largo: true })}</div></section>
+      </div>
+      <div class="painel-rodape" id="pEstado">${a.atualizado_em ? `Última alteração: ${esc(a.atualizado_por || '')} em ${dataBR(a.atualizado_em)}` : 'Ainda sem alterações'}</div>`;
+    ligarPainel();
+  }
+  const estado = (txt, cls = '') => { const e = $('#pEstado', painel); if (e) { e.className = 'painel-rodape ' + cls; e.textContent = txt; } };
+  // Grava um campo do aluno aberto e atualiza a lista e o painel com o que o servidor devolveu
+  async function gravar(k, valor, { redesenhar = false } = {}) {
+    const a = atual;
+    estado('Salvando…', 'salvando');
+    try {
+      const r = await api('PUT', '/api/rematricula/celulas', { alteracoes: [{ aluno_id: a.id, campo: k, valor }] });
+      const novo = r.alunos[0];
+      const i = lista.findIndex((x) => x.id === novo.id);
+      if (novo.destino !== sala.chave) {
+        lista.splice(i, 1); toast(`${titulo(novo.nome)} foi para ${d.series.find((s) => s.chave === novo.destino)?.rotulo || 'outra sala'}`);
+        atual = null; desenharLista(); desenharPainel(); return;
+      }
+      lista[i] = novo;
+      if (atual && atual.id === novo.id) atual = novo;
+      atualizarLinha(novo);
+      if (redesenhar) desenharPainel();
+      estado('✓ Salvo às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), 'ok');
+    } catch (e) {
+      estado('Não salvou: ' + e.message, 'erro');
+      toast(e.message, true);
+      desenharPainel(); // volta o valor que está gravado
+    }
+  }
+  function ligarPainel() {
+    $$('[data-st]', painel).forEach((b) => (b.onclick = () => { if (b.dataset.st !== atual.status) gravar('status', b.dataset.st, { redesenhar: true }); }));
+    $$('input[data-k], textarea[data-k], select[data-k]', painel).forEach((inp) => {
+      const k = inp.dataset.k;
+      const valorAtual = () => { const v = k.startsWith('pag.') ? atual.pag[k.slice(4)] ?? '' : atual[k] ?? ''; return inp.type === 'checkbox' ? !!(v === 1 || v === 'Sim') : k === 'desconto' ? (v === '' || v == null ? '' : String(v).replace('.', ',')) : String(v); };
+      if (inp.type === 'checkbox') {
+        inp.onchange = () => { if (k === 'pag.p1_diferente') $('#p1', painel).hidden = !inp.checked; gravar(k, inp.checked ? 'Sim' : ''); };
+      } else if (inp.tagName === 'SELECT') {
+        inp.onchange = () => gravar(k, inp.value);
+      } else {
+        // Grava ao sair do campo (ou Enter, em campo de uma linha), só se mudou
+        const sair = () => { const v = inp.value.trim(); if (v !== valorAtual()) gravar(k, v, { redesenhar: ['data_matricula', 'desconto', 'pag.valor_bruto', 'pag.valor_recebido'].includes(k) }); };
+        inp.onblur = sair;
+        if (k === 'data_matricula') inp.onchange = sair;
+        if (inp.tagName === 'INPUT') inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } };
+      }
+    });
+    $('#pAnt', painel).onclick = () => irPara(-1);
+    $('#pProx', painel).onclick = () => irPara(1);
+    $('#pFechar', painel).onclick = () => { atual = null; desenharLista(); desenharPainel(); };
+  }
+  function abrir(a, focar = false) {
+    // Sair de um campo em edição grava antes de trocar de aluno
+    if (document.activeElement && painel.contains(document.activeElement)) document.activeElement.blur();
+    atual = a;
+    $$('tr.on', lb).forEach((t) => t.classList.remove('on'));
+    const tr = lb.querySelector(`tr[data-id="${a.id}"]`);
+    if (tr) { tr.classList.add('on'); tr.scrollIntoView({ block: 'nearest' }); if (focar) tr.focus({ preventScroll: true }); }
+    desenharPainel();
+  }
+  function irPara(passo) {
+    const i = atual ? vis.findIndex((x) => x.id === atual.id) : -1;
+    const prox = vis[Math.max(0, Math.min(vis.length - 1, i + passo))];
+    if (prox && (!atual || prox.id !== atual.id)) abrir(prox, true);
+  }
+  lb.onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) abrir(lista.find((a) => a.id === +tr.dataset.id), true); };
+  // ↑ ↓ na lista trocam de aluno (fora dos campos do painel)
+  el.addEventListener('keydown', (e) => {
+    if (e.target.closest('input, textarea, select') || !['ArrowDown', 'ArrowUp'].includes(e.key) || !e.target.closest('.sala-lista, .painel-topo')) return;
+    e.preventDefault(); irPara(e.key === 'ArrowDown' ? 1 : -1);
+  });
+  ['rq', 'rs', 'rc'].forEach((id) => { $('#' + id, el).oninput = desenharLista; $('#' + id, el).onchange = desenharLista; });
+  $('#rAtual', el).onclick = () => rotear();
+  $('#rNovo', el).onclick = () => modal('Aluno novo em ' + sala.rotulo, `<form id="fn"><div class="campos">
+      <div class="campo"><label for="nn">Nome do aluno *</label><input id="nn" required></div>
+      <div class="campo"><label for="nm">Matrícula (se já tiver no ACADESC)</label><input id="nm"></div></div>
+      <p class="dado" style="margin-top:8px">Entra como matrícula (aluno novo) em ${esc(sala.rotulo)} ${d.ano}. O resto você preenche no painel ao lado.</p>
+      <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Cadastrar</button></div></form>`,
+  { onAbrir: (m, fechar) => { $('#fn', m).onsubmit = tentar(async (e) => {
+    e.preventDefault();
+    const r = await api('POST', '/api/alunos', { nome: $('#nn', m).value.trim().toUpperCase(), mat: $('#nm', m).value.trim() || undefined, serie_chave: sala.chave });
+    fechar(); invalidar(); toast('Aluno novo cadastrado');
+    const c2 = await api('GET', '/api/rematricula/controle');
+    lista = c2.alunos.filter((a) => a.destino === sala.chave);
+    desenharLista();
+    const novo = lista.find((a) => a.id === r.id);
+    if (novo) abrir(novo, true);
+  }); } });
+  desenharLista();
+  desenharPainel();
+}
+
+// Listas das colunas de opção (o que aparece ao digitar nas colunas de lista). Uma opção por linha.
+function editarListasRem(L) {
+  const NOMES = { categoria: 'Categoria', forma: 'Forma de pagamento', banco: 'Banco/instituição', plano_mensalidade: 'Plano da mensalidade',
+    plano_material: 'Plano do material didático', plano_matricula: 'Plano da matrícula/rematrícula' };
+  modal('Listas de opções da planilha', `<p class="dado">Uma opção por linha. Nas células também dá para digitar um valor que não está na lista.</p>
+    <div class="grade g3" style="margin-top:10px">${Object.entries(NOMES).map(([k, n]) => `<div class="campo"><label for="l_${k}">${n}</label>
+      <textarea id="l_${k}" rows="6">${esc((L[k] || []).join('\n'))}</textarea></div>`).join('')}</div>
+    <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri" id="lOk">Salvar listas</button></div>`,
+  { onAbrir: (m, fechar) => { $('#lOk', m).onclick = tentar(async () => {
+    await api('PUT', '/api/rematricula/listas', Object.fromEntries(Object.keys(NOMES).map((k) => [k, $('#l_' + k, m).value.split('\n')])));
+    fechar(); toast('Listas salvas'); rotear();
+  }); } });
+}
+
+// 5.7.0 — Na ficha: o que veio da planilha de controle (só leitura; para mudar, mude na planilha e importe de novo)
+function quadroPlanilha(r, destino) {
+  // Aparece para quem veio da planilha importada e para quem foi preenchido direto na planilha do app (5.8.0)
+  if (!r.planilha_em && !r.pagamento_json && r.desconto == null && !r.categoria && !r.docs_pendentes && !r.obs_planilha && !r.boletos_entregues) return '';
+  let p = {};
+  try { p = JSON.parse(r.pagamento_json || '{}') || {}; } catch { /* registro estragado: mostra o resto */ }
+  const itens = [
+    ['Categoria', r.categoria], ['Desconto', r.desconto != null ? String(r.desconto).replace('.', ',') + '%' : ''], ['Tipo', p.tipo],
+    ['Plano da mensalidade', p.plano_mensalidade], ['Plano do material didático', p.plano_material],
+    ['Valor bruto (matrícula/rematrícula)', p.valor_bruto], ['Plano da matrícula/rematrícula', p.plano_matricula],
+    ['Forma de pagamento', p.forma], ['Banco/instituição', p.banco], ['Nº autorização / final do cartão', p.autorizacao],
+    ['1ª parcela com forma diferente', p.p1_diferente ? [p.p1_forma, p.p1_banco, p.p1_autorizacao].filter(Boolean).join(' · ') || 'Sim' : ''],
+    ['Parcelas / boletos', p.parcelas], ['Valor recebido', p.valor_recebido], ['Documentos pendentes', r.docs_pendentes],
+    ['Boletos entregues', r.boletos_entregues ? 'Sim' : ''], ['Observações da planilha', r.obs_planilha],
+  ].filter(([, v]) => v);
+  return `<details style="margin-top:12px" ${r.docs_pendentes ? 'open' : ''}><summary><b>Controle da matrícula</b>
+      <small class="dado">${r.planilha_em ? `planilha importada em ${dataBR(r.planilha_em)} · ` : ''}${destino ? `<a href="#/rematricula/${esc(destino)}">editar na planilha da sala</a>` : ''}</small></summary>
+    <div class="campos" style="margin-top:8px">${itens.map(([k, v]) => `<div class="campo"><label>${esc(k)}</label><div>${esc(v)}</div></div>`).join('')}</div></details>`;
+}
+
+// 5.7.0 — Importar a planilha "Controle de Matrículas e Rematrículas" do Google (baixada como .xlsx).
+// Passo 1: escolher o arquivo. Passo 2: conferência (o que muda). Passo 3: gravar. O mesmo arquivo é enviado duas vezes.
+function importarPlanilhaRematricula() {
+  const ST = { pendente: 'Não iniciada', concluida: 'Concluída', nao_renova: 'Não vai renovar' };
+  modal('Importar planilha de controle', '<div id="ipl"></div>', { onAbrir: (m, fechar) => {
+    const caixa = $('#ipl', m);
+    let arquivo = null;
+    const passo1 = (erroTxt = '') => {
+      caixa.innerHTML = `<p>Traz para cá a planilha <b>Controle de Matrículas e Rematrículas</b> do Google: situação, data de efetivação, série do ano que vem,
+        desconto, categoria, pagamento, documentos pendentes e as vagas de cada série.</p>
+        <ol class="dado" style="padding-left:18px"><li>Abra a planilha no Google.</li><li>Menu <b style="display:inline">Arquivo › Fazer download › Microsoft Excel (.xlsx)</b>.</li><li>Escolha o arquivo baixado aqui embaixo.</li></ol>
+        ${erroTxt ? `<div class="dica ib-aviso">${esc(erroTxt)}</div>` : ''}
+        <div class="campo" style="margin-top:10px"><input type="file" id="ipl_arq" accept=".xlsx"></div>
+        <p class="dado" style="margin-top:8px">Antes de gravar, aparece o que vai mudar. Pode importar de novo sempre que a planilha mudar. Depois, apague o arquivo baixado (tem dados das famílias).</p>
+        <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri" id="ipl_ler">Conferir</button></div>`;
+      $('#ipl_ler', m).onclick = async () => {
+        arquivo = $('#ipl_arq', m).files[0];
+        if (!arquivo) return toast('Escolha o arquivo .xlsx', true);
+        caixa.innerHTML = `<p class="ib-lendo" role="status">Lendo <b>${esc(arquivo.name)}</b>…</p>`;
+        try { passo2(await api('POST', '/api/rematricula/planilha', undefined, arquivo)); } catch (e) { passo1(e.message); }
+      };
+    };
+    const passo2 = (r) => {
+      const na = r.nao_achados;
+      caixa.innerHTML = `${r.avisos.map((x) => `<div class="dica ib-aviso">${esc(x)}</div>`).join('')}
+        <div class="grade g4" style="margin-top:4px">
+          <div class="cartao kpi destaque"><div class="rot">Alunos encontrados</div><div class="val">${r.achados}</div><div class="det">de ${r.linhas} linhas, pela matrícula</div></div>
+          <div class="cartao kpi"><div class="rot">Situação muda</div><div class="val">${r.mudam}</div><div class="det">no sistema</div></div>
+          <div class="cartao kpi ${na.length ? 'alerta' : ''}"><div class="rot">Não encontrados</div><div class="val">${na.length}</div><div class="det">ficam de fora</div></div>
+          <div class="cartao kpi"><div class="rot">Vagas</div><div class="val">${r.vagas.length}</div><div class="det">séries com vagas na planilha</div></div>
+        </div>
+        <p style="margin-top:12px">Na planilha: ${Object.entries(r.contagem).filter(([, n]) => n).map(([k, n]) => `<b style="display:inline">${n}</b> ${ST[k].toLowerCase()}`).join(' · ')}
+          · ${r.com_docs} com documento pendente · ${r.com_pagamento} com dados de pagamento.</p>
+        <p class="dado">Categorias: ${r.categorias.map(([k, n]) => `${esc(k)} (${n})`).join(', ')}.</p>
+        ${r.mantidos ? `<div class="dica">${r.mantidos} aluno(s) estão vazios ou "Pendente" na planilha, mas já avançaram no sistema: a situação do sistema é mantida
+          (ex.: ${esc(r.exemplos_mantidos.slice(0, 3).join('; '))}).</div>` : ''}
+        ${na.length ? `<details style="margin-top:8px"><summary>Quem não foi encontrado (${na.length})</summary><ul class="dado" style="padding-left:18px;margin-top:6px">
+          ${na.map((x) => `<li>${esc(titulo(x.nome))} — ${esc(x.aba)}${x.mat ? ` · mat. ${esc(x.mat)}` : ' · sem matrícula'}${x.novo ? ' · aluno novo' : ''}${x.repetido ? ' · repetido em outra aba' : ''}</li>`).join('')}</ul></details>` : ''}
+        ${na.filter((x) => !x.repetido).length ? `<label class="chk" style="margin-top:8px"><input type="checkbox" id="ipl_novos" checked>
+          Cadastrar ${na.filter((x) => !x.repetido).length === 1 ? 'o aluno novo' : `os ${na.filter((x) => !x.repetido).length} alunos novos`} da planilha na sala deles (assim nada fica só na planilha)</label>` : ''}
+        ${r.sem_linha ? `<p class="dado" style="margin-top:8px">${r.sem_linha} aluno(s) do sistema (fora a 3ª série EM) não estão na planilha: nada muda para eles.</p>` : ''}
+        ${r.vagas.length ? `<p class="dado">Vagas: ${r.vagas.map((v) => `${esc(v.rotulo)} ${v.capacidade}`).join(' · ')}.</p>` : ''}
+        <div class="rodape"><button type="button" class="btn" id="ipl_outro">Escolher outro arquivo</button><button type="button" class="btn" data-fechar>Cancelar</button>
+          <button class="btn pri" id="ipl_ok">Importar ${r.achados} alunos</button></div>`;
+      $('#ipl_outro', m).onclick = () => passo1();
+      $('#ipl_ok', m).onclick = tentar(async () => {
+        const novos = $('#ipl_novos', m) && $('#ipl_novos', m).checked ? '&novos=1' : '';
+        const res = await api('POST', '/api/rematricula/planilha?aplicar=1' + novos, undefined, arquivo);
+        fechar(); invalidar();
+        toast(`Planilha importada: ${res.achados} alunos, ${res.mudam} mudaram de situação${res.criados ? `, ${res.criados} alunos novos cadastrados` : ''}${res.vagas.length ? ', vagas atualizadas' : ''}`);
+        rotear();
+      });
+    };
+    passo1();
+  } });
+}
 
 // ───────────── Pendências ─────────────
 TELAS.pendencias = async (c) => {
