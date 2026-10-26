@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/10/2026**, versão **5.13.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.14.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -359,6 +359,19 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   (o servidor manda `faltam_ch` além de `faltam`).
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Cadastro mais caprichado e busca nas observações (versão 5.14.0, 26/10/2026)
+Sugestões do Claude aprovadas pelo Kevin ("faça todos os de código"). Nada mudou no visual: os avisos usam o toast e a confirmação que já existiam.
+- **Aluno repetido:** `POST /api/alunos` devolve 409 `{ parecidos }` se já existe aluno (ativo ou ex-aluno, não anonimizado) com o mesmo CPF
+  (CPF com 11 dígitos iguais, como o 000.000.000-00 da demonstração, não conta) ou com o mesmo nome (sem acento/maiúscula) e nascimento.
+  A tela pergunta "Cadastrar mesmo assim?" e reenvia com `_mesmo_assim: true`.
+- **CPF conferido:** `cpfValido()` em app.js checa os dígitos verificadores. Errado ou incompleto: toast na hora e `setCustomValidity`, que não deixa salvar.
+  Só confere o campo que a pessoa mexeu (CPF antigo errado na ficha não trava outra edição).
+- **Formatação:** `mascarar(raiz)` + `MASCARAS` (data-mascara="cpf|tel|cep") arrumam ao sair do campo: 000.000.000-00, (11) 90000-0000,
+  (11) 4000-0000, 4000-0000 e 00000-000. Número fora desses tamanhos fica como foi digitado. Usado no cadastro de aluno e no Novo contato.
+- **Busca nas observações** (rotas/busca.js): olha também `obs`/`saida_obs` do aluno, `obs` de autorizados, interessados e bolsas, e `obs`/`contato_obs`
+  das vivências. Quando só a observação bateu, o resultado diz "achado nas observações".
+- Ajuda da tela Alunos ganhou essas dicas.
 
 ### Formulários de aluno organizados em seções (versão 5.13.0, 26/10/2026)
 Pedido do Kevin: o cadastro "parecia só um monte de caixas jogadas". Escolhido por ele: **seções com título**.

@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.13.1';
+const VERSAO = '5.14.0';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -480,6 +480,38 @@ const ARTE_LOGIN = `<div class="login-arte">
 function telaAguarde(tituloTxt, textoHtml) {
   $('#raiz').innerHTML = `<div class="login">${ARTE_LOGIN}<div class="login-form"><div class="aguarde" role="status">
     <span class="girando" aria-hidden="true"></span><h2>${esc(tituloTxt)}</h2><p>${textoHtml}</p></div></div></div>`;
+}
+
+// 5.14.0: CPF, telefone e CEP se arrumam ao sair do campo (data-mascara="cpf|tel|cep"); número fora do padrão fica como foi digitado
+const MASCARAS = {
+  cpf: (d) => (d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : ''),
+  tel: (d) => (d.length === 11 ? d.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3') : d.length === 10 ? d.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
+    : d.length === 9 ? d.replace(/(\d{5})(\d{4})/, '$1-$2') : d.length === 8 ? d.replace(/(\d{4})(\d{4})/, '$1-$2') : ''),
+  cep: (d) => (d.length === 8 ? d.replace(/(\d{5})(\d{3})/, '$1-$2') : ''),
+};
+// Os dois últimos números do CPF são a conferência dos nove primeiros: pega erro de digitação sem precisar de internet
+function cpfValido(d) {
+  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
+  for (const n of [9, 10]) { let s = 0; for (let i = 0; i < n; i++) s += +d[i] * (n + 1 - i); if ((s * 10) % 11 % 10 !== +d[n]) return false; }
+  return true;
+}
+// Só confere o que a pessoa mexeu: um CPF antigo errado na ficha não impede de salvar outra mudança
+function mascarar(raiz) {
+  $$('[data-mascara]', raiz).forEach((el) => {
+    const tipo = el.dataset.mascara;
+    const conferir = () => {
+      const d = el.value.replace(/\D/g, '');
+      el.setCustomValidity(tipo !== 'cpf' || !el.value.trim() || cpfValido(d) ? ''
+        : d.length === 11 ? 'CPF inválido: algum número foi digitado errado. Confira no documento.' : 'CPF incompleto: são 11 números.');
+    };
+    el.addEventListener('input', conferir);
+    el.addEventListener('change', () => {
+      const f = MASCARAS[tipo](el.value.replace(/\D/g, ''));
+      if (f) el.value = f;
+      conferir();
+      if (el.validationMessage) toast(el.validationMessage, true);
+    });
+  });
 }
 
 // Botão de olho dentro de cada campo de senha: mostra/esconde o que foi digitado (útil para quem erra a senha no balcão)
@@ -1057,16 +1089,17 @@ function formAluno(a) {
       ${secao('Aluno', linha('1fr', campo('nome', 'Nome completo *', 'text', 'required'))
         + linha('2fr 1fr 1fr', `<div class="campo"><label for="f_serie_chave">${novo ? 'Série que vai cursar *' : 'Série atual'}</label><select id="f_serie_chave">${opSerie}</select></div>
           ${campo('turma', 'Turma (A, B…)')}${campo('mat', 'Matrícula (ACADESC)', 'text', novo ? '' : 'disabled title="A matrícula vem do ACADESC e não muda por aqui"')}`)
-        + linha('repeat(5, 1fr)', `${campo('dt_nasc', 'Nascimento', 'date')}${campo('cpf', 'CPF')}${campo('rg', 'RG')}${campo('ra', 'R.A. (SED)')}${campo('nis', 'NIS')}`))}
-      ${secao('Mãe', linha('2fr 1fr 1.4fr', `${campo('nome_mae', 'Nome')}${campo('cel_mae', 'Celular', 'tel')}${campo('email_mae', 'E-mail', 'email')}`))}
-      ${secao('Pai', linha('2fr 1fr 1.4fr', `${campo('nome_pai', 'Nome')}${campo('cel_pai', 'Celular', 'tel')}${campo('email_pai', 'E-mail', 'email')}`))}
-      ${secao('Responsável financeiro', linha('2fr 1fr 1fr 1fr', `${campo('nome_resp', 'Nome')}${campo('cpf_resp', 'CPF')}${campo('rg_resp', 'RG')}${campo('tel_resp', 'Telefone', 'tel')}`),
+        + linha('repeat(5, 1fr)', `${campo('dt_nasc', 'Nascimento', 'date')}${campo('cpf', 'CPF', 'text', 'data-mascara="cpf"')}${campo('rg', 'RG')}${campo('ra', 'R.A. (SED)')}${campo('nis', 'NIS')}`))}
+      ${secao('Mãe', linha('2fr 1fr 1.4fr', `${campo('nome_mae', 'Nome')}${campo('cel_mae', 'Celular', 'tel', 'data-mascara="tel"')}${campo('email_mae', 'E-mail', 'email')}`))}
+      ${secao('Pai', linha('2fr 1fr 1.4fr', `${campo('nome_pai', 'Nome')}${campo('cel_pai', 'Celular', 'tel', 'data-mascara="tel"')}${campo('email_pai', 'E-mail', 'email')}`))}
+      ${secao('Responsável financeiro', linha('2fr 1fr 1fr 1fr', `${campo('nome_resp', 'Nome')}${campo('cpf_resp', 'CPF', 'text', 'data-mascara="cpf"')}${campo('rg_resp', 'RG')}${campo('tel_resp', 'Telefone', 'tel', 'data-mascara="tel"')}`),
         '<span class="acoes"><button type="button" class="btn peq" data-copiar="mae">Mesmo que a mãe</button><button type="button" class="btn peq" data-copiar="pai">Mesmo que o pai</button></span>')}
-      ${secao('Endereço', linha('1fr 3fr', `${campo('cep', 'CEP')}${campo('endereco', 'Rua e número')}`)
-        + linha('1.4fr 1.4fr .5fr 1fr', `${campo('bairro', 'Bairro')}${campo('cidade', 'Cidade')}${campo('uf', 'UF')}${campo('telefone', 'Telefone de casa')}`))}
+      ${secao('Endereço', linha('1fr 3fr', `${campo('cep', 'CEP', 'text', 'data-mascara="cep"')}${campo('endereco', 'Rua e número')}`)
+        + linha('1.4fr 1.4fr .5fr 1fr', `${campo('bairro', 'Bairro')}${campo('cidade', 'Cidade')}${campo('uf', 'UF')}${campo('telefone', 'Telefone de casa', 'tel', 'data-mascara="tel"')}`))}
       ${novo ? '<div class="dica">Aluno novo: lembre de fazer a consulta SPC/SERASA e de cadastrá-lo também no ACADESC. Depois de importar o ACADESC, os dados serão atualizados pela matrícula.</div>' : ''}
       <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`,
   { larga: true, onAbrir: (el, fechar) => {
+    mascarar(el);
     // "Mesmo que a mãe/o pai": copia nome e celular para o responsável (CPF e RG continuam para digitar)
     $$('[data-copiar]', el).forEach((b) => (b.onclick = () => {
       const q = b.dataset.copiar;
@@ -1079,7 +1112,13 @@ function formAluno(a) {
       const b = {};
       CAMPOS_FORM_ALUNO.forEach((k) => { b[k] = $('#f_' + k, el).value.trim(); });
       if (novo) {
-        const r = await api('POST', '/api/alunos', b);
+        let r;
+        try { r = await api('POST', '/api/alunos', b); } catch (e) {
+          if (!e.dados?.parecidos) throw e;
+          const lista = e.dados.parecidos.map((p) => `${titulo(p.nome)} (Mat. ${p.mat || '—'}${p.ativo ? '' : ', ex-aluno'})`).join('; ');
+          if (!(await confirmar(`Já existe aluno com o mesmo CPF ou com o mesmo nome e nascimento: ${lista}. Confira na lista de alunos antes. Cadastrar mesmo assim?`, 'Cadastrar mesmo assim'))) return;
+          r = await api('POST', '/api/alunos', { ...b, _mesmo_assim: true });
+        }
         await api('PUT', `/api/alunos/${r.id}/rematricula`, { status: 'reservada' });
         fechar(); invalidar(); toast('Aluno cadastrado'); location.hash = '#/aluno/' + r.id;
       } else {
@@ -1710,6 +1749,7 @@ function formInteressado(i) {
       + linha('1fr', campo('obs', 'Observação')))}
   <div class="rodape">${novo ? '' : '<button type="button" class="btn perigo" id="del" style="margin-right:auto">Excluir</button>'}<button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`,
   { larga: true, onAbrir: (el, fechar) => {
+    $('#i_contato', el).dataset.mascara = 'tel'; mascarar(el);
     $('#fi', el).onsubmit = tentar(async (ev) => {
       ev.preventDefault();
       const b = {};

@@ -28,7 +28,11 @@ const AJUDA = {
     nome: 'Alunos',
     serve: 'Lista de todos os alunos ativos, separada por turma, com filtros por turma, situação da rematrícula e alunos novos.',
     passos: ['Digite parte do nome, da mãe, da matrícula ou do CPF para filtrar.', 'Cada turma mostra quantos alunos tem e uma barrinha verde com quanto da rematrícula já foi feito.', 'Clique no aluno para abrir a ficha completa.', '"+ Cadastrar aluno novo" serve para quem está entrando na escola.', 'Marque "Ex-alunos" para ver quem saiu (transferidos, formados, quem não renovou).'],
-    dicas: ['Os alunos vêm da importação do ACADESC (Configurações › Importar dados). Corrija no ACADESC e importe de novo sempre que puder.'],
+    dicas: ['Os alunos vêm da importação do ACADESC (Configurações › Importar dados). Corrija no ACADESC e importe de novo sempre que puder.',
+      'No cadastro, CPF, celular e CEP se arrumam sozinhos quando você sai do campo. CPF com número errado é avisado na hora e não deixa salvar.',
+      'Se já existir aluno com o mesmo CPF, ou com o mesmo nome e nascimento, o sistema avisa antes de cadastrar de novo.',
+      '"Mesmo que a mãe" / "Mesmo que o pai" copiam o nome e o celular para o responsável financeiro.',
+      'A busca de cima (tecla /) também acha o que foi escrito nas observações.'],
   },
   aluno: {
     nome: 'Ficha do aluno',

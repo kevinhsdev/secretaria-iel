@@ -436,6 +436,16 @@ rota('POST', '/api/alunos', async (req, res, { u }) => {
   if (!String(b.nome || '').trim()) falha(400, 'Informe o nome do aluno');
   if (!S.porChave(b.serie_chave)) falha(400, 'Escolha a série que o aluno vai cursar');
   if (b.mat && db.prepare('SELECT 1 FROM alunos WHERE mat = ?').get(String(b.mat))) falha(400, 'Já existe aluno com essa matrícula');
+  // Aluno repetido (5.14.0): mesmo CPF, ou mesmo nome e nascimento. A tela pergunta e, se a pessoa confirmar, reenvia com _mesmo_assim.
+  if (!b._mesmo_assim) {
+    const cpf = String(b.cpf || '').replace(/\D/g, '');
+    const cpfBom = cpf.length === 11 && !/^(\d)\1+$/.test(cpf); // 000.000.000-00 e parecidos não contam
+    const nome = S.norm(b.nome);
+    const parecidos = db.prepare('SELECT id, nome, mat, cpf, dt_nasc, ativo FROM alunos WHERE anonimizado IS NULL').all()
+      .filter((x) => (cpfBom && String(x.cpf || '').replace(/\D/g, '') === cpf) || (b.dt_nasc && x.dt_nasc === b.dt_nasc && S.norm(x.nome) === nome))
+      .map((x) => ({ id: x.id, nome: x.nome, mat: x.mat, ativo: x.ativo }));
+    if (parecidos.length) falha(409, 'Já existe aluno parecido', { parecidos });
+  }
   const reg = {};
   for (const k of CAMPOS_EDITAVEIS) if (b[k] !== undefined) reg[k] = b[k] === '' ? null : b[k];
   const s = S.porChave(b.serie_chave);
