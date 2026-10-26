@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/10/2026**, versão **5.10.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.12.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -359,6 +359,40 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   (o servidor manda `faltam_ch` além de `faltam`).
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Endereço seguro (https) — tira o "Não seguro" (versão 5.12.0, 26/10/2026)
+O Kevin instalou o SEK como app pelo endereço http://192.168.0.38 e o navegador mostra "Não seguro" no alto. Causa: http pela rede.
+- `lib/certificado.js` cria, **só com o crypto do Node** (DER/X.509 escrito à mão, sem OpenSSL e sem mexer no Windows), uma raiz própria
+  da escola (`<dados>\certificado\SEK-raiz.cer` + `raiz.key`, criada uma vez) e o certificado do servidor (825 dias) com o nome do PC,
+  `localhost`, 127.0.0.1 e os IPs da rede. A tentativa por PowerShell (`New-SelfSignedCertificate`) foi bloqueada pela proteção do Claude Code.
+- `server.js`: se o certificado existe, sobe também um servidor https na **porta http + 443** (3000 → **3443**; `IEL_PORTA_HTTPS` muda),
+  com o mesmo atendimento. Ao abrir, se mudou o IP/nome do PC ou falta < 30 dias, **renova sozinho com a mesma raiz** (ninguém reinstala).
+  "Renovar agora" troca na hora (`setSecureContext`). `GET /api/certificado/raiz` é público (os outros PCs baixam antes de entrar).
+- Configurações › Celular e rede › **Endereço seguro**: criar certificado, baixar o .cer, passo a passo do Windows (Máquina Local › Autoridades
+  de Certificação Raiz Confiáveis), reinstalar o app pelo https, Android, e a chave **"Mandar todo mundo para o endereço seguro"**
+  (`https_redirecionar`: redireciona http da rede para https; este PC/localhost continua no http, que o navegador já trata como seguro).
+- **A instalação do certificado no Windows é feita pela pessoa** (o Claude não instala certificado raiz). Não testado ainda: Chrome
+  depois de instalar a raiz e celular. Testado: conexão TLS conferida pelo Node confiando só na raiz (8/8), certutil lê o certificado,
+  renovação automática com o IP da rede, tela no Chrome. Rodando para o Kevin ver em http://localhost:4000 e https://Dell7:4443 (demonstração).
+
+### Ano automático nas mensagens, ex-aluno na importação, aviso de backup, atualização por .zip e feriados da cidade (5.11.0, 26/10/2026)
+Pedidos do Kevin depois da virada do ano (itens 1 a 5 sugeridos por mim e aprovados todos):
+1. **Modelos de mensagem** ganham `{ano}` (ano da matrícula), `{data_desconto}`, `{data_garantia}`, `{data_fim}` (da config, em dd/mm/aaaa),
+   preenchidos em `preencherModelo` (app.js), também no título. Migração única (`config.modelos_campos_ano`) troca nos modelos já gravados
+   "22/01/2027", "07/11/2026", "04/12/2026" e "2027" pelos campos. O aviso de concluinte no contrato usa o ano da config.
+2. **Importar do ACADESC não reativa** quem tem `saida_motivo`: atualiza os dados, mantém inativo e lista "ex-alunos vieram na planilha"
+   com link para a ficha (Reativar é à mão).
+3. **Aviso no Início** quando a pasta das cópias está no mesmo disco do banco (`mesmo_disco` em `backup.estado`). Só no Início.
+4. **Atualizar por .zip** (Configurações › Atualizações, `POST /api/admin/atualizacao/zip`, `aplicarZip` em lib/atualizacao.js): aceita o
+   "Download ZIP" do GitHub (acha a pasta pelo server.js + lib/versao.js) ou a pasta app zipada; recusa versão mais velha e caminho com
+   `..`; faz cópia de segurança (`-atualizacao`), copia a app atual para `app-antigo` (ao lado), grava por cima, apaga arquivos que saíram e
+   reinicia (código 90 do .bat). Não renomeia a pasta app porque o .bat roda com ela como pasta atual (o Windows não deixa). Erro no
+   meio → copia app-antigo de volta. Não troca o `Iniciar Secretaria.bat` (o Windows lê .bat enquanto roda).
+5. **Feriados da cidade** (Configurações › Geral, `feriados_cidade`, um por linha "dd/mm Nome"): ao salvar, entram no ano letivo e no da
+   matrícula; a virada põe no ano seguinte. **Não foram cadastrados**: um site de calendário (proximoferiado.net, não oficial) indica
+   14/10 (aniversário da cidade) — confirmar com a Samara antes. Lei municipal 3.184/2013 aparece citada para Corpus Christi (já incluso).
+- Testes (pasta temporária, demonstração): .zip 9/9 numa CÓPIA da app; 6/6 dos itens 1, 2, 3, 5; migração de modelo antigo conferida;
+  telas conferidas no Chrome pelo conteúdo da página.
 
 ### Ajuda para instalar o Git (versão 5.10.1, 26/10/2026)
 Pedido do Kevin: em Configurações › Atualizações, quando o PC não tem Git, um cartão "Instalar o Git" (`cartaoInstalarGit` em etapa4.js):

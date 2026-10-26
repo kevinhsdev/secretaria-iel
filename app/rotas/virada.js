@@ -24,6 +24,13 @@ function feriadosDoAno(ano) {
   ];
 }
 
+// Feriados da cidade (Configurações › Geral), um por linha: "14/10 Aniversário da cidade". Linha fora do formato é ignorada.
+function feriadosCidade(texto, ano) {
+  return String(texto || '').split(/\r?\n/).map((l) => l.match(/^\s*(\d{1,2})\/(\d{1,2})\s*[-–:]?\s*(.*)$/)).filter(Boolean)
+    .filter(([, d, m]) => +m >= 1 && +m <= 12 && +d >= 1 && +d <= 31)
+    .map(([, d, m, nome]) => [`${ano}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`, nome.trim() || 'Feriado municipal']);
+}
+
 const maisUmAno = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? (+iso.slice(0, 4) + 1) + (iso.slice(4) === '-02-29' ? '-02-28' : iso.slice(4)) : iso);
 
 module.exports = function virada(ctx) {
@@ -100,6 +107,8 @@ module.exports = function virada(ctx) {
         const ins = db.prepare('INSERT OR IGNORE INTO feriados (data, nome) VALUES (?, ?)');
         for (const f of feriadosDoAno(para + 1)) ins.run(...f);
       }
+      const insCidade = db.prepare('INSERT OR IGNORE INTO feriados (data, nome) VALUES (?, ?)');
+      for (const f of feriadosCidade(c.feriados_cidade, para + 1)) insCidade.run(...f);
     });
     registrar(u.login, `fez a virada do ano letivo ${para - 1} → ${para}`, { ...res_, copia: copia.arquivo });
     json(res, 200, { ...res_, ano_letivo: para, ano_matricula: para + 1, copia: copia.arquivo });
@@ -133,4 +142,5 @@ module.exports = function virada(ctx) {
   });
 };
 module.exports.feriadosDoAno = feriadosDoAno;
+module.exports.feriadosCidade = feriadosCidade;
 module.exports.MOTIVOS = MOTIVOS;

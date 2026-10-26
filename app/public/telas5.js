@@ -504,12 +504,12 @@ TELAS.relatorios = async (c, ano) => {
 
 // ═════════════ MENSAGENS ═════════════
 // Lista de modelos à esquerda; à direita o editor e a prévia de como a família vai ver no WhatsApp
-const EXEMPLO_MSG = { aluno: 'Ana Lima', responsavel: 'Diego', serie: '5º ano do Fundamental I', serie_destino: '6º ano do Fundamental II', documentos: 'Contrato 2027, Ficha de saúde', prazo: '07/11' };
+const EXEMPLO_MSG = { aluno: 'Ana Lima', responsavel: 'Diego', serie: '5º ano do Fundamental I', serie_destino: '6º ano do Fundamental II', documentos: 'Contrato, Ficha de saúde', prazo: '07/11' };
 let modeloAberto = null;
 TELAS.mensagens = async (c) => {
   const modelos = await api('GET', '/api/modelos');
   if (modeloAberto !== 'novo' && !modelos.some((m) => m.id === modeloAberto)) modeloAberto = modelos[0] ? modelos[0].id : 'novo';
-  const CAMPOS_MSG = ['{aluno}', '{responsavel}', '{serie}', '{serie_destino}', '{documentos}', '{prazo}'];
+  const CAMPOS_MSG = ['{aluno}', '{responsavel}', '{serie}', '{serie_destino}', '{documentos}', '{prazo}', '{ano}', '{data_desconto}', '{data_garantia}', '{data_fim}'];
   c.innerHTML = cabecalho('Mensagens', 'Textos prontos para o WhatsApp. O app troca as palavras entre chaves pelos dados do aluno.',
     `<button class="btn ama" id="novo">${icone('mais')}Novo modelo</button>`)
     + `<div class="mensagens"><div class="modelos" id="lista" role="listbox" aria-label="Modelos"></div>
@@ -635,7 +635,7 @@ async function abaCelular(el) {
   <div class="cartao" style="margin-top:14px"><h2>${icone('escudo')}Cuidados</h2>
     <ul class="lista-cuidados">
       <li>Use só na <b>rede da secretaria</b>. Nunca libere no Wi-Fi de visitantes ou de alunos.</li>
-      <li>A conexão pela rede não tem o cadeado (é <span class="mono">http</span>): qualquer aparelho do mesmo Wi-Fi vê a tela de entrada. Todos ainda precisam de usuário e senha.</li>
+      <li>No endereço <span class="mono">http</span> o navegador mostra "Não seguro". Para ter o cadeado, use o <b>endereço seguro</b> logo abaixo. Em qualquer um, todos precisam de usuário e senha.</li>
       <li>Fora do Wi-Fi da escola (no 4G, por exemplo) não abre. É de propósito: os dados não vão para a internet.</li>
       <li>Na primeira vez, o Windows pergunta sobre o Firewall: marque <b>Redes privadas</b> e clique em Permitir. Se o celular não abrir, o Firewall ou a rede marcada como "pública" costumam ser o motivo.</li>
       <li>"Abrir pasta" do prontuário só funciona neste computador.</li>
@@ -664,6 +664,53 @@ async function abaCelular(el) {
     try { await navigator.clipboard.writeText(txt); toast('Endereço copiado'); }
     catch { getSelection().selectAllChildren($('#qrUrl', el)); toast('Selecionei o endereço: aperte Ctrl+C para copiar'); }
   };
+  await cartaoHttps(el);
+}
+
+// Endereço seguro (https): tira o "Não seguro" do alto do navegador e do app instalado.
+// O certificado é da própria escola, então cada computador precisa instalá-lo uma vez (o passo a passo fica aqui).
+async function cartaoHttps(el) {
+  const h = await api('GET', '/api/admin/https');
+  const nome = h.nome_pc, urlSegura = `https://${nome}:${h.porta}`;
+  const caixa = document.createElement('div');
+  caixa.className = 'cartao'; caixa.style.marginTop = '14px';
+  let corpo;
+  if (!h.existe) {
+    corpo = `<p>O aviso <b>"Não seguro"</b> aparece porque o SEK é aberto pela rede com <span class="mono">http://</span>. Para ter o cadeado, o sistema cria um
+      <b>certificado da escola</b> e passa a ter também um endereço seguro, <span class="mono">${esc(urlSegura)}</span>. Depois, cada computador instala o certificado uma vez.</p>
+      <p class="dado">Neste próprio computador, abrindo por <span class="mono">http://localhost:${h.porta_http}</span>, o aviso já não aparece.</p>
+      <div class="acoes" style="margin-top:10px"><button class="btn pri" id="htCriar">${icone('cadeado')}Criar o certificado da escola</button></div>`;
+  } else if (!h.ativo) {
+    corpo = `<div class="situacao info"><span class="selo">${icone('volta')}</span><span><b>Falta reiniciar</b><span>O certificado foi criado e o endereço seguro liga quando o sistema reiniciar.</span></span>
+      <button class="btn pri" id="htReiniciar">${icone('volta')}Reiniciar agora</button></div>`;
+  } else {
+    corpo = `<div class="endereco-rede"><span class="mono" id="htUrl">${esc(urlSegura)}</span><button class="btn peq" id="htCopiar">${icone('copia')}Copiar</button></div>
+      ${h.rede ? '' : '<p class="dado">O acesso pela rede está fechado: por enquanto o endereço seguro só abre neste computador.</p>'}
+      <h3>Em cada computador (inclusive este), uma vez só:</h3>
+      <ol class="virada-passos">
+        <li><a class="btn peq" href="/api/certificado/raiz" download>${icone('importar')}Baixar o certificado da escola</a> (arquivo <span class="mono">SEK-certificado-da-escola.cer</span>).
+          Nos outros PCs, dá para baixar abrindo <span class="mono">http://${esc(nome)}:${h.porta_http}/api/certificado/raiz</span>.</li>
+        <li>Dê dois cliques no arquivo › <b>Instalar Certificado…</b> › escolha <b>Máquina Local</b> › Avançar › Sim.</li>
+        <li>Marque <b>"Colocar todos os certificados no repositório a seguir"</b> › <b>Procurar…</b> › <b>Autoridades de Certificação Raiz Confiáveis</b> › OK › Avançar › Concluir.</li>
+        <li>Feche <b>todas</b> as janelas do navegador e abra de novo em <span class="mono">${esc(urlSegura)}</span>. O cadeado aparece no lugar do "Não seguro".</li>
+        <li>Se o SEK estava instalado como aplicativo: desinstale o antigo (botão direito no ícone › Desinstalar) e instale de novo pelo endereço seguro
+          (Chrome: menu ⋮ › Transmitir, salvar e compartilhar › Instalar página como app · Edge: menu ⋯ › Aplicativos › Instalar este site como aplicativo).</li></ol>
+      <p class="dado">Celular Android: baixe o certificado e instale em Configurações › Segurança › Criptografia e credenciais › Instalar um certificado › Certificado CA (o nome do menu muda de marca para marca).</p>
+      <label class="chk" style="margin-top:12px"><input type="checkbox" class="interruptor" id="htRedir" ${h.redirecionar ? 'checked' : ''}>
+        Mandar todo mundo para o endereço seguro. <span class="dado">Ligue só depois de instalar o certificado em todos os computadores: quem não instalou vê um aviso de erro.</span></label>
+      <p class="dado" style="margin-top:12px">Certificado válido até ${dataBR(h.valido_ate)} para ${esc([...h.nomes, ...h.ips].join(', '))}. Se o nome ou o IP deste PC mudar, o sistema renova sozinho ao abrir (sem precisar reinstalar nos outros PCs).
+        <button class="btn peq" id="htCriar">Renovar agora</button></p>`;
+  }
+  caixa.innerHTML = `<h2>${icone('cadeado')}Endereço seguro (tira o "Não seguro")</h2>${corpo}`;
+  el.appendChild(caixa);
+  if ($('#htCriar', caixa)) $('#htCriar', caixa).onclick = tentar(async () => {
+    const r = await api('POST', '/api/admin/https');
+    if (r.precisa_reiniciar) { if (await confirmar('Certificado criado. Reiniciar o sistema agora para ligar o endereço seguro? Volta em alguns segundos.', 'Reiniciar')) await reiniciarSistema(false); else rotear(); }
+    else { toast('Certificado renovado'); rotear(); }
+  });
+  if ($('#htReiniciar', caixa)) $('#htReiniciar', caixa).onclick = tentar(() => reiniciarSistema(false));
+  if ($('#htCopiar', caixa)) $('#htCopiar', caixa).onclick = async () => { try { await navigator.clipboard.writeText(urlSegura); toast('Endereço copiado'); } catch { getSelection().selectAllChildren($('#htUrl', caixa)); } };
+  if ($('#htRedir', caixa)) $('#htRedir', caixa).onchange = tentar(async (ev) => { await api('PUT', '/api/admin/https', { redirecionar: ev.target.checked }); toast(ev.target.checked ? 'Quem chegar pelo http vai para o endereço seguro' : 'Redirecionamento desligado'); });
 }
 
 // Nome bonito de quem excluiu ("samara" → "Samara"); "sistema" fica como está
@@ -696,6 +743,11 @@ TELAS.config = async (c, aba = 'geral') => {
         ${campo('inep', 'Código INEP', 'text')}${campo('horario_infantil', 'Horário Ed. Infantil', 'text')}${campo('horario_fund1', 'Horário Fund. I', 'text')}
         ${campo('horario_fund2', 'Horário Fund. II', 'text')}${campo('horario_medio', 'Horário Ensino Médio', 'text')}</div>
         <p class="dado">Estes horários também desenham as faixas da Linha do dia, na tela de Início.</p></section>
+      <section><h2>Feriados da cidade (Ferraz de Vasconcelos)</h2>
+        <div class="campo"><label for="c_feriados_cidade">Um por linha, com dia/mês e o nome</label>
+          <textarea id="c_feriados_cidade" rows="3" style="width:100%" placeholder="14/10 Aniversário da cidade">${esc(cfg.feriados_cidade || '')}</textarea></div>
+        <p class="dado">Os nacionais e o 9 de julho o sistema já sabe sozinho. Estes entram no livro ponto deste ano, do próximo e, depois, a cada virada do ano.
+          Para tirar um que já entrou, use Documentos › Funcionários e feriados.</p></section>
       <section><h2>Atividades extras e olimpíada</h2><div class="campos">
         ${campo('extras_dia_venc', 'Dia de vencimento das parcelas', 'number')}${campo('extras_ultimo_mes', 'Último mês de parcela (11 = novembro)', 'number')}
         ${campo('olimpiada_titulo', 'Título da olimpíada', 'text')}${campo('olimpiada_validade', 'Validade da carteirinha')}</div></section>
@@ -719,7 +771,7 @@ TELAS.config = async (c, aba = 'geral') => {
       const b = {}; ['ano_matricula', 'prazo_dias', 'data_inicio', 'data_desconto', 'data_garantia_vaga', 'data_fim', 'pasta_prontuario', 'pastas_fotos', 'inep',
         'horario_infantil', 'horario_fund1', 'horario_fund2', 'horario_medio', 'extras_dia_venc', 'extras_ultimo_mes', 'olimpiada_titulo', 'olimpiada_validade',
         'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
-        'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone'].forEach((k) => { b[k] = $('#c_' + k).value.trim(); });
+        'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone', 'feriados_cidade'].forEach((k) => { b[k] = $('#c_' + k).value.trim(); });
       await api('PUT', '/api/admin/config', b); EU = await api('GET', '/api/eu'); toast('Configurações salvas');
     });
   }
@@ -744,7 +796,9 @@ TELAS.config = async (c, aba = 'geral') => {
       const r = await api('POST', '/api/admin/importar-alunos?arquivo=' + encodeURIComponent(file.name), undefined, file);
       invalidar();
       $('#resA').innerHTML = `<div class="situacao"><span class="selo">${icone('ok')}</span><span><b>${r.novos} novos · ${r.atualizados} atualizados</b>
-        <span>${r.ignorados} linhas ignoradas${r.sem_serie.length ? ` · ${r.sem_serie.length} sem série reconhecida: ${esc(r.sem_serie.slice(0, 10).join(', '))}${r.sem_serie.length > 10 ? '…' : ''}` : ''}</span></span><span></span></div>`;
+        <span>${r.ignorados} linhas ignoradas${r.sem_serie.length ? ` · ${r.sem_serie.length} sem série reconhecida: ${esc(r.sem_serie.slice(0, 10).join(', '))}${r.sem_serie.length > 10 ? '…' : ''}` : ''}</span></span><span></span></div>
+        ${r.ex_alunos.length ? `<div class="dica">${icone('alerta')}<b>${plural(r.ex_alunos.length, 'ex-aluno veio', 'ex-alunos vieram')} na planilha</b> e continuam como ex-alunos (os dados foram atualizados). Confira: se algum voltou mesmo para a escola, abra a ficha e clique em "Reativar aluno".
+          <div style="margin-top:6px">${r.ex_alunos.map((a) => `<a class="btn peq" href="#/aluno/${a.id}">${esc(titulo(a.nome))}</a>`).join(' ')}</div></div>` : ''}`;
     });
     const demo = (tam) => tentar(async () => { const r = await api('POST', '/api/admin/demo' + (tam ? '?tamanho=' + tam : '')); invalidar(); toast(r.alunos + ' alunos fictícios criados'); location.hash = '#/'; });
     if ($('#carregarDemo')) $('#carregarDemo').onclick = demo('');

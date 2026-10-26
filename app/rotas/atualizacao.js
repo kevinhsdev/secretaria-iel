@@ -6,7 +6,7 @@ const { VERSAO } = require('../lib/versao');
 const { execFile } = require('child_process');
 
 module.exports = function atualizacao(ctx) {
-  const { rota, db, cfg, registrar, json, exigirAdmin, falha, PASTA_DADOS } = ctx;
+  const { rota, db, cfg, registrar, json, exigirAdmin, falha, lerCorpo, PASTA_DADOS } = ctx;
 
   rota('GET', '/api/admin/atualizacao', async (req, res, { u }) => {
     exigirAdmin(u);
@@ -40,6 +40,18 @@ module.exports = function atualizacao(ctx) {
         registrar(u.login, e.git ? 'instalou o Git' : 'tentou instalar o Git', instalacao.aviso || '');
       });
     json(res, 200, instalacao);
+  });
+
+  // Atualizar sem Git: a tela manda o .zip; cópia de segurança antes, troca a pasta app (guardando app-antigo) e a tela pede o reinício
+  rota('POST', '/api/admin/atualizacao/zip', async (req, res, { u }) => {
+    exigirAdmin(u);
+    const buf = await lerCorpo(req, 60 * 1024 * 1024);
+    let copia;
+    try { copia = B.fazerBackup(db, cfg(), PASTA_DADOS, 'atualizacao'); }
+    catch (e) { return json(res, 200, { ok: false, aviso: 'Não consegui gravar a cópia de segurança antes de atualizar (' + e.message + '). A atualização foi cancelada.' }); }
+    const r = A.aplicarZip(buf, VERSAO);
+    registrar(u.login, r.ok ? 'atualizou o sistema por arquivo .zip' : 'tentou atualizar o sistema por arquivo .zip', { de: VERSAO, para: r.para, aviso: r.aviso, copia: copia.arquivo });
+    json(res, 200, { ...r, copia: copia.arquivo, precisa_reiniciar: !!r.ok });
   });
 
   // Fala com o GitHub — pode demorar alguns segundos

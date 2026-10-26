@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.10.1';
+const VERSAO = '5.12.0';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -289,7 +289,11 @@ function confirmar(msg, textoBtn = 'Confirmar') {
   });
 }
 
-function preencherModelo(texto, d) {
+// Além dos dados do aluno, todo modelo conhece o ano da matrícula e as datas da campanha (mudam sozinhos na virada do ano)
+function preencherModelo(texto, dados) {
+  const c = EU.config;
+  const d = { ano: c.ano_matricula, data_desconto: c.data_desconto && dataBR(c.data_desconto), data_garantia: c.data_garantia_vaga && dataBR(c.data_garantia_vaga),
+    data_fim: c.data_fim && dataBR(c.data_fim), ...dados };
   return texto.replace(/\{(\w+)\}/g, (m, k) => (d[k] != null && d[k] !== '' ? d[k] : m));
 }
 
@@ -301,7 +305,7 @@ function linkWhats(numero, texto) {
 async function janelaWhats(dados, modeloPreferido = 0) {
   const modelos = await api('GET', '/api/modelos');
   if (!modelos.length) return toast('Cadastre um modelo de mensagem primeiro', true);
-  const opcoes = modelos.map((m, i) => `<option value="${i}" ${i === modeloPreferido ? 'selected' : ''}>${esc(m.titulo)}</option>`).join('');
+  const opcoes = modelos.map((m, i) => `<option value="${i}" ${i === modeloPreferido ? 'selected' : ''}>${esc(preencherModelo(m.titulo, {}))}</option>`).join('');
   modal('Mensagem para ' + (dados.responsavel || 'o responsável'), `
     <div class="campo"><label>Modelo</label><select id="mod">${opcoes}</select></div>
     <div class="campo" style="margin-top:10px"><label>Mensagem (pode editar antes de enviar)</label><textarea id="txt"></textarea></div>

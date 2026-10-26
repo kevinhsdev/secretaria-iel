@@ -178,7 +178,7 @@ const AJUDA = {
   mensagens: {
     nome: 'Mensagens',
     serve: 'Textos prontos para WhatsApp e e-mail, com campos que se preenchem sozinhos.',
-    passos: ['Crie ou edite um modelo.', 'Use os campos {aluno} {responsavel} {serie} {serie_destino} {documentos} {prazo} no texto.', 'Clique num campo embaixo do texto para colocá-lo onde está o cursor. A prévia mostra como a família vai ver.', 'Clique em "Salvar". O modelo aparece para escolher quando você clica em WhatsApp numa ficha ou lista.'],
+    passos: ['Crie ou edite um modelo.', 'Use os campos {aluno} {responsavel} {serie} {serie_destino} {documentos} {prazo} no texto. {ano} {data_desconto} {data_garantia} {data_fim} são o ano da matrícula e as datas da campanha: mudam sozinhos na virada do ano.', 'Clique num campo embaixo do texto para colocá-lo onde está o cursor. A prévia mostra como a família vai ver.', 'Clique em "Salvar". O modelo aparece para escolher quando você clica em WhatsApp numa ficha ou lista.'],
     dicas: ['O sistema não manda mensagem sozinho: ele abre o WhatsApp com o texto pronto e você confere antes de enviar.'],
   },
   lixeira: {
@@ -193,9 +193,11 @@ const AJUDA = {
     passos: [
       'Importar dados: exporte do ACADESC em Excel e envie aqui (alunos, responsáveis, pagamentos).',
       'Cópias de segurança: aponte a pasta para um pen drive ou o OneDrive, defina a senha e teste uma restauração.',
-      'Atualizações: "Verificar atualizações" mostra o que mudou, faz cópia antes e reinicia sozinho. Se o computador não tiver o Git, a mesma tela ensina a instalar (botão automático ou passo a passo pelo site).',
+      'Atualizações: "Verificar atualizações" mostra o que mudou, faz cópia antes e reinicia sozinho. Se o computador não tiver o Git, a mesma tela ensina a instalar (botão automático ou passo a passo pelo site), ou atualiza por um arquivo .zip (Download ZIP do GitHub).',
+      'Geral › Feriados da cidade: escreva um por linha (ex.: 14/10 Aniversário da cidade). Eles entram no livro ponto e se repetem a cada virada do ano.',
       'LGPD e acessos: relatório dos dados de um aluno para a família e descarte de ex-alunos.',
       'Virada do ano: uma vez por ano, quando o ano letivo acaba. Confira a lista (amarelo = não iniciou a rematrícula), troque o que precisar e confirme. Quem continua sobe de série, quem saiu vai para Ex-alunos e a matrícula passa para o ano seguinte.',
+      'Celular e rede › Endereço seguro: tira o "Não seguro" do navegador. Crie o certificado da escola, instale-o uma vez em cada computador (passo a passo na tela) e use o endereço https.',
       'Celular e rede: "Liberar para o celular" reinicia o sistema e mostra um QR Code; aponte a câmera do celular (no mesmo Wi-Fi) e entre com usuário e senha.',
     ],
     dicas: ['Só a administração vê esta área.', 'Backup que nunca foi restaurado não é backup: faça o teste de restauração pelo menos uma vez.'],

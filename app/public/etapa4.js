@@ -26,6 +26,12 @@ window.avisosEtapa4 = async () => {
       Se este computador falhar, os dados da secretaria se perdem.
       ${EU.perfil === 'admin' ? '<button class="btn peq" id="avBackup">Fazer cópia agora</button> <a class="btn peq" href="#/config/backup">Configurar</a>' : 'Avise a administração.'}</div>`);
   }
+  // Só no Início, para não pesar em toda tela: a cópia no mesmo HD do banco some junto se o HD queimar
+  if (e.mesmo_disco && !e.atrasado && !e.pendente && ['', '#', '#/'].includes(location.hash)) {
+    partes.push(`<div class="aviso-fixo">${icone('escudo')}<b>As cópias de segurança estão no mesmo disco do sistema.</b>
+      Se o HD deste computador queimar, o banco e as cópias se perdem juntos. Aponte a pasta das cópias para um pen drive, HD externo ou o OneDrive.
+      ${EU.perfil === 'admin' ? '<a class="btn peq" href="#/config/backup">Mudar a pasta</a>' : 'Avise a administração.'}</div>`);
+  }
   caixa.innerHTML = partes.join('');
   if ($('#avBackup')) $('#avBackup').onclick = tentar(async () => {
     const r = await api('POST', '/api/backups');
@@ -315,8 +321,31 @@ function desenharAtualizacao(el, d, resultado) {
     <div id="atResultado" style="margin-top:12px">${resultado || '<p class="dado">Clique em "Verificar se há atualização" quando quiser. Não precisa ser sempre — só quando eu avisar que tem novidade.</p>'}</div>
     ${d.origem ? `<p class="dado" style="margin-top:12px">Origem: <span class="mono">${esc(d.origem)}</span> · ramo <span class="mono">${esc(d.ramo)}</span></p>` : ''}
   </div>
-  ${d.git ? '' : cartaoInstalarGit()}`;
+  ${d.git ? '' : cartaoInstalarGit()}
+  <div class="cartao" style="margin-top:16px"><h2>Atualizar por arquivo (.zip), sem Git</h2>
+    <p>Para quando o computador não tem Git, ou a pasta foi copiada à mão. Troca só o programa: os dados, as fotos e os prontuários não são tocados.</p>
+    <ol class="virada-passos">
+      <li>Pegue a versão nova: no GitHub, botão verde <b>Code › Download ZIP</b> (com a conta do sistema), ou um .zip da pasta <span class="mono">app</span> trazido no pen drive.</li>
+      <li>Clique em <b>"Escolher o .zip"</b> e escolha o arquivo (não precisa descompactar).</li>
+      <li>O sistema faz uma cópia de segurança, guarda a versão atual na pasta <span class="mono">app-antigo</span>, troca os arquivos e reinicia sozinho.</li></ol>
+    ${d.repositorio ? '<p class="dado">Este computador já atualiza pelo Git: prefira o botão "Verificar se há atualização", lá em cima. Atualizar por .zip aqui faz o Git achar que há arquivos alterados.</p>' : ''}
+    <div class="acoes" style="margin-top:10px"><label class="btn ${d.repositorio ? '' : 'pri'}">${icone('importar')}Escolher o .zip<input type="file" id="atZip" accept=".zip" hidden></label></div>
+    <div id="atZipRes" style="margin-top:10px"></div>
+    <p class="dado" style="margin-top:10px">Se depois de atualizar o sistema não abrir: feche a janela preta, apague a pasta <span class="mono">app</span>, renomeie <span class="mono">app-antigo</span> para <span class="mono">app</span> e abra de novo.</p></div>`;
   if (!d.git) ligarInstalarGit(el);
+  $('#atZip', el).onchange = tentar(async (ev) => {
+    const arq = ev.target.files[0]; ev.target.value = '';
+    if (!arq) return;
+    if (!(await confirmar(`Atualizar o sistema com "${arq.name}"? Vou fazer uma cópia de segurança, guardar a versão atual em app-antigo e reiniciar no fim. Quem estiver usando em outro computador vai precisar esperar uns segundos.`, 'Atualizar'))) return;
+    $('#atZipRes', el).innerHTML = '<div class="dica">⏳ Fazendo cópia de segurança e trocando os arquivos…</div>';
+    const r = await api('POST', '/api/admin/atualizacao/zip', undefined, arq);
+    if (!r.ok) { $('#atZipRes', el).innerHTML = `<div class="aviso-fixo perigo" style="border-radius:8px">${icone('alerta')}${esc(r.aviso || 'A atualização não foi aplicada.')}</div>`; return; }
+    toast('Atualizado! Reiniciando o sistema…');
+    try { await api('POST', '/api/admin/reiniciar'); } catch { /* o servidor cai no meio da resposta */ }
+    telaAguarde('Atualizando…', `Versão ${esc(r.de)} → <b>${esc(r.para)}</b>. O sistema está reiniciando.<br>Esta página volta sozinha em alguns segundos.`);
+    const voltar = async () => { try { await fetch('/api/backups/estado', { headers: { 'X-IEL': '1' } }); location.reload(); } catch { setTimeout(voltar, 1500); } };
+    setTimeout(voltar, 4000);
+  });
 
   if ($('#atVerificar')) $('#atVerificar').onclick = tentar(async () => {
     const b = $('#atVerificar');

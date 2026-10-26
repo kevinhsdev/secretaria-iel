@@ -447,10 +447,16 @@ function inicializar() {
     const ins = db.prepare('INSERT INTO modelos (titulo, texto, ordem) VALUES (?, ?, ?)');
     ins.run('Cobrança de documentos faltantes',
       'Olá, {responsavel}! Verificamos aqui no sistema que ainda constam pendências na documentação do(a) aluno(a) {aluno} ({serie}).\n\n📄 Documentos em falta: {documentos}\n📅 Prazo para entrega: até {prazo}.\n\nVocê pode trazer os documentos físicos à secretaria ou enviá-los digitalizados por este WhatsApp. A regularização é fundamental para a emissão de históricos e certidões. Contamos com sua colaboração!\n\n🏛️ Instituto Educacional Luterano - Secretaria', 1);
-    ins.run('Lembrete de rematrícula 2027',
-      'Olá, {responsavel}! O período de rematrícula 2027 do Instituto Educacional Luterano está aberto até 22/01/2027.\n\n✅ Valores com desconto para rematrículas até 07/11/2026.\n⚠️ A garantia de vaga para alunos da escola vai até 04/12/2026.\n\nPara rematricular {aluno} no {serie_destino}, procure a secretaria (seg. a sex., 8h às 17h) ou responda esta mensagem.\n\n🏛️ Instituto Educacional Luterano - Secretaria', 2);
+    ins.run('Lembrete de rematrícula {ano}',
+      'Olá, {responsavel}! O período de rematrícula {ano} do Instituto Educacional Luterano está aberto até {data_fim}.\n\n✅ Valores com desconto para rematrículas até {data_desconto}.\n⚠️ A garantia de vaga para alunos da escola vai até {data_garantia}.\n\nPara rematricular {aluno} no {serie_destino}, procure a secretaria (seg. a sex., 8h às 17h) ou responda esta mensagem.\n\n🏛️ Instituto Educacional Luterano - Secretaria', 2);
     ins.run('Rematrícula concluída',
-      'Olá, {responsavel}! A rematrícula de {aluno} para o {serie_destino} em 2027 foi concluída com sucesso. 🎉\nA sua via do contrato será enviada por e-mail após a assinatura do colégio.\n\n🏛️ Instituto Educacional Luterano - Secretaria', 3);
+      'Olá, {responsavel}! A rematrícula de {aluno} para o {serie_destino} em {ano} foi concluída com sucesso. 🎉\nA sua via do contrato será enviada por e-mail após a assinatura do colégio.\n\n🏛️ Instituto Educacional Luterano - Secretaria', 3);
+  }
+  // 5.11.0: modelos antigos tinham o ano e as datas da campanha 2027 escritos à mão; viram campos que acompanham a virada do ano
+  if (!db.prepare("SELECT 1 FROM config WHERE chave = 'modelos_campos_ano'").get()) {
+    const troca = (col) => db.prepare(`UPDATE modelos SET ${col} = REPLACE(REPLACE(REPLACE(REPLACE(${col}, '22/01/2027', '{data_fim}'), '07/11/2026', '{data_desconto}'), '04/12/2026', '{data_garantia}'), '2027', '{ano}')`).run();
+    troca('texto'); troca('titulo');
+    db.prepare("INSERT INTO config (chave, valor) VALUES ('modelos_campos_ano', '1')").run();
   }
 }
 

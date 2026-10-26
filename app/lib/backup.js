@@ -8,7 +8,7 @@ const crypto = require('crypto');
 
 const MARCA = Buffer.from('IELBK1');           // marca para reconhecer arquivo cifrado nosso
 const CABECALHO_SQLITE = 'SQLite format 3\0';
-const MOTIVOS = { inicio: 'ao abrir o sistema', automatico: 'automática', manual: 'feita à mão', restauracao: 'antes de restaurar', config: 'mudança de configuração', virada: 'antes da virada do ano' };
+const MOTIVOS = { inicio: 'ao abrir o sistema', automatico: 'automática', manual: 'feita à mão', restauracao: 'antes de restaurar', config: 'mudança de configuração', virada: 'antes da virada do ano', atualizacao: 'antes de atualizar' };
 
 function pastaDe(cfg, PASTA_DADOS) {
   const p = String(cfg.backup_pasta || '').trim() || path.join(PASTA_DADOS, 'backups');
@@ -99,8 +99,10 @@ function estado(cfg, PASTA_DADOS) {
   let pasta = '';
   let acessivel = true;
   try { pasta = pastaDe(cfg, PASTA_DADOS); } catch { acessivel = false; }
+  // 5.11.0: cópia no mesmo disco do banco não salva nada se o HD queimar (C:\ com C:\)
+  const disco = (p) => path.parse(path.resolve(p)).root.toLowerCase();
   return {
-    pasta, acessivel, total: lista.length, ultimo,
+    pasta, acessivel, total: lista.length, ultimo, mesmo_disco: !!pasta && disco(pasta) === disco(PASTA_DADOS),
     idade_horas: horas == null ? null : Math.round(horas * 10) / 10,
     atrasado: horas == null || horas > avisarDias * 24,
     nunca: !ultimo,

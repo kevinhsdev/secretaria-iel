@@ -102,4 +102,65 @@ async function aplicar() {
   };
 }
 
-module.exports = { estado, verificar, aplicar, RAIZ };
+// ── 5.11.0: atualizar sem Git, por um .zip (o "Download ZIP" do GitHub ou a pasta app zipada num pen drive) ──
+// Troca só a pasta do programa (app). A pasta dados, o node e as fotos/prontuários nunca são tocados.
+// Antes, guarda a versão atual em "app-antigo", ao lado; se algo der errado no meio, volta tudo de lá.
+const { readZip } = require('./zip');
+const PASTA_APP = path.join(__dirname, '..');
+const versaoDe = (txt) => (String(txt).match(/VERSAO:\s*'([\d.]+)'/) || [])[1] || null;
+const comparar = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+
+function lerPacote(buf) {
+  let zip;
+  try { zip = readZip(buf); } catch { return { erro: 'Este arquivo não é um .zip válido.' }; }
+  const barra = (n) => n.split('\\').join('/');
+  const nomes = [...zip.keys()].map(barra);
+  const porNome = new Map([...zip].map(([n, b]) => [barra(n), b]));
+  // A pasta do programa é a que tem server.js e lib/versao.js (no zip do GitHub fica em "secretaria-iel-main/app/")
+  const prefixo = nomes.filter((n) => n.endsWith('server.js')).map((n) => n.slice(0, -'server.js'.length))
+    .filter((p) => porNome.has(p + 'lib/versao.js')).sort((a, b) => a.length - b.length)[0];
+  if (prefixo === undefined) return { erro: 'Não achei o sistema dentro deste .zip (falta a pasta app com server.js). Use o "Download ZIP" do GitHub ou zipe a pasta app.' };
+  const arquivos = new Map();
+  for (const n of nomes) {
+    if (!n.startsWith(prefixo) || n.endsWith('/')) continue;
+    const rel = n.slice(prefixo.length);
+    if (rel.split('/').some((p) => p === '..' || p === '') || path.isAbsolute(rel)) return { erro: 'O .zip tem um caminho estranho (' + rel + '). Por segurança, nada foi feito.' };
+    arquivos.set(rel, porNome.get(n));
+  }
+  const versao = versaoDe(arquivos.get('lib/versao.js'));
+  if (!versao) return { erro: 'Não consegui ler a versão dentro do .zip.' };
+  return { arquivos, versao };
+}
+
+function listarArquivos(pasta, base = pasta) {
+  return fs.readdirSync(pasta, { withFileTypes: true }).flatMap((e) => {
+    const p = path.join(pasta, e.name);
+    return e.isDirectory() ? listarArquivos(p, base) : [path.relative(base, p).split(path.sep).join('/')];
+  });
+}
+
+function aplicarZip(buf, versaoAtual, { pastaApp = PASTA_APP } = {}) {
+  const pacote = lerPacote(buf);
+  if (pacote.erro) return { ok: false, aviso: pacote.erro };
+  if (comparar(pacote.versao, versaoAtual) < 0) {
+    return { ok: false, aviso: `O .zip é de uma versão mais velha (${pacote.versao}) que a instalada (${versaoAtual}). Nada foi feito.` };
+  }
+  const antigo = path.join(pastaApp, '..', 'app-antigo');
+  fs.rmSync(antigo, { recursive: true, force: true });
+  fs.cpSync(pastaApp, antigo, { recursive: true });
+  try {
+    for (const [rel, dados] of pacote.arquivos) {
+      const destino = path.join(pastaApp, rel);
+      fs.mkdirSync(path.dirname(destino), { recursive: true });
+      fs.writeFileSync(destino, dados);
+    }
+    // Arquivo que a versão nova não tem mais sai (senão uma tela velha poderia continuar carregando)
+    for (const rel of listarArquivos(pastaApp)) if (!pacote.arquivos.has(rel)) fs.rmSync(path.join(pastaApp, rel), { force: true });
+  } catch (e) {
+    try { fs.cpSync(antigo, pastaApp, { recursive: true }); } catch { /* o app-antigo continua lá para trocar à mão */ }
+    return { ok: false, aviso: 'Deu erro ao trocar os arquivos (' + e.message + '). A versão anterior foi devolvida; se o sistema não abrir, renomeie a pasta app-antigo para app.' };
+  }
+  return { ok: true, de: versaoAtual, para: pacote.versao, arquivos: pacote.arquivos.size };
+}
+
+module.exports = { estado, verificar, aplicar, aplicarZip, lerPacote, RAIZ };

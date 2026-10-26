@@ -1,6 +1,7 @@
 // Secretaria IEL — servidor do aplicativo de gestão da secretaria do Instituto Educacional Luterano.
 'use strict';
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -13,6 +14,7 @@ const { lerPlanilha, serialParaIso } = require('./lib/planilha');
 const S = require('./lib/series');
 const { gerarContrato } = require('./lib/contrato');
 const prontuario = require('./lib/prontuario');
+const certificado = require('./lib/certificado');
 const { gerarDemo, gerarDemoEtapa2, gerarDemoEtapa3, gerarDemoHistorico, gerarDemoVivencias } = require('./lib/demo');
 
 inicializar();
@@ -23,6 +25,10 @@ const PORTA = Number(process.env.IEL_PORTA || 3000);
 const REDE_PELO_BAT = process.env.IEL_REDE === '1';
 const HOST = REDE_PELO_BAT || cfg().rede_liberada === '1' ? '0.0.0.0' : '127.0.0.1';
 const PUBLICO = path.join(__dirname, 'public');
+// 5.12.0: endereço seguro (https), que tira o "Não seguro" do navegador. Só liga depois que o certificado da escola é criado.
+const PORTA_HTTPS = Number(process.env.IEL_PORTA_HTTPS || PORTA + 443);
+let servidorHttps = null;
+const ehLocal = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 
 // ───────────────────────── sessões ─────────────────────────
 // As sessões ficam na memória e também no banco (só o hash do token, nunca o token): se o servidor cair ou
@@ -213,8 +219,8 @@ function importarAlunos(abas, usuario) {
     const n = S.norm(c);
     for (const [campo, nomes] of Object.entries(APELIDOS)) if (col[campo] == null && nomes.includes(n)) col[campo] = i;
   });
-  const res = { novos: 0, atualizados: 0, ignorados: 0, sem_serie: [] };
-  const buscar = db.prepare('SELECT id FROM alunos WHERE mat = ?');
+  const res = { novos: 0, atualizados: 0, ignorados: 0, sem_serie: [], ex_alunos: [] };
+  const buscar = db.prepare('SELECT id, saida_motivo FROM alunos WHERE mat = ?');
   const campos = Object.keys(APELIDOS).filter((k) => k !== 'mat');
   transacao(() => {
     for (const l of aba.linhas.slice(cab + 1)) {
@@ -247,7 +253,10 @@ function importarAlunos(abas, usuario) {
       const ex = buscar.get(mat);
       const ks = Object.keys(reg);
       if (ex) {
-        db.prepare(`UPDATE alunos SET ${ks.map((k) => k + ' = ?').join(', ')}, ativo = 1, demo = 0 WHERE id = ?`).run(...ks.map((k) => reg[k]), ex.id);
+        // 5.11.0: quem teve a saída registrada não volta sozinho (o ACADESC às vezes ainda lista transferido); só atualiza os dados e avisa
+        const saiu = !!ex.saida_motivo;
+        if (saiu) res.ex_alunos.push({ id: ex.id, nome });
+        db.prepare(`UPDATE alunos SET ${ks.map((k) => k + ' = ?').join(', ')}${saiu ? '' : ', ativo = 1'}, demo = 0 WHERE id = ?`).run(...ks.map((k) => reg[k]), ex.id);
         res.atualizados++;
       } else {
         db.prepare(`INSERT INTO alunos (mat, ${ks.join(', ')}) VALUES (?, ${ks.map(() => '?').join(', ')})`).run(mat, ...ks.map((k) => reg[k]));
@@ -511,7 +520,7 @@ rota('GET', '/api/alunos/:id/contrato', async (req, res, { u, p }) => {
   const a = db.prepare('SELECT * FROM alunos WHERE id = ?').get(+p.id) || falha(404, 'Aluno não encontrado');
   if (!a.mat) falha(400, 'O aluno precisa ter número de matrícula (Mat) do ACADESC para gerar o contrato');
   const d = destinoDe(a, ano);
-  if (!d || d.chave === 'CONC') falha(400, 'Aluno concluinte: não há série para 2027');
+  if (!d || d.chave === 'CONC') falha(400, `Aluno concluinte: não há série para ${ano}`);
   const buf = gerarContrato(a, { ano, descricao: d.descricao, serie: d.serie });
   registrar(u.login, 'gerou contrato ' + ano, { aluno_id: a.id, nome: a.nome });
   const nomeArq = `CONTRATO EDUCACIONAL ${ano} - ${a.nome}.xlsx`;
@@ -526,8 +535,7 @@ rota('GET', '/api/alunos/:id/contrato', async (req, res, { u, p }) => {
 rota('POST', '/api/alunos/:id/abrir-pasta', async (req, res, { p }) => {
   const c = cfg();
   const a = db.prepare('SELECT nome FROM alunos WHERE id = ?').get(+p.id) || falha(404, 'Aluno não encontrado');
-  const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
-  if (!local) falha(400, 'Abrir pasta só funciona no computador onde o app está instalado');
+  if (!ehLocal(req)) falha(400, 'Abrir pasta só funciona no computador onde o app está instalado');
   const pastas = prontuario.doAluno(c.pasta_prontuario, a.nome);
   const alvo = pastas[0]?.pasta || c.pasta_prontuario;
   execFile('explorer.exe', [alvo], () => {});
@@ -636,8 +644,13 @@ rota('PUT', '/api/admin/config', async (req, res, { u }) => {
     'cebas_ano', 'cebas_retirada', 'cebas_entrega_ini', 'cebas_entrega_fim', 'cebas_resultado', 'cebas_prestacao',
     'desconto_funcionario', 'boletos_dia_venc', 'boletos_mes_massa', 'fotos_sistemas', 'saida_aviso_telefone',
     'backup_pasta', 'backup_horas', 'backup_manter', 'backup_avisar_dias', 'bloqueio_minutos', 'lgpd_anos_descarte', 'lixeira_dias',
-    'hist_media', 'hist_arredonda', 'hist_frequencia', 'hist_carga_fund', 'hist_carga_medio', 'hist_dias', 'hist_secretario', 'hist_diretor'];
+    'hist_media', 'hist_arredonda', 'hist_frequencia', 'hist_carga_fund', 'hist_carga_medio', 'hist_dias', 'hist_secretario', 'hist_diretor', 'feriados_cidade'];
   for (const k of permitidas) if (b[k] !== undefined) db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(k, String(b[k]));
+  // Feriados da cidade entram já no ano letivo atual e no da matrícula (a virada põe nos anos seguintes)
+  if (b.feriados_cidade !== undefined) {
+    const ano = +cfg().ano_matricula, ins = db.prepare('INSERT OR IGNORE INTO feriados (data, nome) VALUES (?, ?)');
+    for (const a of [ano - 1, ano]) for (const f of require('./rotas/virada').feriadosCidade(b.feriados_cidade, a)) ins.run(...f);
+  }
   prontuario.limparCache();
   registrar(u.login, 'alterou configurações', b);
   json(res, 200, { ok: true });
@@ -667,6 +680,33 @@ rota('PUT', '/api/admin/rede', async (req, res, { u }) => {
   db.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run('rede_liberada', liberar ? '1' : '0');
   registrar(u.login, liberar ? 'liberou o acesso pela rede (celular e outros PCs)' : 'fechou o acesso pela rede', '');
   json(res, 200, { ok: true, precisa_reiniciar: liberar !== (HOST === '0.0.0.0') && !REDE_PELO_BAT });
+});
+// HTTPS: certificado da escola (lib/certificado.js). O SEK-raiz.cer é público (não tem segredo): os outros PCs baixam antes de entrar.
+const nomesDoCertificado = () => ({ nomes: [...new Set([os.hostname(), os.hostname().toLowerCase(), 'localhost'])], ips: ['127.0.0.1', ...enderecosDaRede().map((e) => e.ip)] });
+rota('GET', '/api/certificado/raiz', async (req, res) => {
+  const f = certificado.arquivos(PASTA_DADOS).raizCer;
+  if (!fs.existsSync(f)) falha(404, 'O certificado da escola ainda não foi criado (Configurações › Celular e rede).');
+  res.writeHead(200, { 'Content-Type': 'application/x-x509-ca-cert', 'Content-Disposition': 'attachment; filename="SEK-certificado-da-escola.cer"' });
+  res.end(fs.readFileSync(f));
+}, true);
+rota('GET', '/api/admin/https', async (req, res, { u }) => {
+  exigirAdmin(u);
+  json(res, 200, { ...certificado.estado(PASTA_DADOS), ativo: !!servidorHttps, porta: PORTA_HTTPS, porta_http: PORTA, nome_pc: os.hostname(),
+    rede: HOST === '0.0.0.0', redirecionar: cfg().https_redirecionar === '1', enderecos: enderecosDaRede() });
+});
+rota('POST', '/api/admin/https', async (req, res, { u }) => {
+  exigirAdmin(u);
+  const e = certificado.criar(PASTA_DADOS, nomesDoCertificado());
+  if (servidorHttps) servidorHttps.setSecureContext(certificado.opcoesHttps(PASTA_DADOS)); // já ligado: troca na hora, sem reiniciar
+  registrar(u.login, 'criou o certificado da escola (https)', { nomes: e.nomes, ips: e.ips });
+  json(res, 200, { ...e, precisa_reiniciar: !servidorHttps });
+});
+rota('PUT', '/api/admin/https', async (req, res, { u }) => {
+  exigirAdmin(u);
+  const b = await corpoJson(req);
+  db.prepare("INSERT INTO config (chave, valor) VALUES ('https_redirecionar', ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").run(b.redirecionar ? '1' : '0');
+  registrar(u.login, b.redirecionar ? 'mandou todos para o endereço seguro (https)' : 'deixou de redirecionar para o https', '');
+  json(res, 200, { ok: true });
 });
 rota('PUT', '/api/admin/vagas', async (req, res, { u }) => {
   exigirAdmin(u);
@@ -816,6 +856,13 @@ const servidor = http.createServer(async (req, res) => {
   // O app não carrega nada de fora: trancar isso evita que um script estranho consiga rodar aqui dentro
   res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
     "script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
+  // Depois que todos os PCs instalaram o certificado da escola: quem chega pela rede no http vai para o https.
+  // Este próprio PC (localhost) continua no http, que o navegador já considera seguro, e o certificado sempre pode ser baixado.
+  if (servidorHttps && !req.socket.encrypted && cfg().https_redirecionar === '1' && !ehLocal(req) && url.pathname !== '/api/certificado/raiz') {
+    const host = new URL('http://' + (req.headers.host || 'localhost')).hostname;
+    res.writeHead(302, { Location: `https://${host.includes(':') ? `[${host}]` : host}:${PORTA_HTTPS}${req.url}` });
+    return res.end();
+  }
   if (!url.pathname.startsWith('/api/')) return servirEstatico(req, res, url);
   try {
     // Pedidos que alteram dados precisam vir do próprio app (cabeçalho customizado bloqueia CSRF)
@@ -860,6 +907,20 @@ if (restauracao) {
 if (copias.naHora(cfg(), PASTA_DADOS)) copiaAutomatica('inicio');
 setInterval(() => { if (copias.naHora(cfg(), PASTA_DADOS)) copiaAutomatica('automatico'); }, 30 * 60 * 1000);
 
+// Liga o https se o certificado existe. Se o IP ou o nome do PC mudou, emite um novo com a mesma raiz (ninguém precisa reinstalar).
+if (certificado.estado(PASTA_DADOS).existe) {
+  try {
+    const e = certificado.estado(PASTA_DADOS), quer = nomesDoCertificado();
+    if (e.vencendo || quer.ips.some((ip) => !e.ips.includes(ip)) || quer.nomes.some((n) => !e.nomes.includes(n))) {
+      certificado.criar(PASTA_DADOS, quer);
+      registrar('sistema', 'renovou o certificado da escola (mudou o IP, o nome do PC ou estava vencendo)', quer);
+    }
+    servidorHttps = https.createServer(certificado.opcoesHttps(PASTA_DADOS), servidor.listeners('request')[0]); // mesmo atendimento do http
+    servidorHttps.on('error', (e) => { console.log('  Não consegui abrir o endereço seguro (https):', e.message); servidorHttps = null; });
+    servidorHttps.listen(PORTA_HTTPS, HOST);
+  } catch (e) { console.log('  Certificado com problema, https desligado:', e.message); servidorHttps = null; }
+}
+
 servidor.listen(PORTA, HOST, () => {
   console.log('');
   console.log('  Secretaria IEL rodando!');
@@ -868,6 +929,7 @@ servidor.listen(PORTA, HOST, () => {
     console.log('  (liberado para celulares e outros PCs da rede)');
     for (const e of enderecosDaRede().filter((x) => x.provavel)) console.log(`  No celular:        http://${e.ip}:${PORTA}`);
   }
+  if (servidorHttps) console.log(`  Endereço seguro:   https://${os.hostname()}:${PORTA_HTTPS}`);
   console.log('  Não feche esta janela enquanto estiver usando o sistema.');
   console.log('');
 });
