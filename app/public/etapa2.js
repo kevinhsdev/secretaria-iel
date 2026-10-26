@@ -18,6 +18,7 @@ const TIPOS_DOC = [
   ['escolaridade', 'Declaração de escolaridade', false, 'pasta'], ['vaga', 'Declaração de vaga', false, 'pasta'], ['transferencia', 'Declaração de transferência', false, 'pasta'],
   ['conclusao', 'Declaração de conclusão', false, 'pasta'], ['comparecimento', 'Declaração de comparecimento', false, 'pasta'], ['pagamento', 'Declaração de pagamento', true, 'boletos'],
   ['termo_saida', 'Autorização de saída', false, 'rematricula'], ['termo_canc_matricula', 'Cancelamento de matrícula', false, 'rematricula'], ['termo_canc_extra', 'Cancelamento de atividade extra', false, 'rematricula'],
+  ['contrato_recreacao', 'Contrato de recreação', false, 'extras'],
   ['termo_canc_bolsa', 'Cancelamento de bolsa', false, 'rematricula'], ['carteirinha', 'Carteirinha olímpica', false, 'carteira'],
   ['historico', 'Histórico escolar', false, 'historico'],
 ];
@@ -61,6 +62,7 @@ window.fichaEtapa2 = async (el, a) => {
   $('#insc', el).onclick = () => formInscricao(a);
   $$('[data-contrato]', el).forEach((b) => (b.onclick = tentar(async () => {
     const i = inscr.find((x) => x.id === +b.dataset.contrato);
+    if (/^recrea/i.test(i.atividade)) return abrirDoc({ tipo: 'contrato_recreacao', aluno: a.id });
     await baixar(`/api/inscricoes/${i.id}/contrato`, `CONTRATO ${i.atividade.toUpperCase()} ${i.ano} - ${titulo(a.nome)}.xlsx`);
     toast('Contrato gerado! Abra no Excel, confira e imprima.');
   })));

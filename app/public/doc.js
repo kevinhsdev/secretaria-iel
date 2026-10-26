@@ -188,6 +188,7 @@ const DOCS = {
   termo_canc_matricula: termoCancelamento('SOLICITAÇÃO DE CANCELAMENTO DE MATRÍCULA', 'CANCELAMENTO DE MATRÍCULA', true),
   termo_canc_bolsa: termoCancelamento('SOLICITAÇÃO DE CANCELAMENTO DE BOLSA DE ESTUDOS', 'CANCELAMENTO DE BOLSA DE ESTUDOS', false),
   termo_canc_extra: termoCancelamento('CANCELAMENTO DE MATRÍCULA EM ATIVIDADE EXTRA', 'CANCELAMENTO DE ATIVIDADE EXTRA', true, true),
+  contrato_recreacao: contratoRecreacao(),
   termo_saida: {
     nome: 'Autorização de saída sem o responsável',
     carregar: alunosDaUrl,
@@ -599,6 +600,82 @@ function termoCancelamento(tituloDoc, acao, comMatricula, extra) {
         <div class="assinatura" style="margin-top:40px">Assinatura e carimbo da escola</div>
         ${comMatricula ? '<p class="nota">Senhores responsáveis, o cancelamento dos boletos no nosso sistema ACADESC é realizado de imediato no ato do cancelamento. Na instituição financeira, os boletos são cancelados automaticamente após 30 dias do seu vencimento, sem prejuízo.</p>' : ''}`);
     },
+  };
+}
+
+// Contrato de contraturno (recreação) — igual ao "Contrato Recreação 2027.pdf" da escola.
+// O horário (7h ou 9h30) é escolhido à mão; valores do plano ficam lembrados neste PC para o próximo contrato.
+function contratoRecreacao() {
+  const HORARIOS = { h7: 'das 7h às 13h', h930: 'das 9h30 às 13h' };
+  const lembrar = (k) => { try { return localStorage.getItem('iel-recreacao-' + k) || ''; } catch { return ''; } };
+  const guardar = (k, x) => { try { localStorage.setItem('iel-recreacao-' + k, x); } catch { /* sem armazenamento: só não lembra */ } };
+  const num = (s) => Number(String(s || '').replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')) || 0;
+  const reais = (s) => (String(s || '').trim() ? moeda(num(s)) : '');
+  const linha = (x, larg) => (x ? `<b>${esc(x)}</b>` : `<span class="rc-branco" style="min-width:${larg}"></span>`);
+  return {
+    nome: 'Contrato de recreação (contraturno)',
+    carregar: alunosDaUrl,
+    campos: ({ alunos: [a] }) => [
+      { id: 'mat', rot: 'Nº de matrícula', valor: a.mat || '' },
+      { id: 'aluno', rot: 'Nome do aluno', valor: a.nome.toUpperCase() },
+      { id: 'serie', rot: 'Ano escolar', tipo: 'select', opcoes: SERIES_EXT.map((s) => [s, s]), valor: a.destino_extenso || a.serie_extenso },
+      { id: 'resp', rot: 'Contratante / responsável financeiro', tipo: 'select', opcoes: respOpcoes(a), valor: titulo(a.nome_resp || a.nome_mae || a.nome_pai), livre: true },
+      { id: 'cpf', rot: 'CPF do responsável', valor: a.cpf_resp || '' },
+      { id: 'horario', rot: 'Horário contratado', tipo: 'select', opcoes: [['', '(deixar em branco para marcar à mão)'], ['h7', 'Das 7h às 13h'], ['h930', 'Das 9h30 às 13h']], valor: '' },
+      { id: 'plano', rot: 'Valor do plano (R$)', valor: lembrar('plano') },
+      { id: 'entrada', rot: 'Valor da entrada (R$)', valor: lembrar('entrada') },
+      { id: 'parcelas', rot: 'Nº de parcelas', tipo: 'number', valor: lembrar('parcelas') || 3 },
+      { id: 'parcela', rot: 'Valor das parcelas (R$)', valor: '', dica: 'Em branco: calcula sozinho (plano − entrada) ÷ parcelas' },
+      { id: 'ano', rot: 'Ano do contrato', valor: a.ano_matricula },
+    ],
+    aviso: 'Escolha o horário (7h ou 9h30) antes de imprimir. Campo de valor em branco sai com a linha para preencher à caneta.',
+    render: (v) => {
+      ['plano', 'entrada', 'parcelas'].forEach((k) => guardar(k, v[k]));
+      const n = +v.parcelas || 0;
+      const parcela = String(v.parcela || '').trim() ? reais(v.parcela)
+        : (num(v.plano) && n ? moeda(Math.max(0, num(v.plano) - num(v.entrada)) / n) : '');
+      const bola = (k) => `<span class="rc-bola${v.horario === k ? ' marcada' : ''}"></span>`;
+      const horarioTxt = HORARIOS[v.horario] ? HORARIOS[v.horario].replace(/^das /, '') : '';
+      const P1 = `<section class="folha rc"><img class="rc-marca" src="logo.png" alt="">
+        <h2 class="rc-titulo">CONTRATO DE PRESTAÇÃO DE SERVIÇOS PARA ATIVIDADES DE CONTRATURNO<br><span>TERMO ADITIVO ${esc(v.ano)}</span></h2>
+        <p>Pelo presente instrumento particular de CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS, Instituto Educacional Luterano, devidamente inscrito no CNPJ 60.761.657/0005-27, com sede à Rua Herman Teles Ribeiro, 162, Ferraz de Vasconcelos – SP, CEP 08529-100 Centro, doravante denominada <b>CONTRATADA</b>, neste ato representada pelo seu representante legal, e de outro lado o(s) responsável(eis) pelo aluno, abaixo qualificado, doravante denominado(s) <b>CONTRATANTE</b> têm justo e contratado o seguinte:</p>
+        <table class="rc-quadro">
+          <tr><td style="width:18%"><small>Nª Matrícula</small>${esc(v.mat)}</td><td colspan="5"><small>Nome do Aluno</small>${esc(v.aluno)}</td></tr>
+          <tr><td colspan="2"><small>Ano Escolar</small>${esc(v.serie)}</td><td colspan="3"><small>CONTRATANTE / Responsável Financeiro</small>${esc(v.resp)}</td><td style="width:20%"><small>CPF</small>${esc(v.cpf)}</td></tr>
+          <tr><td colspan="2"><small>Horário Contratado</small><span class="rc-op">${bola('h7')} das 7h às 13h</span> <span class="rc-op">${bola('h930')} das 9h30 às 13h</span></td>
+            <td><small>Valor do Plano</small>R$ ${linha(reais(v.plano), '24mm')}</td><td><small>Valor Entrada</small>R$ ${linha(reais(v.entrada), '16mm')}</td>
+            <td><small>Nª Parcelas</small>${linha(v.parcelas, '10mm')} <small style="display:inline">Valor das Parcelas</small> ${linha(parcela, '16mm')}</td><td><small>Data Vencimento Parcelas</small>DIA 10</td></tr>
+        </table>
+        <p>O objetivo do presente CONTRATO é definir, discriminar e regular os serviços opcionais de atividades de contra turno a serem prestados durante o ano letivo de ${esc(v.ano)} pela <b>CONTRATADA</b>, o custo destes serviços, o seu plano de pagamento, a forma e época dos reajustes das parcelas livremente pactuadas com o Responsável pelo aluno, seja de caráter ordinário ou excepcional, estabelecer os dispositivos rescisórios e eventuais multas ou penalidades às partes contratantes, ficando, desde já, nulo de pleno este CONTRATO, ou eventuais prorrogações, por força do indeferido do requerimento de matrícula, firmado nesta mesma data, como termo aditivo principal deste instrumento.</p>
+        <p><b>CLAUSULA 1ª -</b> A assinatura do presente CONTRATO não exime o <b>CONTRATANTE</b> de outras obrigações financeiras, decorrentes de prestações anteriores e não cumpridas.</p>
+        <p><b>CLAUSULA 2ª -</b> Fazem parte integrante do presente CONTRATO o requerimento de matrícula, o contrato de prestação de serviços educacionais regente e o Regimento Interno, todos de pleno conhecimento e aceitação pelo CONTRATANTE.</p>
+        <p><b>CLAUSULA 3ª -</b> A contratação de atividades de contra turno acontecerão das 7:00h às 13:00h ou a partir das 9h30 conforme quadro explicativo abaixo. Caso o responsável financeiro opte pela redução da carga horária <b>CONTRATADA</b> durante a vigência do contrato, a <b>CONTRATADA</b> fica autorizada a repassar a vaga para outro aluno que necessite da carga horária integral caso haja no momento do pedido da redução, fila de espera para</p>
+        <p><b>Parágrafo primeiro –</b> Haverá uma tolerância de 10 minutos para a entrada do(a) aluno(a), conforme o horário previamente contratado. Caso o aluno(a) chegue com antecedência superior a esse período, será cobrada uma taxa adicional de R$17,50 por dia. O pagamento desta taxa será efetuado através de boleto emitido pelo ESCOLA, com vencimento até o 5ª dia útil do mês subsequente..</p>
+        <p><b>CLÁUSULA 4ª – DA PERMANÊNCIA E CONTROLE DE ACESSO:</b> Uma vez efetuada a entrada do ALUNO nas dependências da ESCOLA, para cumprimento das atividades de CONTRATURNO, este não poderá retirar-se antes do término do período sem a prévia e expressa autorização de seus responsáveis legais.</p>
+        <p><b>Parágrafo Único:</b> A saída antecipada será permitida exclusivamente em casos de <b>emergência comprovada</b> ou <b>motivos de saúde</b>, mediante comunicação imediata aos responsáveis ou acompanhamento por pessoa devidamente autorizada, eximindo-se a ESCOLA de qualquer responsabilidade civil ou criminal caso o ALUNO evada-se do recinto em descumprimento a esta norma.</p>
+        <p><b>CLAUSULA 5ª – A CONTRATADA</b> se compromete a oferecer a(o) <b>CONTRATANTE</b> em horário não coincidente com o seu horário escolar, as seguintes atividades: Recreação Física e Lúdica, orientação de tarefas, Orientação de Pesquisas e Estudos, Momento / Visitas Cultural(ais), Oficinas de expressões (Atividades que envolvam a criatividade), música.</p>
+        <p><b>Parágrafo Primeiro –</b> As atividades serão realizadas em salas específicas ou locais em que a <b>CONTRATADA</b> indicar, tendo em vista a natureza do conteúdo e a técnica necessária para atingir êxito na programação.</p>
+        <span class="rc-pag">1/2</span></section>`;
+      const P2 = `<section class="folha rc"><img class="rc-marca" src="logo.png" alt="">
+        <p><b>Parágrafo Segundo -</b> A <b>CONTRATADA</b> será responsável por oferecer ao aluno uma refeição diária em caráter de cortesia, observando que em caso de orientações médicas específicas a escola deverá ser contatada.</p>
+        <p><b>CLAUSULA 6ª –</b> São de inteira responsabilidade da <b>CONTRATADA</b> o planejamento e a prestação de serviços constantes nesse termo.</p>
+        <p><b>CLAUSULA 7ª -</b> No que se refere a datas, locais, designação dos professores e monitores, metodologia, locais de atividades externas, além de outras providências que as referidas atividades exigirem, obedecendo ao exclusivo critério da <b>CONTRATADA</b>, sem ingerência da <b>CONTRATANTE.</b></p>
+        <p><b>CLAUSULA 8ª - Como contrapartida pelos serviços que serão prestados durante o ano de ${esc(v.ano)}, o (a) CONTRATANTE pagará à CONTRATADA a quantia de R$ ${linha(reais(v.plano), '34mm')} para o horário das ${linha(horarioTxt, '70mm')}, em dias letivos, pagos com entrada de R$ ${linha(reais(v.entrada), '24mm')} mais ${esc(v.parcelas || 3)} parcelas mensais de R$ ${linha(parcela, '30mm')} com vencimento no dia 10 de cada mês.</b></p>
+        <p><b>Parágrafo Primeiro –</b> As atividades que serão realizadas incluem: recreação, lição de casa, leitura e atividades lúdicas para seu pleno desenvolvimento a serem desenvolvidos no contra turno. Além do almoço ofertado pela escola.</p>
+        <p><b>Parágrafo Segundo –</b> Para o pagamento das parcelas, a <b>CONTRATADA</b> emitirá título em nome do responsável financeiro e que para todos os efeitos passa a integrar o presente CONTRATO. Quando este for assinado junto com o período regular, o título será único. Somente receberemos por pix/depósito bancário ou transferência bancária quando previamente autorizado por nossa instituição.</p>
+        <p><b>Parágrafo Terceiro –</b> A participação do aluno nas atividades de recreação durante o mês de julho já faz parte do pacote adquirido, porém sua participação é opcional e, por questões de planejamento, sua participação ou não deverá ser comunicada para a <b>CONTRATADA</b>, assim que essa informação for solicitada.</p>
+        <p><b>Parágrafo Quarto -</b> O não comparecimento do aluno aos atos escolares ora contratados não exime o responsável pelo pagamento, tendo em vista a disponibilidade do serviço colocado ao <b>CONTRATANTE</b>.</p>
+        <p class="rc-destaque"><b>Parágrafo Quinto -</b> No caso de atraso no pagamento das parcelas, independente de notificação / comunicação: a) À partir do 30º dia de atraso, A <b>CONTRATADA</b> suspenderá imediatamente os serviços de recreação, ficando o aluno impossibilitado de frequentar o contra turno e o retorno às atividades estará condicionado à regulação de quaisquer pendências que, porventura, possam existir no momento. Além do responsável financeiro ter seus dados incluídos no serviço de proteção ao crédito; b) À partir do 45º dia de atraso, A <b>CONTRATADA</b> cancelará imediatamente os serviços de recreação.</p>
+        <p><b>Parágrafo Sexto -</b> A cobrança continuará a ser realizada até a solicitação da saída do aluno, por e-mail ou por carta entregue diretamente na secretaria do colégio, sendo devida a parcela do mês em que a <b>CONTRATADA</b> receber a solicitação de cancelamento das Atividades de Contraturno.</p>
+        <p><b>CLAUSULA 9ª –</b> Para dirimir as questões originadas do presente <b>CONTRATO</b>, fica eleito o foro da Comarca Ferraz de Vasconcelos - SP.</p>
+        <div class="rc-assin">
+          <div><div class="rc-linha">CONTRATADA</div><p>TESTEMUNHA 1</p><div class="rc-campo">NOME:</div><div class="rc-campo">CPF</div></div>
+          <div><div class="rc-linha">ASSINATURA RESPONSAVEL / CONTRATANTE<br>CONTRATANTE</div><p>TESTEMUNHA 2</p><div class="rc-campo">NOME:</div><div class="rc-campo">CPF</div></div>
+        </div>
+        <span class="rc-pag">2/2</span></section>`;
+      return P1 + P2;
+    },
+    emissao: (v, { alunos: [a] }) => ({ tipo: 'Contrato de recreação', alunos: [a.id], descricao: HORARIOS[v.horario] || 'horário a marcar' }),
   };
 }
 

@@ -26,8 +26,8 @@ const AJUDA = {
   },
   alunos: {
     nome: 'Alunos',
-    serve: 'Lista de todos os alunos ativos, com filtros por turma, situação da rematrícula e alunos novos.',
-    passos: ['Digite parte do nome, da mãe, da matrícula ou do CPF para filtrar.', 'Clique no aluno para abrir a ficha completa.', '"+ Cadastrar aluno novo" serve para quem está entrando na escola.'],
+    serve: 'Lista de todos os alunos ativos, separada por turma, com filtros por turma, situação da rematrícula e alunos novos.',
+    passos: ['Digite parte do nome, da mãe, da matrícula ou do CPF para filtrar.', 'Cada turma mostra quantos alunos tem e uma barrinha verde com quanto da rematrícula já foi feito.', 'Clique no aluno para abrir a ficha completa.', '"+ Cadastrar aluno novo" serve para quem está entrando na escola.', 'Marque "Ex-alunos" para ver quem saiu (transferidos, formados, quem não renovou).'],
     dicas: ['Os alunos vêm da importação do ACADESC (Configurações › Importar dados). Corrija no ACADESC e importe de novo sempre que puder.'],
   },
   aluno: {
@@ -37,6 +37,7 @@ const AJUDA = {
       'Rematrícula: clique na situação (Não iniciada, Em andamento, Concluída…). A data da matrícula e o prazo de documentos aparecem sozinhos.',
       'Documentos: marque o que a família entregou. Os PDFs da pasta de prontuário aparecem como conferidos.',
       'Botões do alto: WhatsApp com mensagem pronta, abrir a pasta do aluno, gerar o contrato e editar os dados.',
+      '"Registrar saída": use quando o aluno é transferido ou desiste no meio do ano. Ele sai das listas, mas a ficha fica guardada em Ex-alunos e dá para reativar.',
     ],
     dicas: ['Se outra pessoa alterar a ficha enquanto você edita, o sistema avisa antes de salvar.', 'Abrir a ficha fica registrado (LGPD): abra só quando precisar.'],
   },
@@ -74,7 +75,7 @@ const AJUDA = {
     nome: 'Documentos',
     serve: 'Declarações, termos, carteirinhas, livro ponto e listas com 1 clique, no papel timbrado da OASE.',
     passos: ['Escolha o documento e o aluno.', 'Confira e corrija os campos à esquerda — dá para mudar qualquer texto antes de imprimir.', 'Imprima. A emissão fica registrada no histórico do aluno.'],
-    dicas: ['A declaração de pagamento lê a "Consulta Pagamentos" exportada do ACADESC.', 'A busca de cima também acha documentos já emitidos.'],
+    dicas: ['A declaração de pagamento lê a "Consulta Pagamentos" exportada do ACADESC.', 'No contrato de recreação, escolha o horário (7h ou 9h30) à esquerda. Os valores do plano ficam lembrados para o próximo contrato.', 'A busca de cima também acha documentos já emitidos.'],
   },
   extras: {
     nome: 'Atividades extras',
@@ -194,6 +195,7 @@ const AJUDA = {
       'Cópias de segurança: aponte a pasta para um pen drive ou o OneDrive, defina a senha e teste uma restauração.',
       'Atualizações: "Verificar atualizações" mostra o que mudou, faz cópia antes e reinicia sozinho.',
       'LGPD e acessos: relatório dos dados de um aluno para a família e descarte de ex-alunos.',
+      'Virada do ano: uma vez por ano, quando o ano letivo acaba. Confira a lista (amarelo = não iniciou a rematrícula), troque o que precisar e confirme. Quem continua sobe de série, quem saiu vai para Ex-alunos e a matrícula passa para o ano seguinte.',
       'Celular e rede: "Liberar para o celular" reinicia o sistema e mostra um QR Code; aponte a câmera do celular (no mesmo Wi-Fi) e entre com usuário e senha.',
     ],
     dicas: ['Só a administração vê esta área.', 'Backup que nunca foi restaurado não é backup: faça o teste de restauração pelo menos uma vez.'],

@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **29/09/2026**, versão **5.8.5** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.10.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -359,6 +359,43 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   (o servidor manda `faltam_ch` além de `faltam`).
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Virada do ano letivo, saída de alunos e lista por turma (versão 5.10.0, 26/10/2026)
+Pedido do Kevin: usar o app por muitos anos — trocar o ano letivo e a série de cada aluno, separando quem saiu.
+- **Regra do ano:** o ano letivo atual é sempre `ano_matricula - 1` (a matrícula aberta é a do ano seguinte). Nada novo no banco para isso.
+- **Configurações › Virada do ano** (`abaVirada` em telas5.js, `rotas/virada.js`): uma linha por aluno ativo, por turma, com a sugestão
+  do sistema num seletor (sobe / repete / sai por motivo). Sugestões: rematriculado → sobe (ou repete, se a série de destino é a mesma; ou
+  formado, se o destino é Concluinte); 3ª EM sem rematrícula → formado; transferido / não vai renovar → saída com o mesmo motivo; aluno novo
+  que não confirmou → desistiu; **"Não iniciada" → "Não renovou", em destaque amarelo para conferir** (escolha do Kevin, 26/10/2026).
+- Ao confirmar (`POST /api/admin/virada`, com `de` = ano que a tela via, trava contra virada dupla → 409): cópia de segurança `-virada`
+  ANTES (se falhar, não vira), quem continua ganha a série nova, `novo = 0` e `ano_letivo`; quem sai fica `ativo = 0` com
+  `saida_motivo / saida_data / saida_ano`; `ano_matricula` +1; datas da campanha e do CEBAS +1 ano; vagas copiadas; feriados do ano
+  seguinte calculados (Páscoa) se ainda não existirem. A turma (letra) é mantida: reimportar o ACADESC depois acerta.
+- **Saída no meio do ano:** botão "Registrar saída" na ficha (`PUT/DELETE /api/alunos/:id/saida`), faixa "Ex-aluno" com "Reativar".
+  Lista "Ex-alunos" (`GET /api/ex-alunos`) pela caixinha na tela Alunos. Motivos: transferido, não renovou, desistiu, formado, outro.
+- **LGPD:** quem saiu com `saida_ano` só vira candidato a descarte depois do prazo (`lgpd_anos_descarte`); inativo antigo sem ano continua candidato.
+- **Lista de alunos** redesenhada (o Kevin escolheu entre 4 opções): agrupada por turma, título da turma gruda no alto ao rolar
+  (`--topo-h`), barrinha verde = % com rematrícula feita/em andamento, nome + mãe + matrícula em duas linhas, alunos novos num grupo
+  próprio. Classes `al-*` em app.css. Não usa mais `emPartes` (535 linhas simples desenham rápido).
+- Atenção: a importação do ACADESC continua pondo `ativo = 1` em quem vem na planilha (inclusive ex-aluno) — de propósito.
+- Teste (pasta temporária, demonstração): 18/18 verificações (sobe 5º→6º, repete, novo vira veterano, saída/reativar, ex-alunos,
+  datas +1, feriados 2028, nova campanha zerada, virada dupla bloqueada) + telas conferidas no Chrome (modo escuro).
+
+### Contrato de recreação / contraturno (versão 5.9.0, 05/10/2026)
+Pedido do Kevin: o contrato de contraturno (recreação) preenchido sozinho. Modelo: `Contrato Recreação 2027.pdf` (em branco, sem dado
+de aluno), deixado pelo Kevin na raiz do projeto.
+- Documento `contrato_recreacao` em `public/doc.js` (função `contratoRecreacao()`), 2 folhas iguais ao PDF: sem timbre, logo de marca
+  d'água (`logo.png`, 16%), quadro do alto, cláusulas 1ª–9ª com o texto do modelo **sem correções** (inclusive a frase cortada da
+  cláusula 3ª), Parágrafo Quinto com fundo cinza, assinaturas e testemunhas. CSS com prefixo `rc-` em `doc.css`.
+- Preenche sozinho: matrícula, nome, ano escolar (a série do ano que vem, se já houver), responsável financeiro, CPF e o ano do contrato
+  (`ano_matricula`). **O horário (das 7h às 13h / das 9h30 às 13h) é escolhido à mão** no painel. O padrão é em branco, para marcar
+  à caneta. A escolha marca a bolinha do quadro e preenche o horário na cláusula 8ª.
+- Valores: plano, entrada e nº de parcelas (padrão 3). Ficam lembrados neste navegador (`localStorage iel-recreacao-*`). A parcela é
+  calculada como (plano − entrada) ÷ parcelas se ficar em branco. Valor em branco sai com a linha para preencher à caneta.
+- Onde fica: botão "Contrato de recreação" nos documentos do aluno (`TIPOS_DOC` em etapa2.js). Na ficha, o botão "Contrato" de uma
+  inscrição cujo nome começa com "Recreação" abre este documento, e não a planilha das outras atividades.
+- Pendente: confirmar com a Samara os **valores de 2027** dos dois horários (eles podem ficar como padrão fixo, por horário).
+- Teste (na pasta temporária do Claude, demonstração fictícia, Edge headless): 12 verificações ok + PDF impresso conferido com o modelo.
 
 ### Ícone do app: selo redondo da rosa do Luterano (versões 5.8.3 a 5.8.5, 29/09/2026)
 Pedido do Kevin: "crie uma logo .icon pro app". **Duas versões foram reprovadas**: o "S" do SEK em azul (5.8.3) e a rosa com anéis

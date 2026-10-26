@@ -68,11 +68,12 @@ module.exports = function lgpd(ctx) {
     return db.prepare(`SELECT a.*, (SELECT MAX(ano) FROM rematriculas r WHERE r.aluno_id = a.id) ultimo_ano
       FROM alunos a WHERE COALESCE(a.anonimizado, '') = ''
       AND NOT EXISTS (SELECT 1 FROM rematriculas r WHERE r.aluno_id = a.id AND r.ano = ? AND r.status IN ('reservada','concluida'))`).all(anoMat)
-      .map((a) => ({ ...a, referencia: a.ultimo_ano || a.ano_letivo || null }))
-      .filter((a) => a.ativo === 0 || (a.referencia && a.referencia <= limite))
+      .map((a) => ({ ...a, referencia: +a.saida_ano || a.ultimo_ano || a.ano_letivo || null }))
+      // 5.10.0: quem saiu pela virada/saída tem o ano guardado e espera o prazo como todo mundo; inativo antigo, sem ano, continua candidato
+      .filter((a) => (a.ativo === 0 && !a.saida_ano) || (a.referencia && a.referencia <= limite))
       .map((a) => ({
         aluno_id: a.id, mat: a.mat, nome: a.nome, turma_rotulo: turmaRotulo(a), ativo: !!a.ativo,
-        referencia: a.referencia, motivo: a.ativo === 0 ? 'Marcado como inativo' : `Sem matrícula desde ${a.referencia}`,
+        referencia: a.referencia, motivo: a.ativo === 0 ? (a.saida_ano ? `Saiu em ${a.saida_ano}` : 'Marcado como inativo') : `Sem matrícula desde ${a.referencia}`,
       }));
   }
 

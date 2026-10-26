@@ -215,6 +215,8 @@ for (const c of ['ra', 'rg', 'endereco', 'bairro', 'cidade', 'uf', 'cep', 'cpf_r
 }
 // Etapa 4: marca de aluno cujos dados pessoais já foram descartados (LGPD)
 if (!colunasAluno.has('anonimizado')) db.exec('ALTER TABLE alunos ADD COLUMN anonimizado TEXT');
+// 5.10.0: saída do aluno (transferido, formado…) — o aluno fica inativo, mas guardado com o motivo e o último ano que cursou
+for (const c of ['saida_motivo', 'saida_data', 'saida_ano', 'saida_obs']) if (!colunasAluno.has(c)) db.exec(`ALTER TABLE alunos ADD COLUMN ${c} TEXT`);
 // 5.7.0: o que vem da planilha "Controle de Matrículas e Rematrículas" do Google (importação na aba Rematrícula).
 // desconto em % (30 = 30%); pagamento_json guarda planos, forma, banco, valores e parcelas; planilha_em = quando foi importado.
 {

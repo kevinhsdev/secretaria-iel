@@ -8,7 +8,7 @@ const crypto = require('crypto');
 
 const MARCA = Buffer.from('IELBK1');           // marca para reconhecer arquivo cifrado nosso
 const CABECALHO_SQLITE = 'SQLite format 3\0';
-const MOTIVOS = { inicio: 'ao abrir o sistema', automatico: 'automática', manual: 'feita à mão', restauracao: 'antes de restaurar', config: 'mudança de configuração' };
+const MOTIVOS = { inicio: 'ao abrir o sistema', automatico: 'automática', manual: 'feita à mão', restauracao: 'antes de restaurar', config: 'mudança de configuração', virada: 'antes da virada do ano' };
 
 function pastaDe(cfg, PASTA_DADOS) {
   const p = String(cfg.backup_pasta || '').trim() || path.join(PASTA_DADOS, 'backups');

@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.8.5';
+const VERSAO = '5.10.0';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -941,29 +941,79 @@ TELAS.alunos = async (c) => {
         : '<p class="dado">Peça à administração para importar os alunos.</p>')}</div>`;
     return;
   }
+  const anoMat = EU.config.ano_matricula;
+  const grupoDe = (a) => (a.novo ? `Alunos novos ${anoMat}` : a.turma_rotulo);
   const turmas = [...new Map(lista.map((a) => [a.turma_rotulo, a.ordem])).entries()].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).map((t) => t[0]);
+  let ex = null; // ex-alunos: só busca quando a pessoa pede
   c.innerHTML = `
-  <div class="acoes" style="justify-content:space-between"><div><h1>Alunos</h1><p class="sub">${lista.length} alunos ativos</p></div>
-    <button class="btn ama" id="novo">${icone('mais')}Cadastrar aluno novo ${esc(EU.config.ano_matricula)}</button></div>
+  <div class="acoes" style="justify-content:space-between"><div><h1>Alunos</h1><p class="sub" id="alSub">${lista.length} alunos ativos</p></div>
+    <button class="btn ama" id="novo">${icone('mais')}Cadastrar aluno novo ${esc(anoMat)}</button></div>
   <div class="filtros">
-    <input id="q" placeholder="Filtrar por nome, mãe, pai, matrícula…" style="flex:1;min-width:220px">
-    <select id="t"><option value="">Todas as turmas</option>${turmas.map((t) => `<option>${esc(t)}</option>`).join('')}</select>
-    <select id="s"><option value="">Qualquer situação</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+    <input id="q" placeholder="Filtrar por nome, mãe, pai, matrícula…" style="flex:1;min-width:220px" aria-label="Filtrar alunos">
+    <select id="t" aria-label="Turma"><option value="">Todas as turmas</option>${turmas.map((t) => `<option>${esc(t)}</option>`).join('')}</select>
+    <select id="s" aria-label="Situação"><option value="">Qualquer situação</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
     <label><input type="checkbox" id="nv"> Só alunos novos</label>
+    <label><input type="checkbox" id="ex"> Ex-alunos</label>
   </div>
-  <div class="cartao tabela-wrap" style="padding:0"><table><thead><tr><th>Mat.</th><th>Aluno</th><th>Turma ${Number(EU.config.ano_matricula) - 1}</th><th>Vai para</th><th>Rematrícula</th><th>Responsável</th></tr></thead><tbody id="tb"></tbody></table></div>`;
-  const desenhar = () => {
-    const q = norm($('#q').value), t = $('#t').value, s = $('#s').value, nv = $('#nv').checked;
-    const f = lista.filter((a) => (!q || [a.nome, a.mat, a.nome_mae, a.nome_pai, a.nome_resp].some((v) => norm(v).includes(q))) && (!t || a.turma_rotulo === t) && (!s || a.status === s) && (!nv || a.novo));
-    emPartes($('#tb'), f.map((a) => `<tr class="clic" data-id="${a.id}"><td class="mono">${esc(a.mat || '—')}</td><td><b>${esc(titulo(a.nome))}</b> ${a.novo ? '<span class="tag t-novo">novo</span>' : ''}</td>
-      <td>${esc(a.novo ? '—' : a.turma_rotulo)}</td><td>${esc(a.destino)}</td><td><span class="tag t-${a.status}">${STATUS[a.status]}</span></td><td>${esc(titulo(a.nome_resp || a.nome_mae || ''))}</td></tr>`), {
-      colunas: 6, vazio: '<tr><td colspan="6" class="vazio">Nenhum aluno com esses filtros</td></tr>',
-      ligar: (tb) => $$('tr[data-id]', tb).forEach((tr) => (tr.onclick = () => (location.hash = '#/aluno/' + tr.dataset.id))) });
-  };
-  ['q', 't', 's', 'nv'].forEach((id) => ($('#' + id).oninput = desenhar));
+  <div id="alLista" class="al-lista"></div>`;
+  // O título de cada turma gruda logo abaixo da barra do alto ao rolar
+  c.style.setProperty('--topo-h', ($('.topo')?.offsetHeight || 0) + 'px');
+  const linhaAluno = (a) => `<a class="al-linha" href="#/aluno/${a.id}">
+    <i class="al-ponto t-${a.status}" aria-hidden="true"></i>
+    <span class="al-nome"><b>${esc(titulo(a.nome))}</b>${a.novo ? ' <span class="tag t-novo">novo</span>' : ''}
+      <small>${(a.nome_resp || a.nome_mae) ? `${a.nome_mae ? 'Mãe' : 'Resp.'}: ${esc(titulo(a.nome_mae || a.nome_resp))} · ` : ''}Mat. <span class="mono">${esc(a.mat || '—')}</span></small></span>
+    <span class="al-destino">${a.destino ? '→ ' + esc(a.destino) : ''}</span>
+    <span class="al-status"><span class="tag t-${a.status}">${STATUS[a.status]}</span></span></a>`;
+  const linhaEx = (a) => `<a class="al-linha" href="#/aluno/${a.id}">
+    <i class="al-ponto t-pendente" aria-hidden="true"></i>
+    <span class="al-nome"><b>${esc(titulo(a.nome))}</b>
+      <small>${a.nome_mae || a.nome_resp ? `${a.nome_mae ? 'Mãe' : 'Resp.'}: ${esc(titulo(a.nome_mae || a.nome_resp))} · ` : ''}Mat. <span class="mono">${esc(a.mat || '—')}</span></small></span>
+    <span class="al-destino">${a.saida_data ? 'saiu em ' + dataBR(a.saida_data) : ''}</span>
+    <span class="al-status"><span class="tag t-nao_renova">${esc(a.motivo_rotulo)}</span></span></a>`;
+  const desenhar = tentar(async () => {
+    const q = norm($('#q').value), t = $('#t').value, s = $('#s').value, nv = $('#nv').checked, vex = $('#ex').checked;
+    $('#s').disabled = $('#nv').disabled = vex;
+    if (vex && !ex) ex = await api('GET', '/api/ex-alunos');
+    const base = vex ? ex : lista;
+    const f = base.filter((a) => (!q || [a.nome, a.mat, a.nome_mae, a.nome_pai, a.nome_resp].some((v) => norm(v).includes(q))) && (!t || a.turma_rotulo === t)
+      && (vex || ((!s || a.status === s) && (!nv || a.novo))));
+    $('#alSub').textContent = vex ? `${plural(base.length, 'ex-aluno', 'ex-alunos')} (saíram, transferidos, formados)` : `${lista.length} alunos ativos`;
+    const grupos = new Map();
+    for (const a of f.slice().sort((x, y) => (vex ? 0 : x.novo - y.novo) || x.ordem - y.ordem || x.turma_rotulo.localeCompare(y.turma_rotulo))) {
+      const g = vex ? a.turma_rotulo : grupoDe(a);
+      if (!grupos.has(g)) grupos.set(g, []);
+      grupos.get(g).push(a);
+    }
+    $('#alLista').innerHTML = f.length ? [...grupos].map(([g, als]) => {
+      const feitos = als.filter((a) => a.status === 'reservada' || a.status === 'concluida').length;
+      const formandos = als.every((a) => a.serie_chave === 'EM3' && !a.novo);
+      const pct = Math.round((100 * feitos) / als.length);
+      return `<section class="al-turma"><header class="al-cab"><h3>${esc(g)}</h3><span class="dado">${plural(als.length, 'aluno', 'alunos')}</span>
+        ${vex ? '' : formandos ? '<span class="dado al-pct">formandos</span>' : `<span class="al-barra" title="${feitos} de ${als.length} com rematrícula feita ou em andamento"><i style="width:${pct}%"></i></span><span class="al-pct mono">${pct}%</span>`}</header>
+        ${als.map(vex ? linhaEx : linhaAluno).join('')}</section>`;
+    }).join('') : `<div class="cartao vazio">${vex ? 'Nenhum ex-aluno ainda' : 'Nenhum aluno com esses filtros'}</div>`;
+  });
+  ['q', 't', 's', 'nv', 'ex'].forEach((id) => ($('#' + id).oninput = desenhar));
   desenhar();
   $('#novo').onclick = () => formAluno();
 };
+
+// Saída durante o ano (transferência, desistência…). O aluno sai das listas, mas a ficha e o histórico ficam guardados em Ex-alunos.
+const MOTIVOS_SAIDA = { transferido: 'Transferido', nao_renovou: 'Não renovou', desistiu: 'Desistiu', formado: 'Formado', outro: 'Outro motivo' };
+function formSaida(a) {
+  modal('Registrar saída do aluno', `<form id="fs"><p><b>${esc(titulo(a.nome))}</b> sai das listas de alunos e passa para <b>Ex-alunos</b>. A ficha, os documentos e o histórico continuam guardados, e dá para reativar depois.</p>
+    <div class="campos"><div class="campo"><label for="fs_m">Motivo</label><select id="fs_m">${Object.entries(MOTIVOS_SAIDA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="campo"><label for="fs_d">Data da saída</label><input type="date" id="fs_d" value="${hojeIso()}"></div></div>
+    <div class="campo" style="margin-top:10px"><label for="fs_o">Observação (opcional)</label><input id="fs_o" placeholder="Ex.: foi para a escola X; pediu a transferência em 10/03"></div>
+    <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Registrar saída</button></div></form>`,
+  { onAbrir: (el, fechar) => {
+    $('#fs', el).onsubmit = tentar(async (ev) => {
+      ev.preventDefault();
+      await api('PUT', `/api/alunos/${a.id}/saida`, { motivo: $('#fs_m', el).value, data: $('#fs_d', el).value, obs: $('#fs_o', el).value });
+      fechar(); invalidar(); toast('Saída registrada'); rotear();
+    });
+  } });
+}
 
 function formAluno(a) {
   const novo = !a;
@@ -1024,6 +1074,8 @@ TELAS.aluno = async (c, id) => {
   const dado = (rot, v) => `<div class="dado">${rot}<b>${esc(v || '—')}</b></div>`;
   c.innerHTML = `
   <p class="nao-imprimir" style="margin:0 0 10px"><a href="#/alunos">← Alunos</a></p>
+  ${a.ativo ? '' : `<div class="faixa-demo">${icone('alerta')}<span><b>Ex-aluno: ${esc(MOTIVOS_SAIDA[a.saida_motivo] || 'inativo')}</b>${a.saida_data ? ' em ' + dataBR(a.saida_data) : ''}${a.saida_ano ? ` · último ano cursado: ${esc(a.saida_ano)}` : ''}${a.saida_obs ? ' · ' + esc(a.saida_obs) : ''}</span>
+    <button class="btn peq" id="btnReativar" style="margin-left:auto">Reativar aluno</button></div>`}
   <div class="ficha-topo">
     <div class="info"><h1>${esc(titulo(a.nome))} ${a.novo ? '<span class="tag t-novo">aluno novo</span>' : ''} ${a.filho_funcionario ? '<span class="tag t-func">filho(a) de funcionário</span>' : ''} ${a.demo ? '<span class="tag t-demo">fictício</span>' : ''}</h1>
       <p class="sub" style="margin:0">Mat. <b class="mono">${esc(a.mat || '—')}</b> · ${a.novo ? 'Ingresso ' + ano : esc(a.turma_rotulo) + (a.turno ? ` (${a.turno === 'M' ? 'manhã' : 'tarde'})` : '')} → <b>${esc(f.destino?.rotulo || '?')}</b> em ${ano}</p></div>
@@ -1033,6 +1085,7 @@ TELAS.aluno = async (c, id) => {
       <button class="btn" id="btnPasta">${icone('arquivo')}Abrir pasta</button>
       ${/^(F\d|EM\d)$/.test(a.serie_chave || '') ? `<a class="btn" href="#/hist/${a.id}">${icone('historico')}Notas do histórico</a>` : ''}
       <button class="btn" id="btnEditar">${icone('rematricula')}Editar</button>
+      ${a.ativo ? `<button class="btn" id="btnSaida">${icone('sair')}Registrar saída</button>` : ''}
     </div>
   </div>
   <div class="grade g2">
@@ -1093,6 +1146,11 @@ TELAS.aluno = async (c, id) => {
   $('#btnZap').onclick = tentar(() => janelaWhats(dadosMsg, faltam.length && matriculado ? 0 : r.status === 'concluida' ? 2 : 1));
   $('#btnPasta').onclick = tentar(async () => { const r2 = await api('POST', `/api/alunos/${a.id}/abrir-pasta`); toast('Abrindo ' + r2.pasta); });
   $('#btnEditar').onclick = () => formAluno(a);
+  if ($('#btnSaida')) $('#btnSaida').onclick = () => formSaida(a);
+  if ($('#btnReativar')) $('#btnReativar').onclick = tentar(async () => {
+    if (!(await confirmar(`Reativar ${titulo(a.nome)}? Volta para a lista de alunos.`, 'Reativar'))) return;
+    await api('DELETE', `/api/alunos/${a.id}/saida`); invalidar(); toast('Aluno reativado'); rotear();
+  });
   if (window.fichaEtapa2) window.fichaEtapa2($('#fichaEtapa2'), a, f).catch((e) => toast(e.message, true));
   if (window.fichaEtapa3) window.fichaEtapa3($('#fichaEtapa3'), a, f).catch((e) => toast(e.message, true));
   $('#btnContrato').onclick = async (e) => {

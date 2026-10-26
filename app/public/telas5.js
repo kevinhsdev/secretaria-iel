@@ -673,7 +673,7 @@ function nomeUsuario(login) { return login ? titulo(login) : '—'; }
 TELAS.config = async (c, aba = 'geral') => {
   if (EU.perfil !== 'admin') { c.innerHTML = '<div class="cartao">Somente a administração acessa as configurações.</div>'; return; }
   const d = await api('GET', '/api/admin');
-  const ABAS = { geral: 'Geral', importar: 'Importar dados', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários',
+  const ABAS = { geral: 'Geral', importar: 'Importar dados', virada: 'Virada do ano', vagas: 'Vagas', documentos: 'Documentos', usuarios: 'Usuários',
     backup: 'Cópias de segurança', celular: 'Celular e rede', atualizacao: 'Atualizações', lgpd: 'LGPD e acessos', log: 'Auditoria' };
   if (!ABAS[aba]) aba = 'geral';
   c.innerHTML = cabecalho('Configurações', 'Só a administração vê esta área.')
@@ -804,6 +804,7 @@ TELAS.config = async (c, aba = 'geral') => {
   if (aba === 'atualizacao' && window.abaAtualizacao) await window.abaAtualizacao(el);
   if (aba === 'lgpd' && window.abaLgpd) await window.abaLgpd(el);
   if (aba === 'celular') await abaCelular(el);
+  if (aba === 'virada') await abaVirada(el);
 
   if (aba === 'log') {
     const log = await api('GET', '/api/admin/log');
@@ -821,6 +822,73 @@ TELAS.config = async (c, aba = 'geral') => {
     $('#logQ').oninput = desenhar; desenhar();
   }
 };
+
+// ═════════════ VIRADA DO ANO LETIVO ═════════════
+// Uma linha por aluno com o que vai acontecer (sobe, repete ou sai e por quê). O sistema sugere; a secretaria confere e confirma.
+async function abaVirada(el) {
+  const v = await api('GET', '/api/admin/virada');
+  const dec = Object.fromEntries(v.alunos.map((a) => [a.id, a.sugestao]));
+  const SAI = Object.keys(v.motivos);
+  const tipo = (d) => (d === 'sobe' ? 'sobe' : d === 'repete' ? 'repete' : d === 'formado' ? 'formado' : 'sai');
+  const opcoes = (a) => [
+    a.destino ? `<option value="sobe">${a.novo ? 'Começa no' : 'Sobe para'} ${esc(a.destino.rotulo)}</option>` : '',
+    a.novo ? '' : '<option value="repete">Repete a série</option>',
+    ...SAI.map((k) => `<option value="${k}">Sai: ${esc(v.motivos[k])}</option>`)].join('');
+  el.innerHTML = `<div class="cartao"><h2>Virada do ano letivo: ${v.de} → ${v.para}</h2>
+      <p>Faça isto <b>uma vez por ano</b>, quando o ano ${v.de} terminar e a rematrícula estiver fechada. Ao confirmar:</p>
+      <ul class="virada-passos"><li>quem vai continuar <b>sobe de série</b> (ou repete) e passa a ser aluno de ${v.para};</li>
+        <li>quem saiu fica em <b>Ex-alunos</b>, com o motivo guardado (a ficha e o histórico continuam lá);</li>
+        <li>a matrícula aberta passa a ser a de <b>${v.para + 1}</b>, as datas da campanha andam um ano e as vagas são copiadas;</li>
+        <li>antes de tudo o sistema faz uma <b>cópia de segurança</b>.</li></ul>
+      <div class="grade g4 kpis" id="vrKpis" style="margin-top:14px"></div></div>
+    <div class="filtros" style="margin-top:16px">
+      <select id="vrF" aria-label="Mostrar"><option value="">Todos os alunos</option><option value="conferir">Só os para conferir</option><option value="sai">Só os que saem</option>
+        <option value="formado">Só formandos</option><option value="sobe">Só os que sobem</option><option value="repete">Só os que repetem</option></select>
+      <input id="vrQ" placeholder="Filtrar por nome ou matrícula…" style="flex:1;min-width:200px" aria-label="Filtrar">
+    </div>
+    <div id="vrLista"></div>
+    <div class="virada-rodape"><span id="vrResumo" class="dado"></span><button class="btn pri" id="vrOk">${icone('ok')}Fazer a virada para ${v.para}</button></div>`;
+  const contar = () => {
+    const n = { sobe: 0, repete: 0, formado: 0, sai: 0 };
+    v.alunos.forEach((a) => n[tipo(dec[a.id])]++);
+    const conferir = v.alunos.filter((a) => a.conferir && dec[a.id] === a.sugestao).length;
+    const kpi = (rot, val, det, cls = '') => `<div class="cartao kpi ${cls}"><div class="rot">${rot}</div><div class="val">${val}</div><div class="det">${det}</div></div>`;
+    $('#vrKpis').innerHTML = kpi('Sobem de série', n.sobe, n.repete ? `${plural(n.repete, 'repete', 'repetem')} a série` : `continuam em ${v.para}`, 'destaque')
+      + kpi('Formandos', n.formado, '3ª série do Ensino Médio') + kpi('Saem da escola', n.sai, 'transferidos, não renovaram…')
+      + kpi('Para conferir', conferir, 'não iniciaram a rematrícula', conferir ? 'alerta' : 'ok');
+    $('#vrResumo').textContent = `${v.alunos.length} alunos: ${n.sobe + n.repete} continuam, ${n.formado + n.sai} saem.`;
+  };
+  const desenhar = () => {
+    const f = $('#vrF').value, q = norm($('#vrQ').value);
+    const lista = v.alunos.filter((a) => (!q || norm(a.nome + ' ' + (a.mat || '')).includes(q))
+      && (!f || (f === 'conferir' ? a.conferir && dec[a.id] === a.sugestao : tipo(dec[a.id]) === f)));
+    const grupos = {};
+    lista.forEach((a) => (grupos[a.turma_rotulo] ??= []).push(a));
+    const ordem = (t) => (t === 'Aluno novo' ? 999 : grupos[t][0].ordem);
+    $('#vrLista').innerHTML = lista.length ? Object.keys(grupos).sort((x, y) => ordem(x) - ordem(y) || x.localeCompare(y)).map((t) => `
+      <details class="cartao turma-grupo" open style="margin-bottom:12px;padding:0"><summary><h3 style="padding:14px 16px 12px 8px;margin:0">${esc(t === 'Aluno novo' ? `Alunos novos (${v.para})` : t)} <span class="dado">(${grupos[t].length})</span></h3></summary>
+      <div class="virada-linhas">${grupos[t].map((a) => `<div class="virada-linha ${a.conferir && dec[a.id] === a.sugestao ? 'conferir' : ''}" data-id="${a.id}">
+        <span><a href="#/aluno/${a.id}"><b>${esc(titulo(a.nome))}</b></a>${a.novo ? ' <span class="tag t-novo">novo</span>' : ''}<small class="dado">Mat. ${esc(a.mat || '—')} · Rematrícula: ${esc(STATUS[a.status] || a.status)}</small></span>
+        <select data-dec="${a.id}" class="vr-${tipo(dec[a.id])}" aria-label="O que acontece com ${esc(titulo(a.nome))}">${opcoes(a)}</select></div>`).join('')}</div></details>`).join('')
+      : '<div class="cartao vazio">Nenhum aluno com esse filtro.</div>';
+    $$('[data-dec]', el).forEach((s) => {
+      s.value = dec[s.dataset.dec];
+      s.onchange = () => { dec[s.dataset.dec] = s.value; s.className = 'vr-' + tipo(s.value); s.closest('.virada-linha').classList.remove('conferir'); contar(); };
+    });
+  };
+  ['vrF', 'vrQ'].forEach((id) => ($('#' + id).oninput = desenhar));
+  contar(); desenhar();
+  $('#vrOk').onclick = tentar(async () => {
+    const sai = v.alunos.filter((a) => !['sobe', 'repete'].includes(dec[a.id])).length;
+    if (!(await confirmar(`Fazer a virada de ${v.de} para ${v.para}? ${v.alunos.length - sai} alunos continuam e ${sai} saem da escola. Antes, o sistema faz uma cópia de segurança. Depois, para desfazer só restaurando essa cópia.`, `Fazer a virada para ${v.para}`))) return;
+    const r = await api('POST', '/api/admin/virada', { de: v.de, decisoes: dec });
+    EU = await api('GET', '/api/eu'); invalidar();
+    el.innerHTML = `<div class="cartao"><div class="situacao"><span class="selo">${icone('ok')}</span><span><b>Pronto! Agora o ano letivo é ${r.ano_letivo} e a matrícula aberta é a de ${r.ano_matricula}.</b>
+      <span>${plural(r.subiram, 'aluno subiu', 'alunos subiram')} de série${r.repetiram ? `, ${plural(r.repetiram, 'repete', 'repetem')}` : ''} e ${plural(r.sairam, 'saiu', 'saíram')}. Cópia de segurança: <span class="mono">${esc(r.copia)}</span></span></span><span></span></div>
+      <p class="dica">Próximos passos: confira as <a href="#/config/geral">datas da campanha ${r.ano_matricula}</a> e as <a href="#/config/vagas">vagas</a>, e importe de novo os alunos do ACADESC para acertar as turmas (A, B…).</p></div>`;
+    toast('Virada do ano feita');
+  });
+}
 
 // ═════════════ MUTIRÃO DE FOTOS ═════════════
 // Um cartão por aluno: a foto (quando está na pasta), foto tirada e os 3 sistemas. Marcar não recarrega a tela.

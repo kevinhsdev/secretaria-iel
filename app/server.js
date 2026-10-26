@@ -785,6 +785,7 @@ require('./rotas/busca')(ctx);
 require('./rotas/historico')(ctx);
 require('./rotas/vivencias')(ctx);
 require('./rotas/planilha-rematricula')(ctx);
+require('./rotas/virada')(ctx);
 
 // Quem carregou a demonstração antes da Etapa 2 ganha também inscrições, eventos e bolsas fictícias
 if (db.prepare('SELECT 1 FROM alunos WHERE demo = 1 LIMIT 1').get() && !db.prepare('SELECT 1 FROM inscricoes LIMIT 1').get() && !db.prepare('SELECT 1 FROM bolsas LIMIT 1').get()) {

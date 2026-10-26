@@ -498,6 +498,45 @@ details.turma-grupo > summary::before { content: '▸'; color: var(--texto-2); f
 details.turma-grupo[open] > summary::before { transform: rotate(90deg); }
 @media (hover: hover) and (pointer: fine) { details.turma-grupo > summary:hover { background: var(--superficie-2); } }
 
+/* 5.10.0: lista de alunos agrupada por turma — título da turma gruda no alto ao rolar, com a barrinha da rematrícula */
+.al-lista { display: grid; gap: 14px; }
+.al-turma { background: var(--superficie); border-radius: var(--raio-m); box-shadow: var(--sombra); }
+.al-cab { position: sticky; top: var(--topo-h, 0px); z-index: 2; display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  background: var(--superficie); border-bottom: 1px solid var(--borda); border-radius: var(--raio-m) var(--raio-m) 0 0; }
+.al-cab h3 { margin: 0; font-size: 15px; }
+.al-barra { flex: 1; max-width: 220px; height: 8px; margin-left: auto; border-radius: 6px; background: var(--superficie-2); overflow: hidden; }
+.al-barra i { display: block; height: 100%; border-radius: 6px; background: var(--verde); }
+.al-pct { min-width: 4ch; text-align: right; font-size: 12.5px; color: var(--texto-2); }
+.al-cab .dado.al-pct { margin-left: auto; }
+.al-linha { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(110px, auto) 128px; align-items: center; gap: 12px; padding: 10px 16px;
+  color: inherit; text-decoration: none; border-bottom: 1px solid var(--cinza-claro); }
+.al-turma > .al-linha:last-child { border-bottom: 0; border-radius: 0 0 var(--raio-m) var(--raio-m); }
+.al-linha:focus-visible { outline: 2px solid var(--azul-2); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .al-linha:hover { background: var(--superficie-2); } }
+.al-ponto { width: 9px; height: 9px; border-radius: 50%; background: currentColor !important; }
+.al-nome small { display: block; color: var(--texto-2); font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al-destino { color: var(--texto-2); font-size: 13px; white-space: nowrap; }
+.al-status { text-align: right; }
+:root[data-densidade="compacta"] .al-linha { padding-block: 6px; }
+@media (max-width: 620px) {
+  .al-linha { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .al-destino { display: none; }
+  .al-barra { max-width: 90px; }
+}
+@media print { .al-cab { position: static; } .al-turma { break-inside: avoid-page; } }
+
+/* 5.10.0: virada do ano */
+.virada-passos { margin: 6px 0 0; padding-left: 20px; line-height: 1.7; }
+.virada-linhas > .virada-linha { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 260px); align-items: center; gap: 12px; padding: 9px 16px; border-top: 1px solid var(--cinza-claro); }
+.virada-linha small { display: block; margin-top: 2px; }
+.virada-linha.conferir { background: color-mix(in srgb, var(--amarelo) 9%, transparent); box-shadow: inset 3px 0 0 var(--amarelo); }
+.virada-linha select { width: 100%; }
+.virada-linha select.vr-sai { color: var(--vermelho); }
+.virada-linha select.vr-formado { color: var(--azul-2); }
+.virada-rodape { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-top: 14px; padding: 12px 16px; border-radius: var(--raio-m); background: var(--vidro); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: var(--sombra); }
+@media (max-width: 620px) { .virada-linhas > .virada-linha { grid-template-columns: 1fr; } }
+
 /* Histórico escolar: grade de notas que se digita como planilha */
 .grade-notas { width: auto; min-width: 100%; }
 .grade-notas th, .grade-notas td { padding: 4px 5px; border: 1px solid var(--cinza-claro); text-align: center; white-space: nowrap; }
