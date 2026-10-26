@@ -3,13 +3,43 @@
 const A = require('../lib/atualizacao');
 const B = require('../lib/backup');
 const { VERSAO } = require('../lib/versao');
+const { execFile } = require('child_process');
 
 module.exports = function atualizacao(ctx) {
-  const { rota, db, cfg, registrar, json, exigirAdmin, PASTA_DADOS } = ctx;
+  const { rota, db, cfg, registrar, json, exigirAdmin, falha, PASTA_DADOS } = ctx;
 
   rota('GET', '/api/admin/atualizacao', async (req, res, { u }) => {
     exigirAdmin(u);
     json(res, 200, { versao: VERSAO, ...(await A.estado()) });
+  });
+
+  // ── Instalar o Git pelo winget (o instalador oficial da Microsoft que já vem no Windows 10/11) ──
+  // Só no próprio computador do sistema: o Windows pode abrir a janela "Deseja permitir…" e alguém precisa clicar Sim ali.
+  let instalacao = null; // { rodando, inicio, fim, ok, aviso }
+  rota('GET', '/api/admin/atualizacao/instalar-git', async (req, res, { u }) => {
+    exigirAdmin(u);
+    json(res, 200, instalacao || { rodando: false });
+  });
+  rota('POST', '/api/admin/atualizacao/instalar-git', async (req, res, { u }) => {
+    exigirAdmin(u);
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    if (!local) falha(400, 'A instalação só pode ser feita no computador onde o sistema está instalado (o servidor). Vá até ele e clique lá.');
+    if (process.platform !== 'win32') falha(400, 'A instalação automática só funciona no Windows.');
+    if (instalacao?.rodando) return json(res, 200, instalacao);
+    instalacao = { rodando: true, inicio: new Date().toISOString() };
+    registrar(u.login, 'começou a instalar o Git', '');
+    execFile('winget', ['install', '--id', 'Git.Git', '-e', '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements'],
+      { timeout: 15 * 60000, windowsHide: true }, async (erro, saida, saidaErro) => {
+        const e = await A.estado();
+        const semWinget = erro && (erro.code === 'ENOENT' || /não é reconhecido|not recognized/i.test(String(saidaErro)));
+        instalacao = {
+          rodando: false, inicio: instalacao.inicio, fim: new Date().toISOString(), ok: !!e.git,
+          aviso: e.git ? '' : semWinget ? 'Este Windows não tem o instalador automático (winget). Use o botão "Baixar do site oficial" e siga o passo a passo.'
+            : 'A instalação não terminou. Se apareceu a janela "Deseja permitir…", é preciso clicar em Sim. Tente de novo ou use o site oficial.',
+        };
+        registrar(u.login, e.git ? 'instalou o Git' : 'tentou instalar o Git', instalacao.aviso || '');
+      });
+    json(res, 200, instalacao);
   });
 
   // Fala com o GitHub — pode demorar alguns segundos

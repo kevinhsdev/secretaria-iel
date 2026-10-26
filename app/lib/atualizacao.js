@@ -3,16 +3,24 @@
 'use strict';
 const { execFile } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 // A raiz é a pasta do projeto (onde fica o .git). IEL_RAIZ existe para os testes.
 const RAIZ = process.env.IEL_RAIZ || path.join(__dirname, '..', '..');
+
+// Git instalado com o servidor já aberto não entra no PATH deste processo: procura nas pastas de instalação padrão também.
+function gitExe() {
+  const locais = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')]
+    .filter(Boolean).map((p) => path.join(p, 'Git', 'cmd', 'git.exe'));
+  return locais.find((f) => fs.existsSync(f)) || 'git';
+}
 
 // GIT_TERMINAL_PROMPT=0: se o GitHub pedir login, o git falha na hora em vez de travar esperando alguém digitar.
 // "cru" mantém os espaços do começo da linha: o "git status --porcelain" usa as duas primeiras
 // colunas para a situação do arquivo, e limpar isso comeria a primeira letra do nome.
 function git(args, tempo = 25000, cru = false) {
   return new Promise((ok) => {
-    execFile('git', args, { cwd: RAIZ, timeout: tempo, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } },
+    execFile(gitExe(), args, { cwd: RAIZ, timeout: tempo, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } },
       (erro, saida, saidaErro) => ok({
         ok: !erro, codigo: erro ? erro.code : 0,
         texto: cru ? String(saida || '').replace(/\s+$/, '') : String(saida || '').trim(),

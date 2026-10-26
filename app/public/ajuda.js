@@ -193,7 +193,7 @@ const AJUDA = {
     passos: [
       'Importar dados: exporte do ACADESC em Excel e envie aqui (alunos, responsáveis, pagamentos).',
       'Cópias de segurança: aponte a pasta para um pen drive ou o OneDrive, defina a senha e teste uma restauração.',
-      'Atualizações: "Verificar atualizações" mostra o que mudou, faz cópia antes e reinicia sozinho.',
+      'Atualizações: "Verificar atualizações" mostra o que mudou, faz cópia antes e reinicia sozinho. Se o computador não tiver o Git, a mesma tela ensina a instalar (botão automático ou passo a passo pelo site).',
       'LGPD e acessos: relatório dos dados de um aluno para a família e descarte de ex-alunos.',
       'Virada do ano: uma vez por ano, quando o ano letivo acaba. Confira a lista (amarelo = não iniciou a rematrícula), troque o que precisar e confirme. Quem continua sobe de série, quem saiu vai para Ex-alunos e a matrícula passa para o ano seguinte.',
       'Celular e rede: "Liberar para o celular" reinicia o sistema e mostra um QR Code; aponte a câmera do celular (no mesmo Wi-Fi) e entre com usuário e senha.',

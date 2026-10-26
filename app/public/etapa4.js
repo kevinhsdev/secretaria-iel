@@ -314,7 +314,9 @@ function desenharAtualizacao(el, d, resultado) {
       <br><span class="mono">${d.mudancas_locais.slice(0, 8).map(esc).join(', ')}${d.mudancas_locais.length > 8 ? '…' : ''}</span></div>` : ''}
     <div id="atResultado" style="margin-top:12px">${resultado || '<p class="dado">Clique em "Verificar se há atualização" quando quiser. Não precisa ser sempre — só quando eu avisar que tem novidade.</p>'}</div>
     ${d.origem ? `<p class="dado" style="margin-top:12px">Origem: <span class="mono">${esc(d.origem)}</span> · ramo <span class="mono">${esc(d.ramo)}</span></p>` : ''}
-  </div>`;
+  </div>
+  ${d.git ? '' : cartaoInstalarGit()}`;
+  if (!d.git) ligarInstalarGit(el);
 
   if ($('#atVerificar')) $('#atVerificar').onclick = tentar(async () => {
     const b = $('#atVerificar');
@@ -338,6 +340,49 @@ function desenharAtualizacao(el, d, resultado) {
         : '<button class="btn pri" id="atAplicar">Atualizar agora</button><span class="dado">Faz cópia de segurança, troca os arquivos e reinicia o sistema.</span>'}</div>`;
     if ($('#atAplicar')) $('#atAplicar').onclick = tentar(() => aplicarAtualizacao(r.novidades.length));
   });
+}
+
+// Sem Git, o botão de atualizar não funciona: ajuda a instalar (automático pelo winget, ou pelo site com passo a passo)
+const NESTE_PC = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+function cartaoInstalarGit() {
+  return `<div class="cartao" style="margin-top:16px"><h2>Instalar o Git</h2>
+    <p>O <b>Git</b> é o programa gratuito que o sistema usa para baixar as versões novas. Instale uma vez só, no computador onde o sistema roda (o servidor).</p>
+    <div class="grade g2" style="margin-top:12px">
+      <div class="cartao" style="background:var(--superficie-2);box-shadow:none"><h3 style="margin-top:0">Jeito fácil: o sistema instala</h3>
+        ${NESTE_PC ? `<p style="color:var(--texto-2);font-size:13.5px">Leva de 1 a 5 minutos e precisa de internet. Se o Windows perguntar <b>"Deseja permitir que este aplicativo faça alterações?"</b>, clique em <b>Sim</b>.</p>
+          <button class="btn pri" id="gitInstalar">${icone('importar')}Instalar o Git agora</button>`
+        : '<p style="color:var(--texto-2);font-size:13.5px">Este botão só aparece no computador onde o sistema está instalado (o servidor). Abra o sistema lá, entre em Configurações › Atualizações e clique em "Instalar o Git agora".</p>'}
+        <div id="gitSituacao" style="margin-top:10px"></div></div>
+      <div class="cartao" style="background:var(--superficie-2);box-shadow:none"><h3 style="margin-top:0">Jeito manual: pelo site oficial</h3>
+        <ol class="virada-passos" style="margin:0">
+          <li>Clique em <a class="btn peq" href="https://git-scm.com/downloads/win" target="_blank" rel="noopener">Baixar do site oficial</a>
+            e escolha <b>"Click here to download"</b> (64-bit).</li>
+          <li>Abra o arquivo baixado (<span class="mono">Git-…-64-bit.exe</span>) e clique <b>Sim</b> se o Windows perguntar.</li>
+          <li>Em todas as telas do instalador, clique só em <b>Next</b> (não precisa mudar nada) e no fim em <b>Install</b>.</li>
+          <li>Quando terminar, desmarque "View Release Notes" e clique em <b>Finish</b>.</li>
+          <li>Volte aqui e clique em <b>"Já instalei, verificar"</b>.</li></ol></div>
+    </div>
+    <div class="acoes" style="margin-top:14px"><button class="btn" id="gitConferir">${icone('ok')}Já instalei, verificar</button>
+      <span class="dado">Depois do Git, a pasta do sistema também precisa ter sido baixada pelo Git (o <span class="mono">git clone</span> do arquivo "INSTALAR NOS 3 PCs").</span></div></div>`;
+}
+function ligarInstalarGit(el) {
+  const sit = $('#gitSituacao', el);
+  const mostrar = (r) => {
+    if (r.rodando) { sit.innerHTML = '<div class="dica">⏳ Instalando o Git… pode levar alguns minutos. Pode continuar usando o sistema.</div>'; setTimeout(acompanhar, 3000); return; }
+    if (r.ok) { toast('Git instalado!'); window.abaAtualizacao(el); return; }
+    if (r.aviso) sit.innerHTML = `<div class="aviso-fixo perigo" style="border-radius:8px">${icone('alerta')}${esc(r.aviso)}</div>`;
+    if ($('#gitInstalar', el)) $('#gitInstalar', el).disabled = false;
+  };
+  const acompanhar = async () => { if (!sit.isConnected) return; try { mostrar(await api('GET', '/api/admin/atualizacao/instalar-git')); } catch { setTimeout(acompanhar, 3000); } };
+  if ($('#gitInstalar', el)) $('#gitInstalar', el).onclick = tentar(async () => {
+    $('#gitInstalar', el).disabled = true;
+    mostrar(await api('POST', '/api/admin/atualizacao/instalar-git'));
+  });
+  $('#gitConferir', el).onclick = tentar(async () => {
+    const d = await api('GET', '/api/admin/atualizacao');
+    if (d.git) { toast('Git encontrado!'); desenharAtualizacao(el, d); } else toast('Ainda não achei o Git neste computador. Se acabou de instalar, espere o instalador terminar.', true);
+  });
+  acompanhar(); // se uma instalação já estava rodando (tela recarregada), continua mostrando
 }
 
 async function aplicarAtualizacao(quantas) {

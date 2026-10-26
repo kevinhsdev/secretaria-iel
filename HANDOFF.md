@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/10/2026**, versão **5.10.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.10.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -359,6 +359,16 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   (o servidor manda `faltam_ch` além de `faltam`).
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Ajuda para instalar o Git (versão 5.10.1, 26/10/2026)
+Pedido do Kevin: em Configurações › Atualizações, quando o PC não tem Git, um cartão "Instalar o Git" (`cartaoInstalarGit` em etapa4.js):
+- **Botão "Instalar o Git agora"**: `POST /api/admin/atualizacao/instalar-git` roda `winget install --id Git.Git --silent` no servidor e a tela
+  acompanha a cada 3 s (`GET` do mesmo endereço). Só no próprio PC do sistema (localhost), porque o Windows pode pedir "Deseja permitir…".
+  Sem winget, o aviso manda para o site.
+- **Jeito manual**: link para git-scm.com/downloads/win e passo a passo (Next em tudo, Install, Finish) + botão "Já instalei, verificar".
+- `lib/atualizacao.js` agora procura o git.exe também em `Program Files\Git\cmd` e `%LOCALAPPDATA%\Programs\Git\cmd`: o Git instalado
+  com o sistema aberto não entra no PATH do processo, e assim funciona sem reiniciar.
+- Testado: a tela (simulando PC sem Git) e a detecção do Git; a instalação de verdade pelo winget NÃO foi rodada (este PC já tem Git).
 
 ### Virada do ano letivo, saída de alunos e lista por turma (versão 5.10.0, 26/10/2026)
 Pedido do Kevin: usar o app por muitos anos — trocar o ano letivo e a série de cada aluno, separando quem saiu.
