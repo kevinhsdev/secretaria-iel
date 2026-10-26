@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/10/2026**, versão **5.12.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.12.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -359,6 +359,10 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   (o servidor manda `faltam_ch` além de `faltam`).
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Olho para mostrar a senha (versão 5.12.1, 26/10/2026)
+Pedido do Kevin: botão para ver a senha no login. `olhoNaSenha(raiz)` em app.js põe um botão de olho dentro de todo campo de senha
+da raiz (login, criar/trocar senha e tela bloqueada). Volta a esconder ao enviar. Classes `.senha-caixa`/`.senha-olho` em app.css.
 
 ### Endereço seguro (https) — tira o "Não seguro" (versão 5.12.0, 26/10/2026)
 O Kevin instalou o SEK como app pelo endereço http://192.168.0.38 e o navegador mostra "Não seguro" no alto. Causa: http pela rede.

@@ -263,6 +263,7 @@ window.mostrarBloqueio = () => {
     <div class="acoes" style="margin-top:6px"><button class="btn pri" style="flex:1;justify-content:center">Desbloquear</button>
       <button type="button" class="btn" id="b_sair">Sair</button></div></form>`;
   document.body.appendChild(f);
+  olhoNaSenha(f);
   $('#b_senha', f).focus();
   $('#fb', f).onsubmit = async (ev) => {
     ev.preventDefault();

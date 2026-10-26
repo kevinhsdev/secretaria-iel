@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.12.0';
+const VERSAO = '5.12.1';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -438,6 +438,8 @@ const ICONES = {
   relogio: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   pasta: '<path d="M14 3.2H7.4a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.2a2 2 0 0 0 2-2V8z"/><path d="M14 3.2V8h4.6M9 12.5h6M9 16h4"/>',
   celular: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  olho: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  olho_fechado: '<path d="M10.6 5.6A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.6 6.6C3.9 8.3 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9.4 9.4 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m3 3 18 18"/>',
   cadeado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   chave: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2.5 2.5M14.5 8.5l2 2"/>',
   balcao: '<circle cx="12" cy="7" r="3.2"/><path d="M5.5 20.5v-2.2A4.8 4.8 0 0 1 10.3 13.5h3.4a4.8 4.8 0 0 1 4.8 4.8v2.2"/>',
@@ -480,6 +482,25 @@ function telaAguarde(tituloTxt, textoHtml) {
     <span class="girando" aria-hidden="true"></span><h2>${esc(tituloTxt)}</h2><p>${textoHtml}</p></div></div></div>`;
 }
 
+// Botão de olho dentro de cada campo de senha: mostra/esconde o que foi digitado (útil para quem erra a senha no balcão)
+function olhoNaSenha(raiz = document) {
+  $$('input[type=password]', raiz).forEach((inp) => {
+    if (inp.parentElement.classList.contains('senha-caixa')) return;
+    const caixa = document.createElement('span');
+    caixa.className = 'senha-caixa';
+    inp.replaceWith(caixa);
+    caixa.append(inp);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'senha-olho';
+    const estado = (ver) => { inp.type = ver ? 'text' : 'password'; b.innerHTML = icone(ver ? 'olho_fechado' : 'olho'); b.setAttribute('aria-label', ver ? 'Esconder a senha' : 'Mostrar a senha'); b.title = b.getAttribute('aria-label'); b.setAttribute('aria-pressed', String(ver)); };
+    b.onclick = () => { estado(inp.type === 'password'); inp.focus(); };
+    estado(false);
+    caixa.append(b);
+    // Ao enviar, volta a esconder (o navegador não deve guardar a senha como texto comum)
+    inp.form?.addEventListener('submit', () => estado(false));
+  });
+}
+
 function telaLogin() {
   document.title = 'Entrar — ' + NOME_APP;
   $('#raiz').innerHTML = `
@@ -490,6 +511,7 @@ function telaLogin() {
     <div class="erro" id="e"></div>
     <button class="btn pri">Entrar</button>
   </form></div></div>`;
+  olhoNaSenha($('#f'));
   $('#f').onsubmit = async (ev) => {
     ev.preventDefault();
     try { await api('POST', '/api/login', { login: $('#l').value.trim(), senha: $('#s').value }); iniciar(); }
@@ -509,6 +531,7 @@ function telaTrocarSenha(obrigatoria) {
     <button class="btn pri">Salvar senha</button>
     ${obrigatoria ? '' : '<button type="button" class="btn" id="voltar">Voltar sem trocar</button>'}
   </form></div></div>`;
+  olhoNaSenha($('#f'));
   if (!obrigatoria) $('#voltar').onclick = () => iniciar();
   $('#f').onsubmit = async (ev) => {
     ev.preventDefault();
