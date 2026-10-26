@@ -20,3 +20,8 @@ desktop.ini
 backups/
 RESTAURAR.*
 antes-da-restauracao-*
+
+# Configurações e habilidades do Claude (ficam só neste PC)
+.agents/
+.claude/
+skills-lock.json
