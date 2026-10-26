@@ -3,7 +3,7 @@
 
 // Precisa ser igual ao VERSAO de app/lib/versao.js. Se o navegador carregar telas novas
 // enquanto a janela preta ainda roda o servidor antigo, o app avisa em vez de dar erro feio.
-const VERSAO = '5.12.1';
+const VERSAO = '5.13.0';
 // Nome do app (provisório, escolhido pelo Kevin em 29/09/2026 — ainda pode mudar). Para trocar: aqui e no <title> do index.html.
 const NOME_APP = 'SEK';
 
@@ -258,10 +258,10 @@ function sumirSuave(f) {
   setTimeout(() => copia.remove(), 180);
 }
 
-function modal(tituloTxt, corpoHtml, { onAbrir } = {}) {
+function modal(tituloTxt, corpoHtml, { onAbrir, larga } = {}) {
   const f = document.createElement('div');
   f.className = 'fundo-modal';
-  f.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h2><span>${esc(tituloTxt)}</span><button class="x" aria-label="Fechar">×</button></h2>${corpoHtml}</div>`;
+  f.innerHTML = `<div class="modal${larga ? ' larga' : ''}" role="dialog" aria-modal="true"><h2><span>${esc(tituloTxt)}</span><button class="x" aria-label="Fechar">×</button></h2>${corpoHtml}</div>`;
   const focoAntes = document.activeElement;
   // Fechou a janela (salvou, cancelou ou apertou Esc): o rascunho não serve mais, e o foco volta para onde estava
   const fechar = () => { sumirSuave(f); f.remove(); document.removeEventListener('keydown', tecla); apagarRascunho(tituloTxt); mostrarRascunhos();
@@ -1042,30 +1042,42 @@ function formSaida(a) {
   } });
 }
 
+// Cadastro e edição do aluno, em blocos: Aluno, Mãe, Pai, Responsável financeiro, Endereço (5.13.0)
+const CAMPOS_FORM_ALUNO = ['nome', 'mat', 'serie_chave', 'turma', 'dt_nasc', 'cpf', 'rg', 'ra', 'nis', 'nome_mae', 'cel_mae', 'email_mae', 'nome_pai', 'cel_pai', 'email_pai',
+  'nome_resp', 'cpf_resp', 'rg_resp', 'tel_resp', 'cep', 'endereco', 'bairro', 'cidade', 'uf', 'telefone'];
 function formAluno(a) {
   const novo = !a;
   a = a || {};
   const opSerie = (window.__series || []).map((s) => `<option value="${s.chave}" ${a.serie_chave === s.chave ? 'selected' : ''}>${esc(s.rotulo)}</option>`).join('');
-  const campo = (id, rot, tipo = 'text') => `<div class="campo"><label>${rot}</label><input id="f_${id}" type="${tipo}" value="${esc(a[id] ?? '')}"></div>`;
+  const campo = (id, rot, tipo = 'text', extra = '') => `<div class="campo"><label for="f_${id}">${rot}</label><input id="f_${id}" type="${tipo}" value="${esc(a[id] ?? '')}" ${extra}></div>`;
+  const linha = (cols, html) => `<div class="form-linha" style="--cols:${cols}">${html}</div>`;
+  const secao = (titulo2, html, acao = '') => `<section class="form-secao"><div class="form-secao-cab"><h3>${titulo2}</h3>${acao}</div>${html}</section>`;
   modal(novo ? 'Cadastrar aluno novo' : 'Editar dados do aluno', `
-    <form id="fa"><div class="campos">
-      ${campo('nome', 'Nome completo do aluno *')}${campo('mat', 'Matrícula (ACADESC)')}
-      <div class="campo"><label>${novo ? 'Série que vai cursar *' : 'Série atual'}</label><select id="f_serie_chave">${opSerie}</select></div>
-      ${campo('turma', 'Turma (A, B…)')}${campo('dt_nasc', 'Data de nascimento', 'date')}${campo('cpf', 'CPF do aluno')}
-      ${campo('nome_mae', 'Nome da mãe')}${campo('cel_mae', 'Celular da mãe')}${campo('email_mae', 'E-mail da mãe', 'email')}
-      ${campo('nome_pai', 'Nome do pai')}${campo('cel_pai', 'Celular do pai')}${campo('email_pai', 'E-mail do pai', 'email')}
-      ${campo('nome_resp', 'Responsável financeiro')}${campo('cpf_resp', 'CPF do responsável')}${campo('rg_resp', 'RG do responsável')}
-      ${campo('telefone', 'Outro telefone')}${campo('ra', 'R.A. (SED)')}${campo('rg', 'RG do aluno')}
-      ${campo('endereco', 'Endereço')}${campo('bairro', 'Bairro')}${campo('cidade', 'Cidade')}${campo('cep', 'CEP')}
-    </div>
-    ${novo ? '<div class="dica">Aluno novo: lembre de fazer a consulta SPC/SERASA e de cadastrá-lo também no ACADESC. Depois de importar o ACADESC, os dados serão atualizados pela matrícula.</div>' : ''}
-    <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`,
-  { onAbrir: (el, fechar) => {
+    <form id="fa">
+      ${secao('Aluno', linha('1fr', campo('nome', 'Nome completo *', 'text', 'required'))
+        + linha('2fr 1fr 1fr', `<div class="campo"><label for="f_serie_chave">${novo ? 'Série que vai cursar *' : 'Série atual'}</label><select id="f_serie_chave">${opSerie}</select></div>
+          ${campo('turma', 'Turma (A, B…)')}${campo('mat', 'Matrícula (ACADESC)', 'text', novo ? '' : 'disabled title="A matrícula vem do ACADESC e não muda por aqui"')}`)
+        + linha('repeat(5, 1fr)', `${campo('dt_nasc', 'Nascimento', 'date')}${campo('cpf', 'CPF')}${campo('rg', 'RG')}${campo('ra', 'R.A. (SED)')}${campo('nis', 'NIS')}`))}
+      ${secao('Mãe', linha('2fr 1fr 1.4fr', `${campo('nome_mae', 'Nome')}${campo('cel_mae', 'Celular', 'tel')}${campo('email_mae', 'E-mail', 'email')}`))}
+      ${secao('Pai', linha('2fr 1fr 1.4fr', `${campo('nome_pai', 'Nome')}${campo('cel_pai', 'Celular', 'tel')}${campo('email_pai', 'E-mail', 'email')}`))}
+      ${secao('Responsável financeiro', linha('2fr 1fr 1fr 1fr', `${campo('nome_resp', 'Nome')}${campo('cpf_resp', 'CPF')}${campo('rg_resp', 'RG')}${campo('tel_resp', 'Telefone', 'tel')}`),
+        '<span class="acoes"><button type="button" class="btn peq" data-copiar="mae">Mesmo que a mãe</button><button type="button" class="btn peq" data-copiar="pai">Mesmo que o pai</button></span>')}
+      ${secao('Endereço', linha('1fr 3fr', `${campo('cep', 'CEP')}${campo('endereco', 'Rua e número')}`)
+        + linha('1.4fr 1.4fr .5fr 1fr', `${campo('bairro', 'Bairro')}${campo('cidade', 'Cidade')}${campo('uf', 'UF')}${campo('telefone', 'Telefone de casa')}`))}
+      ${novo ? '<div class="dica">Aluno novo: lembre de fazer a consulta SPC/SERASA e de cadastrá-lo também no ACADESC. Depois de importar o ACADESC, os dados serão atualizados pela matrícula.</div>' : ''}
+      <div class="rodape"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`,
+  { larga: true, onAbrir: (el, fechar) => {
+    // "Mesmo que a mãe/o pai": copia nome e celular para o responsável (CPF e RG continuam para digitar)
+    $$('[data-copiar]', el).forEach((b) => (b.onclick = () => {
+      const q = b.dataset.copiar;
+      $('#f_nome_resp', el).value = $('#f_nome_' + q, el).value;
+      if (!$('#f_tel_resp', el).value) $('#f_tel_resp', el).value = $('#f_cel_' + q, el).value;
+      $('#f_cpf_resp', el).focus();
+    }));
     $('#fa', el).onsubmit = tentar(async (ev) => {
       ev.preventDefault();
       const b = {};
-      ['nome', 'mat', 'serie_chave', 'turma', 'dt_nasc', 'cpf', 'nome_mae', 'cel_mae', 'email_mae', 'nome_pai', 'cel_pai', 'email_pai', 'nome_resp', 'telefone',
-        'cpf_resp', 'rg_resp', 'ra', 'rg', 'endereco', 'bairro', 'cidade', 'cep'].forEach((k) => { b[k] = $('#f_' + k, el).value.trim(); });
+      CAMPOS_FORM_ALUNO.forEach((k) => { b[k] = $('#f_' + k, el).value.trim(); });
       if (novo) {
         const r = await api('POST', '/api/alunos', b);
         await api('PUT', `/api/alunos/${r.id}/rematricula`, { status: 'reservada' });
@@ -1098,7 +1110,10 @@ TELAS.aluno = async (c, id) => {
     aluno: titulo(a.nome), responsavel: titulo((a.nome_resp || a.nome_mae || a.nome_pai || '').split(' ')[0]), serie: a.turma_rotulo,
     serie_destino: f.destino?.rotulo || '', documentos: faltam.map((d) => d.nome).join(', '), prazo: f.prazo ? dataBR(f.prazo) : '(a combinar)', whatsapp: a.whatsapp,
   };
-  const dado = (rot, v) => `<div class="dado">${rot}<b>${esc(v || '—')}</b></div>`;
+  const dado = (rot, v) => `<div class="dado">${rot}<b>${v && v.html ? v.html : esc(v || '—')}</b></div>`;
+  // Blocos da ficha (5.13.0): celular vira link do WhatsApp; vazio mostra um traço
+  const bloco = (t, html) => `<section class="dados-bloco"><h3>${t}</h3>${html}</section>`;
+  const fone = (t) => { const d = String(t || '').replace(/\D/g, ''); const n = d.replace(/^0/, ''); return n.length >= 10 ? { html: `<a href="https://wa.me/${n.length >= 12 ? n : '55' + n}" target="_blank" rel="noopener" title="Abrir no WhatsApp">${esc(t)}</a>` } : t; };
   c.innerHTML = `
   <p class="nao-imprimir" style="margin:0 0 10px"><a href="#/alunos">← Alunos</a></p>
   ${a.ativo ? '' : `<div class="faixa-demo">${icone('alerta')}<span><b>Ex-aluno: ${esc(MOTIVOS_SAIDA[a.saida_motivo] || 'inativo')}</b>${a.saida_data ? ' em ' + dataBR(a.saida_data) : ''}${a.saida_ano ? ` · último ano cursado: ${esc(a.saida_ano)}` : ''}${a.saida_obs ? ' · ' + esc(a.saida_obs) : ''}</span>
@@ -1142,14 +1157,14 @@ TELAS.aluno = async (c, id) => {
       <p class="dado" style="margin-top:10px">Pasta do prontuário: ${f.pastas.length ? f.pastas.map((p) => `<span class="mono">${esc(p.turma)}\\${esc(titulo(a.nome))}</span> (${p.arquivos.length} PDFs)`).join(', ') : '<b>nenhuma pasta encontrada com o nome do aluno</b>'}</p>
     </div>
   </div>
-  <div class="cartao" style="margin-top:14px"><h2>Dados e contatos</h2>
-    <div class="campos">
-      ${dado('Nascimento', dataBR(a.dt_nasc))}${dado('CPF do aluno', a.cpf)}${dado('NIS', a.nis)}
-      ${dado('Mãe', titulo(a.nome_mae))}${dado('Celular da mãe', a.cel_mae || a.tel_mae)}${dado('E-mail da mãe', a.email_mae)}
-      ${dado('Pai', titulo(a.nome_pai))}${dado('Celular do pai', a.cel_pai || a.tel_pai)}${dado('E-mail do pai', a.email_pai)}
-      ${dado('Responsável financeiro', titulo(a.nome_resp))}${dado('Telefone', a.telefone)}${dado('E-mail', a.email)}
-      ${dado('CPF do responsável', a.cpf_resp)}${dado('RG do responsável', a.rg_resp)}${dado('R.A. / RG do aluno', [a.ra, a.rg].filter(Boolean).join(' · '))}
-      ${dado('Endereço', [a.endereco, a.bairro, a.cidade, a.cep].filter(Boolean).join(' · '))}
+  <div class="cartao" style="margin-top:14px"><div class="acoes" style="justify-content:space-between"><h2 style="margin:0">Dados e contatos</h2>
+      <button class="btn peq" id="btnEditar2">${icone('rematricula')}Editar</button></div>
+    <div class="dados-blocos">
+      ${bloco('Aluno', dado('Nascimento', dataBR(a.dt_nasc)) + dado('CPF', a.cpf) + dado('RG', a.rg) + dado('R.A. (SED)', a.ra) + dado('NIS', a.nis))}
+      ${bloco('Mãe', dado('Nome', titulo(a.nome_mae)) + dado('Celular', fone(a.cel_mae || a.tel_mae)) + dado('E-mail', a.email_mae))}
+      ${bloco('Pai', dado('Nome', titulo(a.nome_pai)) + dado('Celular', fone(a.cel_pai || a.tel_pai)) + dado('E-mail', a.email_pai))}
+      ${bloco('Responsável financeiro', dado('Nome', titulo(a.nome_resp)) + dado('CPF', a.cpf_resp) + dado('RG', a.rg_resp) + dado('Telefone', fone(a.tel_resp)) + dado('E-mail', a.email))}
+      ${bloco('Endereço', dado('Rua e número', a.endereco) + dado('Bairro', a.bairro) + dado('Cidade', [a.cidade, a.uf].filter(Boolean).join(' / ')) + dado('CEP', a.cep) + dado('Telefone de casa', fone(a.telefone)))}
     </div></div>
   <div id="fichaEtapa2"></div>
   <div id="fichaEtapa3"></div>
@@ -1173,6 +1188,7 @@ TELAS.aluno = async (c, id) => {
   $('#btnZap').onclick = tentar(() => janelaWhats(dadosMsg, faltam.length && matriculado ? 0 : r.status === 'concluida' ? 2 : 1));
   $('#btnPasta').onclick = tentar(async () => { const r2 = await api('POST', `/api/alunos/${a.id}/abrir-pasta`); toast('Abrindo ' + r2.pasta); });
   $('#btnEditar').onclick = () => formAluno(a);
+  $('#btnEditar2').onclick = () => formAluno(a);
   if ($('#btnSaida')) $('#btnSaida').onclick = () => formSaida(a);
   if ($('#btnReativar')) $('#btnReativar').onclick = tentar(async () => {
     if (!(await confirmar(`Reativar ${titulo(a.nome)}? Volta para a lista de alunos.`, 'Reativar'))) return;
@@ -1678,18 +1694,22 @@ TELAS.interessados = async (c) => {
 
 function formInteressado(i) {
   const novo = !i; i = i || { data: hojeIso(), status: 'novo' };
-  const campo = (id, rot, tipo = 'text') => `<div class="campo"><label>${rot}</label><input id="i_${id}" type="${tipo}" value="${esc(i[id] ?? '')}"></div>`;
-  modal(novo ? 'Novo contato' : 'Editar contato', `<form id="fi"><div class="campos">
-    ${campo('aluno', 'Nome do aluno *')}${campo('dt_nasc', 'Nascimento', 'date')}
-    <div class="campo"><label>Série de interesse</label><select id="i_serie_interesse"><option value=""></option>${window.__series.map((s) => `<option ${i.serie_interesse === s.rotulo ? 'selected' : ''}>${esc(s.rotulo)}</option>`).join('')}</select></div>
-    ${campo('responsavel', 'Responsável')}${campo('contato', 'Telefone / WhatsApp')}${campo('email', 'E-mail', 'email')}
-    ${campo('escola_atual', 'Escola atual')}${campo('endereco', 'Bairro / CEP')}
-    <div class="campo"><label>Como chegou</label><select id="i_tipo_contato">${['', 'Presencial', 'WhatsApp', 'Telefone', 'E-mail', 'Indicação', 'Redes sociais'].map((o) => `<option ${i.tipo_contato === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
-    ${campo('data', 'Data do contato', 'date')}${campo('ultimo_contato', 'Último retorno', 'date')}
-    <div class="campo"><label>Situação</label><select id="i_status">${Object.entries(STATUS_INT).map(([k, v]) => `<option value="${k}" ${i.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-  </div><div class="campo" style="margin-top:12px"><label>Observação</label><input id="i_obs" value="${esc(i.obs || '')}"></div>
+  const campo = (id, rot, tipo = 'text') => `<div class="campo"><label for="i_${id}">${rot}</label><input id="i_${id}" type="${tipo}" value="${esc(i[id] ?? '')}"></div>`;
+  const sel = (id, rot, opcoes) => `<div class="campo"><label for="i_${id}">${rot}</label><select id="i_${id}">${opcoes}</select></div>`;
+  const linha = (cols, html) => `<div class="form-linha" style="--cols:${cols}">${html}</div>`;
+  const secao = (t, html) => `<section class="form-secao"><div class="form-secao-cab"><h3>${t}</h3></div>${html}</section>`;
+  modal(novo ? 'Novo contato' : 'Editar contato', `<form id="fi">
+    ${secao('A criança', linha('2fr 1fr', campo('aluno', 'Nome *') + campo('dt_nasc', 'Nascimento', 'date'))
+      + linha('1fr 1fr', sel('serie_interesse', 'Série de interesse', `<option value=""></option>${window.__series.map((s) => `<option ${i.serie_interesse === s.rotulo ? 'selected' : ''}>${esc(s.rotulo)}</option>`).join('')}`)
+        + campo('escola_atual', 'Escola atual')))}
+    ${secao('Responsável', linha('1.4fr 1fr', campo('responsavel', 'Nome') + campo('contato', 'Telefone / WhatsApp', 'tel'))
+      + linha('1.4fr 1fr', campo('email', 'E-mail', 'email') + campo('endereco', 'Bairro / CEP')))}
+    ${secao('Acompanhamento', linha('repeat(4, 1fr)', sel('tipo_contato', 'Como chegou', ['', 'Presencial', 'WhatsApp', 'Telefone', 'E-mail', 'Indicação', 'Redes sociais'].map((o) => `<option ${i.tipo_contato === o ? 'selected' : ''}>${o}</option>`).join(''))
+        + campo('data', 'Data do contato', 'date') + campo('ultimo_contato', 'Último retorno', 'date')
+        + sel('status', 'Situação', Object.entries(STATUS_INT).map(([k, v]) => `<option value="${k}" ${i.status === k ? 'selected' : ''}>${v}</option>`).join('')))
+      + linha('1fr', campo('obs', 'Observação')))}
   <div class="rodape">${novo ? '' : '<button type="button" class="btn perigo" id="del" style="margin-right:auto">Excluir</button>'}<button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri">Salvar</button></div></form>`,
-  { onAbrir: (el, fechar) => {
+  { larga: true, onAbrir: (el, fechar) => {
     $('#fi', el).onsubmit = tentar(async (ev) => {
       ev.preventDefault();
       const b = {};

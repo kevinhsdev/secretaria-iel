@@ -314,7 +314,7 @@ td.acoes { display: table-cell; white-space: nowrap; text-align: right; }
 td.acoes > * + * { margin-left: 6px; }
 td.acoes > .nao-imprimir, td.acoes > [hidden] { margin-left: 0; }
 .filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
-input[type=text], input[type=date], input[type=time], input[type=number], input[type=password], input[type=email], input[type=search], input:not([type]), select, textarea {
+input[type=text], input[type=date], input[type=time], input[type=number], input[type=password], input[type=email], input[type=tel], input[type=search], input:not([type]), select, textarea {
   padding: 9px 12px; border: 1px solid var(--borda); border-radius: var(--raio-p); background: var(--superficie); min-width: 0; transition: border-color .15s, box-shadow .2s; }
 @media (hover: hover) and (pointer: fine) { input:hover:not(:focus):not(:disabled), select:hover:not(:focus), textarea:hover:not(:focus) { border-color: color-mix(in srgb, var(--borda) 55%, var(--texto-2)); } }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--azul-2); box-shadow: var(--foco); }
@@ -324,6 +324,21 @@ textarea { width: 100%; min-height: 160px; resize: vertical; line-height: 1.5; }
 .campo input, .campo select { width: 100%; }
 .dado { font-size: 12.5px; color: var(--texto-2); }
 .dado b { display: block; color: var(--texto); font-size: 14px; font-weight: 500; word-break: break-word; }
+/* 5.13.0: formulários em seções (cadastro do aluno, novo contato) e blocos de dados na ficha */
+.modal.larga { width: min(800px, 100%); }
+.form-secao + .form-secao { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
+.form-secao-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; min-height: 30px; }
+.form-secao-cab h3, .dados-bloco h3 { margin: 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--texto-2); font-weight: 600; font-family: var(--f-texto); }
+.form-linha { display: grid; grid-template-columns: var(--cols, 1fr); gap: 12px; }
+.form-linha + .form-linha { margin-top: 12px; }
+.form-linha .campo input, .form-linha .campo select { width: 100%; min-width: 0; }
+.form-secao ~ .dica { margin-top: 18px; }
+.dados-blocos { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px 26px; margin-top: 14px; }
+.dados-bloco { display: grid; gap: 9px; align-content: start; }
+.dados-bloco h3 { padding-bottom: 6px; border-bottom: 1px solid var(--borda); }
+.dados-bloco .dado a { color: var(--azul-2); text-decoration: none; }
+.dados-bloco .dado a:hover { text-decoration: underline; }
+@media (max-width: 620px) { .form-linha { grid-template-columns: 1fr; } }
 
 /* ───────────── Ficha do aluno ───────────── */
 .ficha-topo { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
@@ -466,6 +481,9 @@ svg.ic { width: 19px; height: 19px; flex: 0 0 19px; }
 .aviso-fixo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--amarelo-claro); color: var(--aviso-txt); padding: 10px clamp(16px, 3vw, 40px); font-size: 13.5px; }
 .aviso-fixo.perigo { background: var(--vermelho-claro); color: var(--vermelho); }
 .aviso-fixo .btn { margin-left: 4px; }
+.aviso-fixo.amarelo { background: var(--amarelo); color: #3a2b00; }
+.aviso-fixo .x { margin-left: auto; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; padding: 2px 8px; border-radius: 6px; cursor: pointer; opacity: .7; }
+.aviso-fixo .x:hover { opacity: 1; background: rgba(0,0,0,.1); }
 
 /* Tela bloqueada */
 .bloqueio { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: var(--fundo); }

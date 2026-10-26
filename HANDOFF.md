@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/10/2026**, versão **5.12.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.13.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -359,6 +359,17 @@ O Kevin não achou onde lançar as notas dos anos anteriores: existia, mas era s
   (o servidor manda `faltam_ch` além de `faltam`).
 - Testado no Edge headless com a demonstração: etiqueta → abre no ano certo, troca de ano pelos botões, 4 bimestres de um ano anterior
   → média 8,5 → salvo no banco e o ano sai de "falta lançar".
+
+### Formulários de aluno organizados em seções (versão 5.13.0, 26/10/2026)
+Pedido do Kevin: o cadastro "parecia só um monte de caixas jogadas". Escolhido por ele: **seções com título**.
+- `formAluno` (app.js): seções Aluno / Mãe / Pai / Responsável financeiro / Endereço, com helpers `campo`, `linha(cols, html)` (`.form-linha`,
+  colunas por `--cols`) e `secao(titulo, html, acao)`. Botões "Mesmo que a mãe/o pai" copiam nome e celular para o responsável financeiro.
+  Matrícula fica travada ao editar. `modal()` aceita `{ onAbrir, larga }` (`.modal.larga` = 800px).
+- Ficha › Dados e contatos: 5 blocos lado a lado (`.dados-blocos`/`.dados-bloco`), celular vira link do WhatsApp, botão Editar no bloco.
+- Interessados › Novo contato: seções A criança / Responsável / Acompanhamento (ids `i_*` iguais).
+- No celular tudo vira 1 coluna. `input[type=tel]` entrou no estilo comum dos campos (antes ficava cinza).
+- Aviso "cópias no mesmo disco" (etapa4.js): agora em **amarelo forte** (`.aviso-fixo.amarelo`), em qualquer tela, com **×** para fechar.
+  Fechar vale só até reabrir o app/F5 (variável `avisoHdFechado`, de propósito sem localStorage).
 
 ### Olho para mostrar a senha (versão 5.12.1, 26/10/2026)
 Pedido do Kevin: botão para ver a senha no login. `olhoNaSenha(raiz)` em app.js põe um botão de olho dentro de todo campo de senha

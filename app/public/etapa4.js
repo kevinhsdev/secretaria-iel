@@ -11,6 +11,7 @@ function idadeBR(horas) {
 }
 
 // ───────────── aviso de backup atrasado (aparece em qualquer tela) ─────────────
+let avisoHdFechado = false; // só na memória da página: abrir o app de novo (ou F5) mostra outra vez
 window.avisosEtapa4 = async () => {
   const caixa = $('#avisos');
   if (!caixa) return;
@@ -26,11 +27,12 @@ window.avisosEtapa4 = async () => {
       Se este computador falhar, os dados da secretaria se perdem.
       ${EU.perfil === 'admin' ? '<button class="btn peq" id="avBackup">Fazer cópia agora</button> <a class="btn peq" href="#/config/backup">Configurar</a>' : 'Avise a administração.'}</div>`);
   }
-  // Só no Início, para não pesar em toda tela: a cópia no mesmo HD do banco some junto se o HD queimar
-  if (e.mesmo_disco && !e.atrasado && !e.pendente && ['', '#', '#/'].includes(location.hash)) {
-    partes.push(`<div class="aviso-fixo">${icone('escudo')}<b>As cópias de segurança estão no mesmo disco do sistema.</b>
+  // A cópia no mesmo HD do banco some junto se o HD queimar. Aparece toda vez que o app abre; o × esconde até abrir de novo.
+  if (e.mesmo_disco && !e.atrasado && !e.pendente && !avisoHdFechado) {
+    partes.push(`<div class="aviso-fixo amarelo">${icone('escudo')}<b>As cópias de segurança estão no mesmo disco do sistema.</b>
       Se o HD deste computador queimar, o banco e as cópias se perdem juntos. Aponte a pasta das cópias para um pen drive, HD externo ou o OneDrive.
-      ${EU.perfil === 'admin' ? '<a class="btn peq" href="#/config/backup">Mudar a pasta</a>' : 'Avise a administração.'}</div>`);
+      ${EU.perfil === 'admin' ? '<a class="btn peq" href="#/config/backup">Mudar a pasta</a>' : 'Avise a administração.'}
+      <button class="x" id="avHdFechar" aria-label="Fechar aviso" title="Fechar (volta a aparecer quando abrir o app de novo)">×</button></div>`);
   }
   caixa.innerHTML = partes.join('');
   if ($('#avBackup')) $('#avBackup').onclick = tentar(async () => {
@@ -38,6 +40,7 @@ window.avisosEtapa4 = async () => {
     toast('Cópia gravada: ' + r.arquivo);
     window.avisosEtapa4();
   });
+  if ($('#avHdFechar')) $('#avHdFechar').onclick = () => { avisoHdFechado = true; $('#avHdFechar').parentElement.remove(); };
   if ($('#avReiniciar')) $('#avReiniciar').onclick = tentar(reiniciarSistema);
   if ($('#avCancelar')) $('#avCancelar').onclick = tentar(async () => {
     await api('DELETE', '/api/backups/restaurar'); toast('Restauração cancelada'); window.avisosEtapa4();
