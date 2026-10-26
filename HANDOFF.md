@@ -1,7 +1,7 @@
 # HANDOFF — Secretaria IEL
 
 > Documento de passagem para continuar o projeto em outro computador ou em outro chat.
-> Última atualização: **26/10/2026**, versão **5.13.0** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
+> Última atualização: **26/10/2026**, versão **5.13.1** (Etapa 4 + início, lixeira, busca global, queda do servidor, edição simultânea, ajuda, desempenho, **histórico escolar e vivências**, **visual premium**, **visual novo 5.0**, **importar boletim e matriz curricular**). O que vem a seguir está em §7.
 
 ---
 
@@ -368,7 +368,7 @@ Pedido do Kevin: o cadastro "parecia só um monte de caixas jogadas". Escolhido 
 - Ficha › Dados e contatos: 5 blocos lado a lado (`.dados-blocos`/`.dados-bloco`), celular vira link do WhatsApp, botão Editar no bloco.
 - Interessados › Novo contato: seções A criança / Responsável / Acompanhamento (ids `i_*` iguais).
 - No celular tudo vira 1 coluna. `input[type=tel]` entrou no estilo comum dos campos (antes ficava cinza).
-- Aviso "cópias no mesmo disco" (etapa4.js): agora em **amarelo forte** (`.aviso-fixo.amarelo`), em qualquer tela, com **×** para fechar.
+- Aviso "cópias no mesmo disco" (etapa4.js): agora em **vermelho meio transparente com o texto correndo (letreiro)** (`.aviso-fixo.letreiro`, 5.13.1, pedido do Kevin; mouse em cima pausa, "Mudar a pasta" fica fixo; sem animação se o Windows pedir menos movimento), em qualquer tela, com **×** para fechar.
   Fechar vale só até reabrir o app/F5 (variável `avisoHdFechado`, de propósito sem localStorage).
 
 ### Olho para mostrar a senha (versão 5.12.1, 26/10/2026)

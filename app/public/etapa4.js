@@ -29,9 +29,11 @@ window.avisosEtapa4 = async () => {
   }
   // A cópia no mesmo HD do banco some junto se o HD queimar. Aparece toda vez que o app abre; o × esconde até abrir de novo.
   if (e.mesmo_disco && !e.atrasado && !e.pendente && !avisoHdFechado) {
-    partes.push(`<div class="aviso-fixo amarelo">${icone('escudo')}<b>As cópias de segurança estão no mesmo disco do sistema.</b>
+    partes.push(`<div class="aviso-fixo letreiro">${icone('alerta')}
+      <div class="letreiro-janela"><span><b>As cópias de segurança estão no mesmo disco do sistema.</b>
       Se o HD deste computador queimar, o banco e as cópias se perdem juntos. Aponte a pasta das cópias para um pen drive, HD externo ou o OneDrive.
-      ${EU.perfil === 'admin' ? '<a class="btn peq" href="#/config/backup">Mudar a pasta</a>' : 'Avise a administração.'}
+      ${EU.perfil === 'admin' ? '' : 'Avise a administração.'}</span></div>
+      ${EU.perfil === 'admin' ? '<a class="btn peq" href="#/config/backup">Mudar a pasta</a>' : ''}
       <button class="x" id="avHdFechar" aria-label="Fechar aviso" title="Fechar (volta a aparecer quando abrir o app de novo)">×</button></div>`);
   }
   caixa.innerHTML = partes.join('');
